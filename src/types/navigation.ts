@@ -2,7 +2,7 @@ export type NavKey =
   | 'dashboard'
   | 'create-persona'
   | 'content-pillar'
-  | 'generate-content'
+  | 'generate-topic'
   | 'auto-post'
   | 'connecting-apps'
 

@@ -46,6 +46,12 @@ export function AppIcon({ name }: AppIconProps) {
           <path d="M11 5h2v14h-2zM5 11h14v2H5z" />
         </svg>
       )
+    case 'minus':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 11h14v2H5z" />
+        </svg>
+      )
     case 'check':
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">

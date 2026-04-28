@@ -4,8 +4,10 @@ import { AuthPage } from './pages/AuthPage'
 import { Sidebar } from './components/Sidebar'
 import { CreateContentPillarPage } from './pages/CreateContentPillarPage'
 import { CreatePersonaPage } from './pages/CreatePersonaPage'
+import { AutoPostPage } from './pages/AutoPostPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ConnectingAppsPage } from './pages/ConnectingAppsPage'
+import { GenerateContentPage } from './pages/GenerateContentPage'
 import type { NavKey } from './types/navigation'
 import { ToastProvider } from './components/Toast'
 import {
@@ -210,6 +212,10 @@ function App() {
               <CreatePersonaPage personaConfig={personaConfig} onSaved={handlePersonaSaved} />
             ) : activePage === 'content-pillar' ? (
               <CreateContentPillarPage />
+            ) : activePage === 'generate-topic' ? (
+              <GenerateContentPage userId={currentUser?.id || ''} />
+            ) : activePage === 'auto-post' ? (
+              <AutoPostPage userId={currentUser?.id || ''} />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage userId={currentUser?.id || ''} />
             ) : (

@@ -13,7 +13,7 @@ const workspaceMenu: MenuItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
   { key: 'create-persona', label: 'Create Persona', icon: 'user' },
   { key: 'content-pillar', label: 'Content Pillar', icon: 'layers' },
-  { key: 'generate-content', label: 'Generate Content', icon: 'sparkles' },
+  { key: 'generate-topic', label: 'Generate Topic', icon: 'sparkles' },
   { key: 'auto-post', label: 'Auto Post', icon: 'calendar' },
 ]
 

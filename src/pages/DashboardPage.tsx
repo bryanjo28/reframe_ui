@@ -77,7 +77,7 @@ const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: st
     eyebrow: 'Reframe Overview',
     title: 'Semua workflow inti Reframe dalam satu tempat.',
     description:
-      'Mulai dari persona, content pillar, generate content, sampai auto post tanpa dashboard yang terlalu padat.',
+      'Mulai dari persona, content pillar, generate topic, sampai auto post tanpa dashboard yang terlalu padat.',
   },
   'create-persona': {
     eyebrow: 'Reframe Persona',
@@ -91,7 +91,7 @@ const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: st
     description:
       'Fokus utamanya ada di template content, penyempurnaan wording, dan penyisipan affiliate link yang relevan di dalam Reframe.',
   },
-  'generate-content': {
+  'generate-topic': {
     eyebrow: 'Reframe Generator',
     title: 'Pilih persona dan pilar, lalu hasilkan batch content dalam sekali jalan.',
     description:
@@ -99,9 +99,9 @@ const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: st
   },
   'auto-post': {
     eyebrow: 'Reframe Scheduler',
-    title: 'Atur schedule posting dari content library dengan fixed time atau random slot.',
+    title: 'Pilih topic dari tabel lalu lanjutkan ke flow auto post.',
     description:
-      'Queue posting, status schedule, dan tindakan hapus jadwal disusun supaya operasional harian di Reframe lebih praktis.',
+      'Tampilan awalnya sederhana: lihat topic, buka detail, lalu nanti baru masuk ke langkah schedule posting.',
   },
   'connecting-apps': {
     eyebrow: 'Reframe Connections',
@@ -124,7 +124,7 @@ export function DashboardPage({ activePage }: { activePage: NavKey }) {
         </div>
         <div className="hero-actions">
           <button className="ghost-button">Open Persona</button>
-          <button className="primary-button">Generate Content</button>
+          <button className="primary-button">Generate Topic</button>
         </div>
       </section>
 
