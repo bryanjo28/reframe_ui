@@ -3,6 +3,7 @@ import './App.css'
 import { AuthPage } from './pages/AuthPage'
 import { Sidebar } from './components/Sidebar'
 import { CreateContentPillarPage } from './pages/CreateContentPillarPage'
+import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
 import { CreatePersonaPage } from './pages/CreatePersonaPage'
 import { AutoPostPage } from './pages/AutoPostPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -24,6 +25,30 @@ import {
 
 type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'error'
 type PersonaStatus = 'idle' | 'loading' | 'ready' | 'error'
+type StandaloneAuthMode = 'login' | 'register'
+const DEMO_SESSION_STORAGE_KEY = 'reframe.demoSessionUserId'
+
+function getStoredDemoSessionUserId() {
+  if (typeof localStorage === 'undefined') {
+    return undefined
+  }
+
+  const value = localStorage.getItem(DEMO_SESSION_STORAGE_KEY)
+
+  return value && value.trim() ? value : undefined
+}
+
+function setStoredDemoSessionUserId(userId?: string) {
+  if (typeof localStorage === 'undefined') {
+    return
+  }
+
+  if (userId) {
+    localStorage.setItem(DEMO_SESSION_STORAGE_KEY, userId)
+  } else {
+    localStorage.removeItem(DEMO_SESSION_STORAGE_KEY)
+  }
+}
 
 function App() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
@@ -31,32 +56,37 @@ function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [activePage, setActivePage] = useState<NavKey>('dashboard')
   const [personaStatus, setPersonaStatus] = useState<PersonaStatus>('idle')
-  const [personaError, setPersonaError] = useState('')
   const [personaConfig, setPersonaConfig] = useState<PersonaConfigRecord | null>(null)
+  const [demoModeActive, setDemoModeActive] = useState(false)
+  const [demoAccessGranted, setDemoAccessGranted] = useState(false)
+  const [showStandaloneAuth, setShowStandaloneAuth] = useState(false)
+  const [standaloneAuthMode, setStandaloneAuthMode] = useState<StandaloneAuthMode>('register')
+  const [authCancelSignal, setAuthCancelSignal] = useState(0)
+
+  const loadPersonaConfig = useCallback(async (userId: string) => {
+    setPersonaStatus('loading')
+
+    try {
+      const config = await findPersonaConfigForUser(userId)
+      setPersonaConfig(config)
+      setPersonaStatus('ready')
+    } catch (error) {
+      setPersonaConfig(null)
+      setPersonaStatus('error')
+    }
+  }, [])
 
   function resetWorkspaceState() {
     setCurrentUser(null)
     setPersonaConfig(null)
     setActivePage('dashboard')
     setPersonaStatus('idle')
-    setPersonaError('')
+    setDemoModeActive(false)
+    setDemoAccessGranted(false)
+    setShowStandaloneAuth(false)
+    setStandaloneAuthMode('register')
+    setAuthCancelSignal(0)
   }
-
-  const loadPersonaConfig = useCallback(async (userId: string) => {
-    setPersonaStatus('loading')
-    setPersonaError('')
-
-    try {
-      const config = await findPersonaConfigForUser(userId)
-      setPersonaConfig(config)
-      setActivePage(config ? 'dashboard' : 'create-persona')
-      setPersonaStatus('ready')
-    } catch (error) {
-      setPersonaConfig(null)
-      setPersonaError(error instanceof Error ? error.message : 'Gagal memuat persona config.')
-      setPersonaStatus('error')
-    }
-  }, [])
 
   const hydrateAuthState = useCallback(async () => {
     setAuthStatus('loading')
@@ -74,7 +104,20 @@ function App() {
 
       setCurrentUser(user)
       setAuthStatus('authenticated')
-      await loadPersonaConfig(user.id)
+      setShowStandaloneAuth(false)
+
+      const pendingDemoUserId = getStoredDemoSessionUserId()
+      const shouldResumeDemoSession = pendingDemoUserId === user.id
+
+      setDemoAccessGranted(false)
+
+      if (shouldResumeDemoSession) {
+        setDemoModeActive(true)
+      } else {
+        setDemoModeActive(false)
+      }
+
+      void loadPersonaConfig(user.id)
     } catch (error) {
       clearAuthSession()
       resetWorkspaceState()
@@ -87,16 +130,23 @@ function App() {
     void hydrateAuthState()
   }, [hydrateAuthState])
 
-  const handleAuthenticated = useCallback(
-    async (session: AuthSession) => {
-      setCurrentUser(session.user)
-      setAuthStatus('authenticated')
-      setPersonaStatus('idle')
-      setPersonaError('')
-      await loadPersonaConfig(session.user.id)
-    },
-    [loadPersonaConfig],
-  )
+  const handleStandaloneAuthenticated = useCallback(async (session: AuthSession) => {
+    setCurrentUser(session.user)
+    setAuthStatus('authenticated')
+    setShowStandaloneAuth(false)
+    setActivePage('dashboard')
+    setDemoAccessGranted(false)
+
+    if (standaloneAuthMode === 'register') {
+      setStoredDemoSessionUserId(session.user.id)
+      setDemoModeActive(true)
+    } else {
+      setStoredDemoSessionUserId(undefined)
+      setDemoModeActive(false)
+    }
+
+    await loadPersonaConfig(session.user.id)
+  }, [loadPersonaConfig, standaloneAuthMode])
 
   const handleLogout = useCallback(async () => {
     try {
@@ -104,10 +154,20 @@ function App() {
     } catch {
       clearAuthSession()
     } finally {
+      setStoredDemoSessionUserId(undefined)
       resetWorkspaceState()
       setAuthStatus('unauthenticated')
     }
   }, [])
+
+  const continueToDashboardFromDemo = useCallback(async () => {
+    setStoredDemoSessionUserId(undefined)
+    setDemoModeActive(false)
+    setDemoAccessGranted(false)
+    setShowStandaloneAuth(false)
+    setAuthCancelSignal((current) => current + 1)
+    await hydrateAuthState()
+  }, [hydrateAuthState])
 
   function handlePersonaSaved(nextConfig: PersonaConfigRecord) {
     setPersonaConfig(nextConfig)
@@ -143,8 +203,74 @@ function App() {
       </div>
     )
   } else if (authStatus === 'unauthenticated') {
-    content = <AuthPage onAuthenticated={handleAuthenticated} />
-  } else if (personaStatus === 'loading' || personaStatus === 'idle') {
+    content = (
+      <>
+        <main className="content-area setup-mode setup-immersive">
+          <CreateContentDemoPage
+            isAuthenticated={false}
+            onRequestAuth={(mode) => {
+              setStandaloneAuthMode(mode)
+              setShowStandaloneAuth(true)
+            }}
+            onDemoSessionStart={() => setDemoModeActive(true)}
+            authCancelSignal={authCancelSignal}
+            onDemoSessionEnd={() => {
+              void continueToDashboardFromDemo()
+            }}
+          />
+        </main>
+
+        {showStandaloneAuth ? (
+          <div className="auth-overlay">
+            <AuthPage
+              onAuthenticated={handleStandaloneAuthenticated}
+              initialMode={standaloneAuthMode}
+              allowRegister
+              onBack={() => {
+                setShowStandaloneAuth(false)
+                setDemoModeActive(false)
+                setAuthCancelSignal((current) => current + 1)
+              }}
+            />
+          </div>
+        ) : null}
+      </>
+    )
+  } else if (demoModeActive) {
+    content = (
+      <>
+        <main className="content-area setup-mode setup-immersive">
+          <CreateContentDemoPage
+            isAuthenticated
+            onRequestAuth={(mode) => {
+              setStandaloneAuthMode(mode)
+              setShowStandaloneAuth(true)
+            }}
+            onDemoSessionStart={() => setDemoModeActive(true)}
+            authCancelSignal={authCancelSignal}
+            onDemoSessionEnd={() => {
+              void continueToDashboardFromDemo()
+            }}
+          />
+        </main>
+
+        {showStandaloneAuth ? (
+          <div className="auth-overlay">
+            <AuthPage
+              onAuthenticated={handleStandaloneAuthenticated}
+              initialMode={standaloneAuthMode}
+              allowRegister
+              onBack={() => {
+                setShowStandaloneAuth(false)
+                setDemoModeActive(true)
+                setAuthCancelSignal((current) => current + 1)
+              }}
+            />
+          </div>
+        ) : null}
+      </>
+    )
+  }  else if (personaStatus === 'loading' || personaStatus === 'idle') {
     content = (
       <div className="bootstrap-shell">
         <section className="panel bootstrap-card">
@@ -162,39 +288,23 @@ function App() {
       <div className="bootstrap-shell">
         <section className="panel bootstrap-card">
           <p className="eyebrow">Bootstrapping</p>
-          <h1>Gagal memuat persona config</h1>
-          <p className="page-description">{personaError}</p>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => void loadPersonaConfig(currentUser?.id || '')}
-            disabled={!currentUser?.id}
-          >
+          <h1>Memuat dashboard...</h1>
+          <p className="page-description">
+            Persona config belum terbaca, jadi kami lanjutkan ke dashboard dulu.
+          </p>
+          <button className="primary-button" type="button" onClick={() => void hydrateAuthState()}>
             Coba lagi
           </button>
         </section>
       </div>
     )
-  } else if (!personaConfig) {
+  } else if (!personaConfig && !demoModeActive && !demoAccessGranted) {
     content = (
-      <div className="dashboard-shell">
-        <Sidebar
-          activePage={activePage}
-          onNavigate={setActivePage}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-        />
-
-        <main className="content-area setup-mode">
-          <div key={activePage} className="page-transition">
-            <CreatePersonaPage
-              personaConfig={null}
-              isInitialSetup
-              onSaved={handlePersonaSaved}
-            />
-          </div>
-        </main>
-      </div>
+      <main className="content-area setup-mode setup-immersive">
+        <div className="page-transition">
+          <DashboardPage activePage={activePage} />
+        </div>
+      </main>
     )
   } else {
     content = (

@@ -48,6 +48,7 @@ const personaFields: PersonaField[] = [
     key: 'targetAudience',
     label: 'Target Audience',
     placeholder: 'Contoh: Creator pemula, affiliate marketer, dan small business owner',
+    multiline: true,
   },
   {
     key: 'nicheTopicFocus',
@@ -58,6 +59,7 @@ const personaFields: PersonaField[] = [
     key: 'contentStyle',
     label: 'Content Style',
     placeholder: 'Contoh: Singkat, padat, mudah di-scan, dan insight-driven',
+    multiline: true,
   },
   {
     key: 'tone',
@@ -74,88 +76,13 @@ const personaFields: PersonaField[] = [
     key: 'goal',
     label: 'Goal',
     placeholder: 'Contoh: Bangun trust, tingkatkan engagement, dan dorong klik affiliate link',
-  },
-  {
-    key: 'posisiPersonaSaatIni',
-    label: 'Posisi Persona Saat Ini',
-    placeholder: 'Contoh: Sudah punya pengalaman, tapi positioning masih belum konsisten',
     multiline: true,
-  },
-  {
-    key: 'audienceMasalahUtama',
-    label: 'Audience Masalah Utama',
-    placeholder: 'Contoh: Sulit bikin konten yang rutin, jelas, dan tetap terasa menjual',
-    multiline: true,
-  },
-  {
-    key: 'apaYangMerekaRasakan',
-    label: 'Apa Yang Mereka Rasakan Tapi Sulit Diungkapkan',
-    placeholder:
-      'Contoh: Mereka capek terlihat aktif tapi hasilnya tidak sebanding, lalu mulai ragu apakah kontennya memang punya value.',
-    multiline: true,
-  },
-  {
-    key: 'kenapaHarusFollow',
-    label: 'Kenapa Mereka Harus Follow Persona Ini',
-    placeholder:
-      'Contoh: Karena persona ini memberi shortcut, framework, dan angle konten yang langsung bisa dipakai tanpa terasa menggurui.',
-    multiline: true,
-  },
-  {
-    key: 'gayaKomunikasi',
-    label: 'Gaya Komunikasi',
-    placeholder: 'Contoh: Seperti mentor dekat yang tajam, santai, dan actionable',
   },
   {
     key: 'platform',
     label: 'Platform',
-    placeholder: 'Contoh: Threads',
-  },
-  {
-    key: 'formatOutput',
-    label: 'Format Output',
-    placeholder: 'Contoh: Thread pendek, single post hook-heavy, dan reply-bait mini insight',
-  },
-  {
-    key: 'gayaHook',
-    label: 'Gaya Hook',
-    placeholder: 'Contoh: Bold statement, kontrarian, dan pain-driven',
-  },
-  {
-    key: 'seberapaPersonal',
-    label: 'Seberapa Personal',
-    type: 'radio',
-    options: [
-      'Low, fokus edukasi',
-      'Medium, sisip personal secukupnya',
-      'Medium to high, tetap relevan ke audience',
-    ],
-  },
-  {
-    key: 'ctaStyle',
-    label: 'CTA Style',
-    type: 'radio',
-    options: ['Soft CTA', 'Ajak reply atau save', 'Follow dan klik link natural'],
-  },
-  {
-    key: 'contentPillarPrioritas',
-    label: 'Content Pillar Prioritas',
-    placeholder: 'Contoh: Educational, storytelling, conversion',
-    multiline: true,
-  },
-  {
-    key: 'referensiGaya',
-    label: 'Referensi Gaya',
-    placeholder:
-      'Contoh: Alex Hormozi meets local creator style yang lebih ringan dan conversational',
-    multiline: true,
-  },
-  {
-    key: 'batasanKonten',
-    label: 'Batasan Konten',
-    placeholder:
-      'Contoh: Hindari klaim bombastis, jargon terlalu teknis, dan tone yang terlalu hard sell',
-    multiline: true,
+    type: 'select',
+    options: ['Threads', 'Instagram', 'X / Twitter', 'LinkedIn'],
   },
 ]
 
@@ -183,31 +110,7 @@ function createFormValuesFromConfig(record: PersonaConfigRecord | null): Persona
     contentStyle: getRecordValue(record, ['contentStyle', 'content_style']),
     tone: getRecordValue(record, ['tone']),
     goal: getRecordValue(record, ['goal']),
-    posisiPersonaSaatIni: getRecordValue(record, [
-      'posisiPersonaSaatIni',
-      'posisi_persona_saat_ini',
-    ]),
-    audienceMasalahUtama: getRecordValue(record, [
-      'audienceMasalahUtama',
-      'audience_masalah_utama',
-    ]),
-    apaYangMerekaRasakan: getRecordValue(record, [
-      'apaYangMerekaRasakan',
-      'apa_yang_mereka_rasakan',
-    ]),
-    kenapaHarusFollow: getRecordValue(record, ['kenapaHarusFollow', 'kenapa_harus_follow']),
-    gayaKomunikasi: getRecordValue(record, ['gayaKomunikasi', 'gaya_komunikasi']),
     platform: getRecordValue(record, ['platform']),
-    formatOutput: getRecordValue(record, ['formatOutput', 'format_output']),
-    gayaHook: getRecordValue(record, ['gayaHook', 'gaya_hook']),
-    seberapaPersonal: getRecordValue(record, ['seberapaPersonal', 'seberapa_personal']),
-    ctaStyle: getRecordValue(record, ['ctaStyle', 'cta_style']),
-    contentPillarPrioritas: getRecordValue(record, [
-      'contentPillarPrioritas',
-      'content_pillar_prioritas',
-    ]),
-    referensiGaya: getRecordValue(record, ['referensiGaya', 'referensi_gaya']),
-    batasanKonten: getRecordValue(record, ['batasanKonten', 'batasan_konten']),
   }
 }
 
@@ -219,7 +122,7 @@ function formatUpdatedAt(record: PersonaConfigRecord | null) {
 }
 
 function buildPersonaTags(values: PersonaConfigPayload) {
-  return [values.platform, values.tone, values.contentStyle, values.ctaStyle]
+  return [values.platform, values.tone, values.contentStyle, values.goal]
     .filter((value): value is string => Boolean(value))
     .filter((value, index, list) => list.indexOf(value) === index)
 }
@@ -552,8 +455,28 @@ export function CreatePersonaPage({
             </div>
 
             <div className="persona-preview-block">
+              <span>Niche / Topic Focus</span>
+              <p>{formValues.nicheTopicFocus || 'Belum diisi'}</p>
+            </div>
+
+            <div className="persona-preview-block">
+              <span>Content Style</span>
+              <p>{formValues.contentStyle || 'Belum diisi'}</p>
+            </div>
+
+            <div className="persona-preview-block">
+              <span>Tone</span>
+              <p>{formValues.tone || 'Belum diisi'}</p>
+            </div>
+
+            <div className="persona-preview-block">
               <span>Goal</span>
               <p>{formValues.goal || 'Belum diisi'}</p>
+            </div>
+
+            <div className="persona-preview-block">
+              <span>Platform</span>
+              <p>{formValues.platform || 'Belum diisi'}</p>
             </div>
 
             <div className="persona-tag-list">
@@ -621,9 +544,9 @@ export function CreatePersonaPage({
             <p className="eyebrow">Tips</p>
             <h2>Biar hasil config lebih kuat</h2>
             <ul className="persona-tip-list">
-              <li>Isi masalah audience dengan kalimat yang konkret, bukan terlalu umum.</li>
-              <li>Hook, CTA, dan gaya komunikasi sebaiknya selaras dengan platform Threads.</li>
-              <li>Tambahkan batasan konten supaya output AI tidak melenceng dari brand.</li>
+              <li>Isi target audience dan niche dengan contoh yang konkret.</li>
+              <li>Pilih tone dan platform yang paling sering dipakai di workflow kontenmu.</li>
+              <li>Kalau belum yakin, mulai dari versi sederhana dulu lalu refine setelah save.</li>
             </ul>
           </article>
         </aside>

@@ -1,14 +1,22 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { login, register, type AuthSession } from '../services/authService'
 
 type AuthMode = 'login' | 'register'
 
 type AuthPageProps = {
   onAuthenticated: (session: AuthSession) => void
+  initialMode?: AuthMode
+  allowRegister?: boolean
+  onBack?: () => void
 }
 
-export function AuthPage({ onAuthenticated }: AuthPageProps) {
-  const [mode, setMode] = useState<AuthMode>('login')
+export function AuthPage({
+  onAuthenticated,
+  initialMode = 'login',
+  allowRegister = true,
+  onBack,
+}: AuthPageProps) {
+  const [mode, setMode] = useState<AuthMode>(initialMode)
   const [email, setEmail] = useState('')
   const [accountName, setAccountName] = useState('')
   const [password, setPassword] = useState('')
@@ -36,9 +44,29 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
   const isLogin = mode === 'login'
 
+  useEffect(() => {
+    setMode(initialMode)
+    setErrorMessage('')
+  }, [initialMode])
+
+  useEffect(() => {
+    if (!allowRegister && mode !== 'login') {
+      setMode('login')
+      setErrorMessage('')
+    }
+  }, [allowRegister, mode])
+
   return (
     <div className="auth-shell">
       <section className="auth-card panel">
+        {onBack ? (
+          <div className="auth-topbar">
+            <button type="button" className="ghost-button auth-back-link" onClick={onBack}>
+              Back
+            </button>
+          </div>
+        ) : null}
+
         <div className="auth-hero">
           <p className="eyebrow">Reframe Access</p>
           <h1>{isLogin ? 'Login ke workspace kamu' : 'Buat akun baru dulu'}</h1>
@@ -60,22 +88,24 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           >
             Login
           </button>
-          <button
-            type="button"
-            className={`auth-tab${!isLogin ? ' active' : ''}`}
-            onClick={() => {
-              setMode('register')
-              setErrorMessage('')
-            }}
-          >
-            Register
-          </button>
+          {allowRegister ? (
+            <button
+              type="button"
+              className={`auth-tab${!isLogin ? ' active' : ''}`}
+              onClick={() => {
+                setMode('register')
+                setErrorMessage('')
+              }}
+            >
+              Register
+            </button>
+          ) : null}
         </div>
 
         {errorMessage ? <div className="integration-note integration-note-error"><p>{errorMessage}</p></div> : null}
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          {isLogin ? (
+          {isLogin || !allowRegister ? (
             <label className="auth-field full-width">
               <span>Email</span>
               <input

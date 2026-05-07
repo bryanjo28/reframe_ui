@@ -79,6 +79,12 @@ const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: st
     description:
       'Mulai dari persona, content pillar, generate topic, sampai auto post tanpa dashboard yang terlalu padat.',
   },
+  'create-persona-chat': {
+    eyebrow: 'Reframe Persona Setup',
+    title: 'Bangun persona pertama lewat flow chat yang lebih terasa seperti game.',
+    description:
+      'Mode onboarding dibuat fokus, tanpa sidebar, supaya user bisa ngobrol dengan AI satu langkah demi satu langkah.',
+  },
   'create-persona': {
     eyebrow: 'Reframe Persona',
     title: 'Bangun persona yang matang sebelum masuk ke proses content generation.',

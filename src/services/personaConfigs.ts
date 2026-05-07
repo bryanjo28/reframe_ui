@@ -10,19 +10,7 @@ export type PersonaConfigPayload = {
   contentStyle: string
   tone: string
   goal: string
-  posisiPersonaSaatIni: string
-  audienceMasalahUtama: string
-  apaYangMerekaRasakan: string
-  kenapaHarusFollow: string
-  gayaKomunikasi: string
   platform: string
-  formatOutput: string
-  gayaHook: string
-  seberapaPersonal: string
-  ctaStyle: string
-  contentPillarPrioritas: string
-  referensiGaya: string
-  batasanKonten: string
 }
 
 export type PersonaConfigRecord = Partial<PersonaConfigPayload> & {
@@ -272,17 +260,5 @@ export async function findPersonaConfigForUser(userId: string) {
 
   const exactMatch = configs.find((record) => isCurrentUserRecord(record, userId))
 
-  if (exactMatch) {
-    return exactMatch
-  }
-
-  if (configs.length === 1) {
-    return configs[0]
-  }
-
-  const fallback = configs.find((record) =>
-    readRecordValue(record, ['persona', 'persona_name', 'personaName']),
-  )
-
-  return fallback ?? null
+  return exactMatch ?? null
 }

@@ -1,5 +1,6 @@
 export type NavKey =
   | 'dashboard'
+  | 'create-persona-chat'
   | 'create-persona'
   | 'content-pillar'
   | 'generate-topic'
