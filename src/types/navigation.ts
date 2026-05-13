@@ -1,10 +1,12 @@
 export type NavKey =
   | 'dashboard'
+  | 'personalize'
   | 'create-persona-chat'
   | 'create-persona'
   | 'content-pillar'
   | 'generate-topic'
-  | 'auto-post'
+  | 'content-engine'
+  | 'manual-post'
   | 'connecting-apps'
 
 export type MenuItem = {

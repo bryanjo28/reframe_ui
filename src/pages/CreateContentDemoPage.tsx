@@ -406,6 +406,10 @@ export function CreateContentDemoPage({
     setCurrentStep((current) => Math.min(current + 1, chatSteps.length - 1))
   }
 
+  function goPrevious() {
+    setCurrentStep((current) => Math.max(current - 1, 0))
+  }
+
   function handleSuggestionPick(value: string) {
     updateField(currentStepConfig.key, value)
     setStatusMessage('')
@@ -682,6 +686,16 @@ export function CreateContentDemoPage({
                 </div>
 
                 <div className="persona-chat-action-row">
+                  {currentStep > 0 ? (
+                    <button
+                      className="ghost-button chat-next-button"
+                      type="button"
+                      onClick={goPrevious}
+                      disabled={Boolean(generatedResult) || isGenerating}
+                    >
+                      Back
+                    </button>
+                  ) : null}
                   {isLastStep ? (
                     <button
                       className="primary-button chat-next-button"

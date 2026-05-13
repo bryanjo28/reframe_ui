@@ -25,6 +25,8 @@ type CreatePersonaChatPageProps = {
   personaConfig: PersonaConfigRecord | null
   isInitialSetup?: boolean
   onSaved?: (personaConfig: PersonaConfigRecord) => void
+  title?: string
+  description?: string
 }
 
 const chatSteps: ChatStep[] = [
@@ -154,6 +156,8 @@ export function CreatePersonaChatPage({
   personaConfig,
   isInitialSetup = false,
   onSaved,
+  title = 'Persona',
+  description,
 }: CreatePersonaChatPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [formValues, setFormValues] = useState<PersonaConfigPayload>(() =>
@@ -273,15 +277,12 @@ export function CreatePersonaChatPage({
       <div className="persona-chat-bg" aria-hidden="true" />
 
       <header className="persona-chat-hero">
-        <div className="persona-chat-kicker">
-          <span className="persona-chat-badge">New</span>
-          <span>First setup via AI chat</span>
-        </div>
-        <h1>{isInitialSetup ? 'Bangun Persona Pertama lewat Chat' : 'Edit Persona lewat Chat'}</h1>
+        <h1>{title}</h1>
         <p className="page-description">
-          {isInitialSetup
-            ? 'Bayangin ini seperti ngobrol dengan AI. Setiap pertanyaan sudah kita arahkan, jadi user tinggal jawab step by step lewat pill atau isi sendiri.'
-            : 'Flow ini bisa dipakai juga untuk edit persona yang sudah ada, tanpa menghapus form lama.'}
+          {description ||
+            (isInitialSetup
+              ? 'Bayangin ini seperti ngobrol dengan AI. Setiap pertanyaan sudah kita arahkan, jadi user tinggal jawab step by step lewat pill atau isi sendiri.'
+              : 'Flow ini bisa dipakai juga untuk edit persona yang sudah ada, tanpa menghapus form lama.')}
         </p>
       </header>
 
@@ -380,7 +381,7 @@ export function CreatePersonaChatPage({
               <div className="persona-chat-choice-rail">
                 <div className="persona-chat-choice-head">
                   <span className="persona-chat-label">Quick picks</span>
-                  <span className="persona-chat-answer-mode subtle">Optional</span>
+                  {/* <span className="persona-chat-answer-mode subtle">Optional</span> */}
                 </div>
 
                 <div className="persona-chat-pills">

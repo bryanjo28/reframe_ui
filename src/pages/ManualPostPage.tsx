@@ -9,8 +9,9 @@ import {
   type ContentTopicRecord,
 } from '../services/contentTopics'
 
-type AutoPostPageProps = {
+type ManualPostPageProps = {
   userId: string
+  onBackToContentEngine: () => void
 }
 
 function getTopicValue(record: ContentTopicRecord | null, keys: string[]) {
@@ -83,7 +84,7 @@ function isTopicOfUser(record: ContentTopicRecord, userId: string) {
   return !ownerId || ownerId === userId
 }
 
-export function AutoPostPage({ userId }: AutoPostPageProps) {
+export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [topics, setTopics] = useState<ContentTopicRecord[]>([])
   const [selectedTopicId, setSelectedTopicId] = useState('')
@@ -97,11 +98,9 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
   const [contentOutputPreview, setContentOutputPreview] = useState('')
-  const [promptTemplateId, setPromptTemplateId] = useState('')
   const [platform, setPlatform] = useState('threads')
   const [formatOutput, setFormatOutput] = useState('single post')
   const [additionalPrompt, setAdditionalPrompt] = useState('')
-  const [improvementHint, setImprovementHint] = useState('')
 
   const accessToken = getCurrentAuthToken() || ''
 
@@ -176,30 +175,16 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
 
   useEffect(() => {
     if (!selectedTopic) {
-      setPromptTemplateId('')
       setPlatform('threads')
       setFormatOutput('single post')
       setAdditionalPrompt('')
-      setImprovementHint('')
       return
     }
 
-    setPromptTemplateId(
-      getTopicValue(selectedTopic, ['promptTemplateId', 'prompt_template_id', 'templateId', 'template_id']),
-    )
     setPlatform(getTopicValue(selectedTopic, ['platform']) || 'threads')
     setFormatOutput(getTopicValue(selectedTopic, ['formatOutput', 'format_output']) || 'single post')
     setAdditionalPrompt(getTopicValue(selectedTopic, ['additionalPrompt', 'additional_prompt']))
-    setImprovementHint(getTopicValue(selectedTopic, ['improvementHint', 'improvement_hint']))
   }, [selectedTopic])
-
-  const stats = useMemo(() => {
-    const total = topics.length
-    const filtered = filteredTopics.length
-    const uniqueCategories = new Set(topics.map((topic) => getTopicCategory(topic))).size
-
-    return { total, filtered, uniqueCategories }
-  }, [filteredTopics.length, topics])
 
   async function handleOpenDetail(id: string) {
     setSelectedTopicId(id)
@@ -272,11 +257,9 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
     try {
       const rawResponse = await createContentOutput({
         topicId: selectedTopic.id,
-        promptTemplateId: promptTemplateId.trim() || undefined,
         platform: platform.trim() || 'threads',
         formatOutput: formatOutput.trim() || 'single post',
         additionalPrompt: additionalPrompt.trim(),
-        improvementHint: improvementHint.trim(),
       })
 
       const preview = unwrapPreviewResponse(rawResponse) || JSON.stringify(rawResponse, null, 2)
@@ -323,22 +306,18 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
             cari berdasarkan judul, dan buka detail topic sebelum masuk ke flow schedule.
           </p>
         </div>
-
-        <div className="generate-hero-metrics">
-          <div className="metric-card">
-            <span>Total Topics</span>
-            <strong>{isLoading ? 'Loading...' : stats.total}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Filtered</span>
-            <strong>{isLoading ? 'Loading...' : stats.filtered}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Auth</span>
-            <strong>{accessToken ? 'Ready' : 'Missing token'}</strong>
-          </div>
-        </div>
       </header>
+
+      <div className="generate-mode-switcher">
+        <span className="pill subtle">Manual mode</span>
+        <button
+          className="ghost-button generate-mode-button manual-flow-button"
+          type="button"
+          onClick={onBackToContentEngine}
+        >
+          Change flow
+        </button>
+      </div>
 
       {statusMessage ? (
         <div className={`integration-note ${statusTone === 'error' ? 'integration-note-error' : ''}`}>
@@ -397,8 +376,7 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                   <th>Category</th>
                   <th>Content Pillar</th>
                   <th>Used At</th>
-                  <th>Created At</th>
-                  <th>Action</th>
+                  {/* <th>Action</th> */}
                 </tr>
               </thead>
               <tbody>
@@ -435,8 +413,7 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                         </td>
                         <td>{getTopicValue(topic, ['contentPillarId', 'content_pillar_id']) || 'Belum ada'}</td>
                         <td>{formatDate(getTopicValue(topic, ['usedAt', 'used_at']))}</td>
-                        <td>{formatDate(getTopicValue(topic, ['createdAt', 'created_at']))}</td>
-                        <td>
+                        {/* <td>
                           <button
                             className="ghost-button table-action-button"
                             type="button"
@@ -445,7 +422,7 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                           >
                             Detail
                           </button>
-                        </td>
+                        </td> */}
                       </tr>
                     )
                   })
@@ -535,15 +512,6 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                 </div>
 
                 <label className="persona-field full-width">
-                  <span>Prompt Template ID</span>
-                  <input
-                    value={promptTemplateId}
-                    onChange={(event) => setPromptTemplateId(event.target.value)}
-                    placeholder="uuid-template"
-                  />
-                </label>
-
-                <label className="persona-field full-width">
                   <span>Platform</span>
                   <input
                     value={platform}
@@ -567,16 +535,6 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                     value={additionalPrompt}
                     onChange={(event) => setAdditionalPrompt(event.target.value)}
                     placeholder="Tonenya lebih santai dan tambahkan CTA yang natural."
-                    rows={3}
-                  />
-                </label>
-
-                <label className="persona-field full-width">
-                  <span>Improvement Hint</span>
-                  <textarea
-                    value={improvementHint}
-                    onChange={(event) => setImprovementHint(event.target.value)}
-                    placeholder="Fokus ke hook yang kuat."
                     rows={3}
                   />
                 </label>

@@ -4,7 +4,7 @@ import { login, register, type AuthSession } from '../services/authService'
 type AuthMode = 'login' | 'register'
 
 type AuthPageProps = {
-  onAuthenticated: (session: AuthSession) => void
+  onAuthenticated: (session: AuthSession, mode: AuthMode) => void
   initialMode?: AuthMode
   allowRegister?: boolean
   onBack?: () => void
@@ -34,7 +34,7 @@ export function AuthPage({
           ? await login({ email, password })
           : await register({ email, accountName, password })
 
-      onAuthenticated(session)
+      onAuthenticated(session, mode)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Auth gagal. Coba lagi.')
     } finally {

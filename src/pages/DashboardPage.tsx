@@ -27,10 +27,10 @@ const summaryCards: SummaryCard[] = [
   {
     label: 'Content library',
     value: '136',
-    note: 'Siap dipakai untuk generate dan schedule.',
+    note: 'Siap dipakai untuk generate dan content engine.',
   },
   {
-    label: 'Auto post active',
+    label: 'Content engine active',
     value: '24',
     note: 'Mix fixed time dan random slot.',
   },
@@ -54,7 +54,7 @@ const actionCards: ActionCard[] = [
   },
   {
     eyebrow: 'Schedule',
-    title: 'Kelola auto post',
+    title: 'Kelola content engine',
     description: 'Jadwalkan content dari library dan pantau queue aktif.',
   },
 ]
@@ -77,7 +77,13 @@ const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: st
     eyebrow: 'Reframe Overview',
     title: 'Semua workflow inti Reframe dalam satu tempat.',
     description:
-      'Mulai dari persona, content pillar, generate topic, sampai auto post tanpa dashboard yang terlalu padat.',
+      'Mulai dari persona, content pillar, generate topic, sampai content engine tanpa dashboard yang terlalu padat.',
+  },
+  personalize: {
+    eyebrow: 'Reframe Personalize',
+    title: 'Satukan setup persona dan content pillar dalam satu flow chat.',
+    description:
+      'User tinggal pindah tab antara Persona dan Content Pillar tanpa loncat ke menu berbeda.',
   },
   'create-persona-chat': {
     eyebrow: 'Reframe Persona Setup',
@@ -99,15 +105,21 @@ const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: st
   },
   'generate-topic': {
     eyebrow: 'Reframe Generator',
-    title: 'Pilih persona dan pilar, lalu hasilkan batch content dalam sekali jalan.',
+    title: 'Generate batch content dari template dan pillar.',
     description:
       'Kontrol jumlah konten dan quality review ditampilkan jelas supaya flow generate di Reframe lebih enak dipantau.',
   },
-  'auto-post': {
-    eyebrow: 'Reframe Scheduler',
-    title: 'Pilih topic dari tabel lalu lanjutkan ke flow auto post.',
+  'content-engine': {
+    eyebrow: 'Reframe Content Engine',
+    title: 'Pilih template, pillar, lalu generate topic dalam satu panel.',
     description:
-      'Tampilan awalnya sederhana: lihat topic, buka detail, lalu nanti baru masuk ke langkah schedule posting.',
+      'Tampilan awalnya sederhana: pilih sumber konten, review payload, lalu lanjut ke proses berikutnya.',
+  },
+  'manual-post': {
+    eyebrow: 'Reframe Scheduler',
+    title: 'Kelola auto post yang sudah siap jalan.',
+    description:
+      'Lihat queue aktif, cek detail topic, lalu lanjutkan ke proses penjadwalan posting.',
   },
   'connecting-apps': {
     eyebrow: 'Reframe Connections',
@@ -130,7 +142,7 @@ export function DashboardPage({ activePage }: { activePage: NavKey }) {
         </div>
         <div className="hero-actions">
           <button className="ghost-button">Open Persona</button>
-          <button className="primary-button">Generate Topic</button>
+          <button className="primary-button">Open Content Engine</button>
         </div>
       </section>
 

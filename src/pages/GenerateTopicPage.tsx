@@ -5,7 +5,7 @@ import { createContentTopic, generateContentTopics } from '../services/contentTo
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
 import { listPromptTemplates, type PromptTemplateRecord } from '../services/promptTemplates'
 
-type GenerateContentPageProps = {
+type GenerateTopicPageProps = {
   userId: string
 }
 
@@ -306,7 +306,7 @@ function PillarCard({
   )
 }
 
-export function GenerateContentPage({ userId }: GenerateContentPageProps) {
+export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
@@ -422,7 +422,7 @@ export function GenerateContentPage({ userId }: GenerateContentPageProps) {
     [activeTemplateText, jumlahTopics, promptMode, selectedContentPillarId, selectedTemplateId],
   )
 
-  const canSubmit =
+  const canSubmitManual =
     Boolean(selectedContentPillarId) &&
     (promptMode === 'custom' ? Boolean(customPromptText.trim()) : Boolean(selectedTemplateId)) &&
     jumlahTopics >= 1 &&
@@ -430,10 +430,21 @@ export function GenerateContentPage({ userId }: GenerateContentPageProps) {
     !isSubmitting &&
     !isLoadingTemplates
 
+  function resetResponseState() {
+    setStatusTone('idle')
+    setStatusMessage('')
+    setResponsePreview('')
+    setResponseTopics([])
+    setTopicDrafts([])
+    setSavedTopicIndices([])
+    setSavingTopicIndices([])
+    setTokenUsage(null)
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!canSubmit) {
+    if (!canSubmitManual) {
       setStatusTone('error')
       setStatusMessage(
         promptMode === 'custom'
@@ -451,13 +462,8 @@ export function GenerateContentPage({ userId }: GenerateContentPageProps) {
     }
 
     setIsSubmitting(true)
-    setStatusTone('idle')
+    resetResponseState()
     setStatusMessage('Mengirim payload ke backend...')
-    setResponseTopics([])
-    setTopicDrafts([])
-    setSavedTopicIndices([])
-    setSavingTopicIndices([])
-    setTokenUsage(null)
 
     void generateContentTopics({
       contentPillarId: payloadPreview.contentPillarId,
@@ -867,8 +873,8 @@ export function GenerateContentPage({ userId }: GenerateContentPageProps) {
                 <p className="eyebrow">Generate Payload</p>
                 <h2>Review sebelum kirim</h2>
               </div>
-              <span className={`pill${canSubmit ? ' subtle' : ''}`}>
-                {canSubmit ? 'Ready' : 'Needs setup'}
+              <span className={`pill${canSubmitManual ? ' subtle' : ''}`}>
+                {canSubmitManual ? 'Ready' : 'Needs setup'}
               </span>
             </div>
 
@@ -936,7 +942,7 @@ export function GenerateContentPage({ userId }: GenerateContentPageProps) {
               <button
                 className="primary-button"
                 type="submit"
-                disabled={!canSubmit}
+                disabled={!canSubmitManual}
               >
                 {isSubmitting ? 'Mengirim...' : 'Create Topics'}
               </button>

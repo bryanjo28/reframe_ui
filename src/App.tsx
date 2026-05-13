@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import './App.css'
 import { AuthPage } from './pages/AuthPage'
 import { Sidebar } from './components/Sidebar'
-import { CreateContentPillarPage } from './pages/CreateContentPillarPage'
 import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
-import { CreatePersonaPage } from './pages/CreatePersonaPage'
-import { AutoPostPage } from './pages/AutoPostPage'
+import { ManualPostPage } from './pages/ManualPostPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ConnectingAppsPage } from './pages/ConnectingAppsPage'
-import { GenerateContentPage } from './pages/GenerateContentPage'
+import { ContentEnginePage } from './pages/ContentEnginePage'
+import { GenerateTopicPage } from './pages/GenerateTopicPage'
+import { PersonalizePage } from './pages/PersonalizePage'
 import type { NavKey } from './types/navigation'
 import { ToastProvider } from './components/Toast'
 import {
@@ -70,7 +70,7 @@ function App() {
       const config = await findPersonaConfigForUser(userId)
       setPersonaConfig(config)
       setPersonaStatus('ready')
-    } catch (error) {
+    } catch {
       setPersonaConfig(null)
       setPersonaStatus('error')
     }
@@ -130,14 +130,18 @@ function App() {
     void hydrateAuthState()
   }, [hydrateAuthState])
 
-  const handleStandaloneAuthenticated = useCallback(async (session: AuthSession) => {
+  const handleStandaloneAuthenticated = useCallback(async (
+    session: AuthSession,
+    authMode: StandaloneAuthMode,
+  ) => {
     setCurrentUser(session.user)
     setAuthStatus('authenticated')
     setShowStandaloneAuth(false)
     setActivePage('dashboard')
     setDemoAccessGranted(false)
+    setStandaloneAuthMode(authMode)
 
-    if (standaloneAuthMode === 'register') {
+    if (authMode === 'register') {
       setStoredDemoSessionUserId(session.user.id)
       setDemoModeActive(true)
     } else {
@@ -146,7 +150,7 @@ function App() {
     }
 
     await loadPersonaConfig(session.user.id)
-  }, [loadPersonaConfig, standaloneAuthMode])
+  }, [loadPersonaConfig])
 
   const handleLogout = useCallback(async () => {
     try {
@@ -169,9 +173,9 @@ function App() {
     await hydrateAuthState()
   }, [hydrateAuthState])
 
-  function handlePersonaSaved(nextConfig: PersonaConfigRecord) {
+  function handlePersonalizePersonaSaved(nextConfig: PersonaConfigRecord) {
     setPersonaConfig(nextConfig)
-    setActivePage('dashboard')
+    setActivePage('personalize')
   }
 
   let content: ReactNode
@@ -270,7 +274,7 @@ function App() {
         ) : null}
       </>
     )
-  }  else if (personaStatus === 'loading' || personaStatus === 'idle') {
+  } else if (personaStatus === 'loading' || personaStatus === 'idle') {
     content = (
       <div className="bootstrap-shell">
         <section className="panel bootstrap-card">
@@ -302,7 +306,10 @@ function App() {
     content = (
       <main className="content-area setup-mode setup-immersive">
         <div className="page-transition">
-          <DashboardPage activePage={activePage} />
+          <PersonalizePage
+            personaConfig={personaConfig}
+            onPersonaSaved={handlePersonalizePersonaSaved}
+          />
         </div>
       </main>
     )
@@ -318,14 +325,23 @@ function App() {
 
         <main className="content-area">
           <div key={activePage} className="page-transition">
-            {activePage === 'create-persona' ? (
-              <CreatePersonaPage personaConfig={personaConfig} onSaved={handlePersonaSaved} />
-            ) : activePage === 'content-pillar' ? (
-              <CreateContentPillarPage />
+            {activePage === 'personalize' || activePage === 'create-persona' || activePage === 'content-pillar' ? (
+              <PersonalizePage
+                personaConfig={personaConfig}
+                onPersonaSaved={handlePersonalizePersonaSaved}
+              />
             ) : activePage === 'generate-topic' ? (
-              <GenerateContentPage userId={currentUser?.id || ''} />
-            ) : activePage === 'auto-post' ? (
-              <AutoPostPage userId={currentUser?.id || ''} />
+              <GenerateTopicPage userId={currentUser?.id || ''} />
+            ) : activePage === 'content-engine' ? (
+              <ContentEnginePage
+                userId={currentUser?.id || ''}
+                onOpenManualPost={() => setActivePage('manual-post')}
+              />
+            ) : activePage === 'manual-post' ? (
+              <ManualPostPage
+                userId={currentUser?.id || ''}
+                onBackToContentEngine={() => setActivePage('content-engine')}
+              />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage userId={currentUser?.id || ''} />
             ) : (

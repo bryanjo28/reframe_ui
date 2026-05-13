@@ -49,10 +49,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function asString(value: unknown) {
-  return typeof value === 'string' ? value : undefined
-}
-
 function unwrapListResponse(response: ConfigListResponse): PersonaConfigRecord[] {
   if (Array.isArray(response)) {
     return response
@@ -83,18 +79,6 @@ function unwrapItemResponse(response: ConfigItemResponse): PersonaConfigRecord |
   }
 
   return null
-}
-
-function readRecordValue(record: PersonaConfigRecord, keys: string[]) {
-  for (const key of keys) {
-    const value = asString(record[key])
-
-    if (value) {
-      return value
-    }
-  }
-
-  return undefined
 }
 
 function isCurrentUserRecord(record: PersonaConfigRecord, userId: string) {

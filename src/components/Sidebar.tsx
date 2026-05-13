@@ -11,10 +11,9 @@ type SidebarProps = {
 
 const workspaceMenu: MenuItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
-  { key: 'create-persona', label: 'Create Persona', icon: 'user' },
-  { key: 'content-pillar', label: 'Content Pillar', icon: 'layers' },
+  { key: 'personalize', label: 'Personalize', icon: 'sparkles' },
   { key: 'generate-topic', label: 'Generate Topic', icon: 'sparkles' },
-  { key: 'auto-post', label: 'Auto Post', icon: 'calendar' },
+  { key: 'content-engine', label: 'Content Engine', icon: 'calendar' },
 ]
 
 const accountMenu: MenuItem[] = [

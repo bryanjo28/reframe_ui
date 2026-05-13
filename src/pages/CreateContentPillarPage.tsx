@@ -2,11 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react'
 import {
   createContentPillar,
   deleteContentPillar,
-  enhanceContentPillar,
   getContentPillarById,
   listContentPillars,
   updateContentPillar,
-  type ContentPillarEnhancePayload,
   type ContentPillarPayload,
   type ContentPillarRecord,
 } from '../services/contentPillars'
@@ -76,28 +74,6 @@ const emptyPillarForm: ContentPillarPayload = {
   affiliateLink: '',
 }
 
-const enhancedPreview = {
-  title: 'AI Enhanced Version',
-  body:
-    'Mulai dengan hook yang langsung menampar pain audience, lanjutkan dengan 3 poin praktis yang terasa actionable, lalu tutup dengan CTA ringan yang membuat audience ingin reply, save, atau lanjut klik link. Format ini menjaga keseimbangan antara value, trust, dan conversion.',
-  tokenEstimate: 'Est. 320 tokens',
-}
-
-const enhancementDefaults: Pick<
-  ContentPillarEnhancePayload,
-  'model' | 'maxTokens' | 'temperature' | 'systemPrompt'
-> = {
-  model: 'gemini-2.5-flash-lite',
-  maxTokens: 350,
-  temperature: 0.5,
-  systemPrompt:
-    'You are a helpful assistant that rewrites marketing strategy inputs into a polished, concise, and coherent Indonesian paragraph.',
-}
-
-const requiredEnhanceFieldKeys = pillarFields
-  .filter((field) => !field.optional)
-  .map((field) => field.key)
-
 function getRecordValue(record: ContentPillarRecord | null, keys: string[]) {
   if (!record) {
     return ''
@@ -152,25 +128,6 @@ function sortContentPillarsDescending(pillars: ContentPillarRecord[]) {
 //     .filter((value): value is string => Boolean(value))
 //     .filter((value, index, list) => list.indexOf(value) === index)
 // }
-
-function getMissingEnhanceFields(values: ContentPillarPayload, personaConfigId: string) {
-  const missingFields: string[] = []
-
-  if (!personaConfigId.trim()) {
-    missingFields.push('Persona')
-  }
-
-  for (const key of requiredEnhanceFieldKeys) {
-    const field = pillarFields.find((item) => item.key === key)
-    const value = values[key] ?? ''
-
-    if (!value.trim() && field) {
-      missingFields.push(field.label)
-    }
-  }
-
-  return missingFields
-}
 
 function getPersonaLabel(persona: PersonaConfigRecord) {
   return (
@@ -245,8 +202,6 @@ function PillarVersionCard({
 export function CreateContentPillarPage() {
   const { success: toastSuccess, error: toastError } = useToast()
   const [formValues, setFormValues] = useState<ContentPillarPayload>(emptyPillarForm)
-  const [reviewText, setReviewText] = useState('')
-  const [enhancedOutput, setEnhancedOutput] = useState('')
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfigRecord[]>([])
   const [savedPillars, setSavedPillars] = useState<ContentPillarRecord[]>([])
   const [selectedPillar, setSelectedPillar] = useState<ContentPillarRecord | null>(null)
@@ -256,7 +211,6 @@ export function CreateContentPillarPage() {
   const [isLoadingPersonas, setIsLoadingPersonas] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isEnhancing, setIsEnhancing] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
 
@@ -296,8 +250,6 @@ export function CreateContentPillarPage() {
 
           setSelectedPillar(record)
           setFormValues(createFormValuesFromRecord(record))
-          setReviewText(getRecordValue(record, ['userReviewEdit', 'user_review_edit']))
-          setEnhancedOutput(getRecordValue(record, ['aiEnhancedVersion', 'ai_enhanced_version']))
           if (record.personaConfigId) {
             setSelectedPersonaConfigId(record.personaConfigId)
           }
@@ -307,20 +259,18 @@ export function CreateContentPillarPage() {
             ...emptyPillarForm,
             personaConfigId: defaultPersonaId,
           })
-          setReviewText('')
-          setEnhancedOutput('')
         }
       } catch (error) {
         if (!isMounted) {
           return
         }
 
-        setStatusTone('error')
-        setStatusMessage(error instanceof Error ? error.message : 'Gagal memuat workspace content pillar.')
-        setPersonaConfigs([])
-        setSavedPillars([])
-        setSelectedPillar(null)
-        setFormValues(emptyPillarForm)
+      setStatusTone('error')
+      setStatusMessage(error instanceof Error ? error.message : 'Gagal memuat workspace content pillar.')
+      setPersonaConfigs([])
+      setSavedPillars([])
+      setSelectedPillar(null)
+      setFormValues(emptyPillarForm)
       } finally {
         if (isMounted) {
           setIsLoadingPersonas(false)
@@ -346,8 +296,6 @@ export function CreateContentPillarPage() {
       setSelectedPillar(record)
       setFormValues(createFormValuesFromRecord(record))
       setSelectedPersonaConfigId(record.personaConfigId || '')
-      setReviewText(getRecordValue(record, ['userReviewEdit', 'user_review_edit']))
-      setEnhancedOutput(getRecordValue(record, ['aiEnhancedVersion', 'ai_enhanced_version']))
     } catch (error) {
       setStatusTone('error')
       setStatusMessage(error instanceof Error ? error.message : 'Gagal memuat content pillar.')
@@ -362,8 +310,6 @@ export function CreateContentPillarPage() {
       ...emptyPillarForm,
       personaConfigId: current.personaConfigId || selectedPersonaConfigId,
     }))
-    setReviewText('')
-    setEnhancedOutput('')
     setStatusMessage('Mode create aktif. Form sudah dikosongkan.')
     setStatusTone('idle')
   }
@@ -384,58 +330,6 @@ export function CreateContentPillarPage() {
     }))
   }
 
-  async function handleEnhanceWithAI() {
-    const missingFields = getMissingEnhanceFields(formValues, selectedPersonaConfigId)
-
-    if (missingFields.length) {
-      setStatusTone('error')
-      setStatusMessage(`Lengkapi dulu sebelum enhance: ${missingFields.join(', ')}.`)
-      return
-    }
-
-    setIsEnhancing(true)
-    setStatusTone('idle')
-    setStatusMessage('Mengirim payload ke AI untuk enhance content pillar...')
-
-    try {
-      const enhancedResult = await enhanceContentPillar(selectedPillar?.id, {
-        ...formValues,
-        personaConfigId: selectedPersonaConfigId,
-        ...enhancementDefaults,
-      })
-
-      const nextText = enhancedResult.aiEnhancedVersion.trim() || enhancedPreview.body
-
-      setReviewText(nextText)
-      setEnhancedOutput(nextText)
-      if (enhancedResult.enhancementInput) {
-        setFormValues((current) => ({
-          ...current,
-          ...enhancedResult.enhancementInput,
-        }))
-      }
-      if (enhancedResult.contentPillar) {
-        setSelectedPillar((current) => ({
-          ...(current ?? {}),
-          ...enhancedResult.contentPillar,
-        }))
-      }
-      setStatusTone('success')
-      setStatusMessage(
-        selectedPillar?.id
-          ? 'Hasil enhance sudah disinkronkan ke pillar yang ada. Silakan edit jika perlu.'
-          : 'Draft baru berhasil di-enhance. Silakan review lalu save/update jika sudah cocok.',
-      )
-    } catch (error) {
-      setStatusTone('error')
-      const errorMessage = error instanceof Error ? error.message : 'Gagal enhance content pillar.'
-      setStatusMessage(errorMessage)
-      toastError('Enhance failed', errorMessage)
-    } finally {
-      setIsEnhancing(false)
-    }
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -452,13 +346,9 @@ export function CreateContentPillarPage() {
       const nextRecord = selectedPillar?.id
         ? await updateContentPillar(selectedPillar.id, {
             ...formValues,
-            aiEnhancedVersion: enhancedOutput,
-            userReviewEdit: reviewText,
           })
         : await createContentPillar({
             ...formValues,
-            aiEnhancedVersion: enhancedOutput,
-            userReviewEdit: reviewText,
           })
 
       setSelectedPillar(nextRecord)
@@ -535,9 +425,7 @@ export function CreateContentPillarPage() {
   // const tags = buildPillarTags(formValues)
   const hasExistingRecord = Boolean(selectedPillar?.id)
   const isBusy = isLoadingList || isLoadingDetail || isLoadingPersonas
-  const isFormLocked = isBusy || isSaving || isDeleting || isEnhancing
-  const missingEnhanceFields = getMissingEnhanceFields(formValues, selectedPersonaConfigId)
-  const canEnhance = !missingEnhanceFields.length && !isFormLocked
+  const isFormLocked = isBusy || isSaving || isDeleting
   const selectedPersona = personaConfigs.find((persona) => getRecordValue(persona, ['id']) === selectedPersonaConfigId)
   const visiblePillars = sortContentPillarsDescending(
     selectedPersonaConfigId
@@ -605,54 +493,7 @@ export function CreateContentPillarPage() {
                 disabled={isFormLocked}
               />
             ))}
-
           </form>
-
-          <div className="pillar-preview-section">
-            <div className="panel-heading compact">
-              <div>
-                <p className="eyebrow">Enhance Preview</p>
-              </div>
-              <span className="pill subtle">{enhancedPreview.tokenEstimate}</span>
-            </div>
-
-            <div className="persona-preview-block">
-              <span>{enhancedPreview.title}</span>
-              <p>{enhancedOutput}</p>
-            </div>
-
-            <div className={`persona-preview-block review-editor-block${isEnhancing ? ' enhancing' : ''}`}>
-              <div className="review-editor-header">
-                <span>User Review / Edit</span>
-                <button
-                  className="enhance-ai-button"
-                  type="button"
-                  onClick={handleEnhanceWithAI}
-                  disabled={!canEnhance}
-                  aria-busy={isEnhancing}
-                >
-                  {isEnhancing ? <span className="enhance-spinner" aria-hidden="true" /> : null}
-                  {isEnhancing ? 'Enhancing...' : 'Enhance with AI'}
-                </button>
-              </div>
-              <textarea
-                className="pillar-review-editor"
-                value={reviewText}
-                onChange={(event) => setReviewText(event.target.value)}
-                rows={6}
-                disabled={isFormLocked}
-              />
-              <p className="review-editor-note">
-                {isEnhancing
-                  ? 'Sedang memproses hasil AI...'
-                  : missingEnhanceFields.length
-                    ? 'Lengkapi semua field wajib supaya tombol enhance aktif.'
-                    : selectedPillar?.id
-                      ? 'Pillar ini sudah ada record-nya, jadi enhance akan memakai route by id.'
-                      : 'Draft baru akan memakai route enhance tanpa perlu save dulu.'}
-              </p>
-            </div>
-          </div>
 
           <div className="persona-actions persona-actions-preview">
             <button
@@ -667,7 +508,7 @@ export function CreateContentPillarPage() {
               className="primary-button"
               type="submit"
               form="content-pillar-form"
-              disabled={isSaving || isDeleting || isBusy || isEnhancing || !selectedPersonaConfigId}
+              disabled={isSaving || isDeleting || isBusy || !selectedPersonaConfigId}
             >
               {isSaving ? 'Menyimpan...' : hasExistingRecord ? 'Update Pillar' : 'Create Pillar'}
             </button>
@@ -678,7 +519,7 @@ export function CreateContentPillarPage() {
               className="ghost-button"
               type="button"
               onClick={handleDeleteSelected}
-              disabled={!hasExistingRecord || isSaving || isDeleting || isEnhancing}
+              disabled={!hasExistingRecord || isSaving || isDeleting}
             >
               {isDeleting ? 'Deleting...' : 'Delete Pillar'}
             </button>
@@ -748,7 +589,7 @@ export function CreateContentPillarPage() {
             </div>
           </article>
 
-          <article className="panel persona-guidance-card">
+          {/* <article className="panel persona-guidance-card">
             <p className="eyebrow">Flow</p>
             <h2>Alur CRUD yang dipakai</h2>
             <ul className="persona-tip-list">
@@ -757,7 +598,7 @@ export function CreateContentPillarPage() {
               <li>POST dipakai saat bikin record baru, PATCH dipakai saat edit record yang dipilih.</li>
               <li>DELETE menghapus versi aktif dari daftar lalu form kembali kosong.</li>
             </ul>
-          </article>
+          </article> */}
         </aside>
       </section>
     </section>

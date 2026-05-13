@@ -121,12 +121,6 @@ function formatUpdatedAt(record: PersonaConfigRecord | null) {
   )
 }
 
-function buildPersonaTags(values: PersonaConfigPayload) {
-  return [values.platform, values.tone, values.contentStyle, values.goal]
-    .filter((value): value is string => Boolean(value))
-    .filter((value, index, list) => list.indexOf(value) === index)
-}
-
 function getRecordTimestamp(record: PersonaConfigRecord | null) {
   const rawTimestamp = getRecordValue(record, ['updatedAt', 'updated_at', 'createdAt', 'created_at'])
   const parsedTimestamp = rawTimestamp ? Date.parse(rawTimestamp) : Number.NaN
@@ -377,7 +371,6 @@ export function CreatePersonaPage({
     }))
   }
 
-  const savedAt = formatUpdatedAt(savedRecord)
   const hasExistingConfig = Boolean(savedRecord?.id)
   const visiblePersonas = sortPersonaConfigsDescending(savedPersonas)
 
@@ -426,7 +419,7 @@ export function CreatePersonaPage({
                 New Persona
               </button>
               <button className="primary-button" type="submit" disabled={isSaving}>
-                {isSaving
+              {isSaving
                   ? 'Menyimpan...'
                   : hasExistingConfig
                     ? 'Update Persona'
@@ -434,63 +427,6 @@ export function CreatePersonaPage({
               </button>
             </div>
           </form>
-
-          <div className="pillar-preview-section">
-            <div className="panel-heading compact">
-              <div>
-                <p className="eyebrow">Persona Preview</p>
-                <h2>{formValues.persona || 'Belum ada persona tersimpan'}</h2>
-              </div>
-              <span className="pill subtle">{savedAt}</span>
-            </div>
-
-            <div className="persona-preview-block">
-              <span>Persona</span>
-              <p>{formValues.persona || 'Belum diisi'}</p>
-            </div>
-
-            <div className="persona-preview-block">
-              <span>Target Audience</span>
-              <p>{formValues.targetAudience || 'Belum diisi'}</p>
-            </div>
-
-            <div className="persona-preview-block">
-              <span>Niche / Topic Focus</span>
-              <p>{formValues.nicheTopicFocus || 'Belum diisi'}</p>
-            </div>
-
-            <div className="persona-preview-block">
-              <span>Content Style</span>
-              <p>{formValues.contentStyle || 'Belum diisi'}</p>
-            </div>
-
-            <div className="persona-preview-block">
-              <span>Tone</span>
-              <p>{formValues.tone || 'Belum diisi'}</p>
-            </div>
-
-            <div className="persona-preview-block">
-              <span>Goal</span>
-              <p>{formValues.goal || 'Belum diisi'}</p>
-            </div>
-
-            <div className="persona-preview-block">
-              <span>Platform</span>
-              <p>{formValues.platform || 'Belum diisi'}</p>
-            </div>
-
-            <div className="persona-tag-list">
-              {buildPersonaTags(formValues).length ? (
-                buildPersonaTags(formValues).map((tag) => (
-                  <span className="chip" key={tag}>
-                    {tag}
-                  </span>
-                ))
-              ) : (
-                <span className="chip">Lengkapi field utama untuk melihat tags</span>
-              )}
-            </div>
-          </div>
         </article>
 
         <aside className="persona-side-column">
