@@ -93,7 +93,7 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+  const [, setIsLoadingDetail] = useState(false)
   const [isGeneratingOutput, setIsGeneratingOutput] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')

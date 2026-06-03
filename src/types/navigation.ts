@@ -7,6 +7,7 @@ export type NavKey =
   | 'generate-topic'
   | 'content-engine'
   | 'manual-post'
+  | 'auto-post'
   | 'connecting-apps'
 
 export type MenuItem = {

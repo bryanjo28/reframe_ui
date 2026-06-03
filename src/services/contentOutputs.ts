@@ -1,4 +1,4 @@
-import { buildApiUrl } from '../config/api'
+import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
 
 const CONTENT_OUTPUTS_ENDPOINT = '/api/content-outputs/generate'
@@ -27,6 +27,12 @@ export type AutoGenerateContentOutputsPayload = {
   scheduledAt: string
 }
 
+export type UpdateContentOutputPayload = {
+  id?: string
+  status?: string
+  content?: string
+}
+
 export type ContentOutputRecord = {
   id?: string
   userId?: string
@@ -40,27 +46,27 @@ export type ContentOutputRecord = {
   format_output?: string
   additionalPrompt?: string
   additional_prompt?: string
+  content?: string
+  contentText?: string
+  content_text?: string
   contentOutput?: string
   content_output?: string
   output?: string
   result?: string
+  status?: string
   generatedAt?: string
   generated_at?: string
   createdAt?: string
   created_at?: string
   scheduledAt?: string
   scheduled_at?: string
+  personaConfigId?: string
+  persona_config_id?: string
   [key: string]: unknown
 }
 
 function buildHeaders(withBody = false) {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
-
-  if (withBody) {
-    headers['Content-Type'] = 'application/json'
-  }
+  const headers = buildApiHeaders({ withBody })
 
   const token = getCurrentAuthToken()
 
@@ -182,6 +188,53 @@ export async function autoGenerateContentOutputs(payload: AutoGenerateContentOut
   return data
 }
 
+export async function updateContentOutput(id: string, payload: UpdateContentOutputPayload) {
+  const bodyIdValue = typeof payload.id === 'string' ? payload.id : undefined
+  const statusValue = typeof payload.status === 'string' ? payload.status : undefined
+  const contentValue = typeof payload.content === 'string' ? payload.content : undefined
+
+  const response = await fetchWithTimeout(buildApiUrl(`/api/content-outputs/${id}`), {
+    method: 'PATCH',
+    headers: buildHeaders(true),
+    body: JSON.stringify({
+      ...(bodyIdValue ? { id: bodyIdValue } : {}),
+      ...(statusValue ? { status: statusValue } : {}),
+      ...(contentValue ? { content: contentValue } : {}),
+    }),
+  })
+
+  const data = await readResponseBodyWithTimeout(response)
+
+  if (!response.ok) {
+    const errorMessage = typeof data === 'string' ? data : 'Gagal mengubah content output.'
+
+    throw new Error(errorMessage || 'Gagal mengubah content output.')
+  }
+
+  return data
+}
+
+export async function deleteContentOutput(id: string) {
+  const response = await fetchWithTimeout(buildApiUrl(`/api/content-outputs/${id}`), {
+    method: 'DELETE',
+    headers: buildHeaders(),
+  })
+
+  if (response.status === 204) {
+    return null
+  }
+
+  const data = await readResponseBodyWithTimeout(response)
+
+  if (!response.ok) {
+    const errorMessage = typeof data === 'string' ? data : 'Gagal menghapus content output.'
+
+    throw new Error(errorMessage || 'Gagal menghapus content output.')
+  }
+
+  return data
+}
+
 function isContentOutputRecord(value: unknown): value is ContentOutputRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -216,9 +269,20 @@ function asString(value: unknown) {
   return typeof value === 'string' ? value : undefined
 }
 
+function asNonEmptyString(value: unknown) {
+  const text = asString(value)?.trim()
+
+  if (!text || text === 'null' || text === 'undefined') {
+    return ''
+  }
+
+  return text
+}
+
 function normalizeContentOutputRecord(record: ContentOutputRecord) {
   return {
     ...record,
+    id: asNonEmptyString(record.id),
     userId: asString(record.userId) || asString(record.user_id) || '',
     topicId: asString(record.topicId) || asString(record.topic_id) || '',
     topic: asString(record.topic) || asString(record.title) || '',
@@ -226,8 +290,12 @@ function normalizeContentOutputRecord(record: ContentOutputRecord) {
     formatOutput: asString(record.formatOutput) || asString(record.format_output) || '',
     additionalPrompt:
       asString(record.additionalPrompt) || asString(record.additional_prompt) || '',
+    content:
+      asString(record.content) || asString(record.contentText) || asString(record.content_text) || '',
     contentOutput: asString(record.contentOutput) || asString(record.content_output) || '',
     output: asString(record.output) || asString(record.result) || '',
+    status: asString(record.status) || '',
+    personaConfigId: asString(record.personaConfigId) || asString(record.persona_config_id) || '',
     generatedAt: asString(record.generatedAt) || asString(record.generated_at) || '',
     createdAt: asString(record.createdAt) || asString(record.created_at) || '',
     scheduledAt: asString(record.scheduledAt) || asString(record.scheduled_at) || '',

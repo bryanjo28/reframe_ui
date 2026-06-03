@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import './App.css'
 import { AuthPage } from './pages/AuthPage'
 import { Sidebar } from './components/Sidebar'
 import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
 import { ManualPostPage } from './pages/ManualPostPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { AutoPostPage } from './pages/AutoPostPage'
 import { ConnectingAppsPage } from './pages/ConnectingAppsPage'
+import { ThreadsCallbackPage } from './pages/ThreadsCallbackPage'
 import { ContentEnginePage } from './pages/ContentEnginePage'
 import { GenerateTopicPage } from './pages/GenerateTopicPage'
 import { PersonalizePage } from './pages/PersonalizePage'
@@ -27,6 +29,40 @@ type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'error'
 type PersonaStatus = 'idle' | 'loading' | 'ready' | 'error'
 type StandaloneAuthMode = 'login' | 'register'
 const DEMO_SESSION_STORAGE_KEY = 'reframe.demoSessionUserId'
+const ACTIVE_PAGE_STORAGE_KEY = 'reframe.activePage'
+
+function getStoredActivePage(): NavKey {
+  if (typeof localStorage === 'undefined') {
+    return 'dashboard'
+  }
+
+  const value = localStorage.getItem(ACTIVE_PAGE_STORAGE_KEY)
+
+  if (
+    value === 'dashboard' ||
+    value === 'personalize' ||
+    value === 'create-persona-chat' ||
+    value === 'create-persona' ||
+    value === 'content-pillar' ||
+    value === 'generate-topic' ||
+    value === 'content-engine' ||
+    value === 'manual-post' ||
+    value === 'auto-post' ||
+    value === 'connecting-apps'
+  ) {
+    return value
+  }
+
+  return 'dashboard'
+}
+
+function setStoredActivePage(page: NavKey) {
+  if (typeof localStorage === 'undefined') {
+    return
+  }
+
+  localStorage.setItem(ACTIVE_PAGE_STORAGE_KEY, page)
+}
 
 function getStoredDemoSessionUserId() {
   if (typeof localStorage === 'undefined') {
@@ -50,11 +86,11 @@ function setStoredDemoSessionUserId(userId?: string) {
   }
 }
 
-function App() {
+function AppShell() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
   const [authError, setAuthError] = useState('')
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
-  const [activePage, setActivePage] = useState<NavKey>('dashboard')
+  const [activePage, setActivePage] = useState<NavKey>(getStoredActivePage)
   const [personaStatus, setPersonaStatus] = useState<PersonaStatus>('idle')
   const [personaConfig, setPersonaConfig] = useState<PersonaConfigRecord | null>(null)
   const [demoModeActive, setDemoModeActive] = useState(false)
@@ -62,15 +98,26 @@ function App() {
   const [showStandaloneAuth, setShowStandaloneAuth] = useState(false)
   const [standaloneAuthMode, setStandaloneAuthMode] = useState<StandaloneAuthMode>('register')
   const [authCancelSignal, setAuthCancelSignal] = useState(0)
+  const bootstrapRunIdRef = useRef(0)
 
-  const loadPersonaConfig = useCallback(async (userId: string) => {
+  const loadPersonaConfig = useCallback(async (userId: string, runId?: number) => {
+    const activeRunId = runId ?? ++bootstrapRunIdRef.current
     setPersonaStatus('loading')
 
     try {
       const config = await findPersonaConfigForUser(userId)
+
+      if (activeRunId !== bootstrapRunIdRef.current) {
+        return
+      }
+
       setPersonaConfig(config)
       setPersonaStatus('ready')
     } catch {
+      if (activeRunId !== bootstrapRunIdRef.current) {
+        return
+      }
+
       setPersonaConfig(null)
       setPersonaStatus('error')
     }
@@ -89,11 +136,16 @@ function App() {
   }
 
   const hydrateAuthState = useCallback(async () => {
+    const runId = ++bootstrapRunIdRef.current
     setAuthStatus('loading')
     setAuthError('')
 
     try {
       const user = await getCurrentUser()
+
+      if (runId !== bootstrapRunIdRef.current) {
+        return
+      }
 
       if (!user) {
         clearAuthSession()
@@ -117,8 +169,12 @@ function App() {
         setDemoModeActive(false)
       }
 
-      void loadPersonaConfig(user.id)
+      void loadPersonaConfig(user.id, runId)
     } catch (error) {
+      if (runId !== bootstrapRunIdRef.current) {
+        return
+      }
+
       clearAuthSession()
       resetWorkspaceState()
       setAuthError(error instanceof Error ? error.message : 'Gagal memuat session auth.')
@@ -129,6 +185,10 @@ function App() {
   useEffect(() => {
     void hydrateAuthState()
   }, [hydrateAuthState])
+
+  useEffect(() => {
+    setStoredActivePage(activePage)
+  }, [activePage])
 
   const handleStandaloneAuthenticated = useCallback(async (
     session: AuthSession,
@@ -342,8 +402,10 @@ function App() {
                 userId={currentUser?.id || ''}
                 onBackToContentEngine={() => setActivePage('content-engine')}
               />
+            ) : activePage === 'auto-post' ? (
+              <AutoPostPage userId={currentUser?.id || ''} />
             ) : activePage === 'connecting-apps' ? (
-              <ConnectingAppsPage userId={currentUser?.id || ''} />
+              <ConnectingAppsPage />
             ) : (
               <DashboardPage activePage={activePage} />
             )}
@@ -354,6 +416,14 @@ function App() {
   }
 
   return <ToastProvider>{content}</ToastProvider>
+}
+
+function App() {
+  if (window.location.pathname === '/threads/callback') {
+    return <ThreadsCallbackPage />
+  }
+
+  return <AppShell />
 }
 
 export default App

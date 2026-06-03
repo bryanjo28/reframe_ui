@@ -1,4 +1,4 @@
-import { buildApiUrl } from '../config/api'
+import { buildApiHeaders, buildApiUrl } from '../config/api'
 
 const AUTH_TOKEN_STORAGE_KEY = 'reframe.authToken'
 
@@ -29,6 +29,27 @@ export type AuthSession = {
   user: AuthUser
 }
 
+export type ThreadsSocialAccountState = {
+  connected?: boolean
+  needsReconnect?: boolean
+  username?: string
+  accountId?: string
+  threadsId?: string
+  token?: string
+  refreshToken?: string
+  expiresAt?: string
+  updatedAt?: string
+  [key: string]: unknown
+}
+
+export type AuthMeState = {
+  user: AuthUser
+  socialAccounts: {
+    threads?: ThreadsSocialAccountState
+    [key: string]: unknown
+  } | null
+}
+
 type ApiResponse = {
   success?: boolean
   message?: string
@@ -38,6 +59,7 @@ type ApiResponse = {
   token?: unknown
   accessToken?: unknown
   session?: unknown
+  socialAccounts?: unknown
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,6 +68,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function getString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value : undefined
+}
+
+function getStringFromKeys(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = getString(record[key])
+
+    if (value) {
+      return value
+    }
+  }
+
+  return undefined
+}
+
+function getBooleanFromKeys(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]
+
+    if (typeof value === 'boolean') {
+      return value
+    }
+  }
+
+  return undefined
+}
+
+function looksLikeThreadsAccountRecord(record: Record<string, unknown>) {
+  return Boolean(
+    getStringFromKeys(record, ['expiresAt', 'expires_at']) ||
+      getStringFromKeys(record, ['refreshToken', 'refresh_token']) ||
+      getStringFromKeys(record, ['platformUserId', 'platform_user_id']) ||
+      getStringFromKeys(record, ['accountId', 'account_id']) ||
+      getStringFromKeys(record, ['threadsId', 'threads_id']) ||
+      getStringFromKeys(record, ['username', 'user_name']) ||
+      getBooleanFromKeys(record, ['connected']) !== undefined ||
+      getBooleanFromKeys(record, ['needsReconnect', 'needs_reconnect']) !== undefined,
+  )
 }
 
 function getTokenFromRecord(value: unknown) {
@@ -163,6 +222,96 @@ function normalizeSessionPayload(payload: ApiResponse): AuthSession | null {
   return null
 }
 
+function normalizeThreadsSocialAccount(candidate: unknown) {
+  if (!isRecord(candidate)) {
+    return null
+  }
+
+  const expiresAt =
+    getStringFromKeys(candidate, ['expiresAt', 'expires_at']) ||
+    getString(candidate.expiresAt)
+  const parsedExpiresAt = expiresAt ? Date.parse(expiresAt) : Number.NaN
+  const hasValidExpiry = Number.isFinite(parsedExpiresAt)
+  const isExpired = hasValidExpiry ? parsedExpiresAt <= Date.now() : true
+  const refreshToken = getStringFromKeys(candidate, ['refreshToken', 'refresh_token'])
+  const token = getStringFromKeys(candidate, ['token', 'accessToken', 'access_token'])
+  const accountId = getStringFromKeys(candidate, ['accountId', 'account_id', 'platformUserId', 'platform_user_id'])
+  const threadsId = getStringFromKeys(candidate, ['threadsId', 'threads_id'])
+  const username = getStringFromKeys(candidate, ['username', 'user_name'])
+  const connectedOverride = getBooleanFromKeys(candidate, ['connected'])
+  const needsReconnectOverride = getBooleanFromKeys(candidate, ['needsReconnect', 'needs_reconnect'])
+  const hasConnectionRow = Boolean(token || refreshToken || accountId || threadsId || username)
+
+  return {
+    ...candidate,
+    connected:
+      connectedOverride ??
+      (hasConnectionRow && !isExpired && hasValidExpiry),
+    needsReconnect:
+      needsReconnectOverride ?? (hasConnectionRow ? !Boolean(connectedOverride ?? (!isExpired && hasValidExpiry)) : undefined),
+    username,
+    accountId,
+    threadsId,
+    token,
+    refreshToken,
+    expiresAt,
+    updatedAt: getStringFromKeys(candidate, ['updatedAt', 'updated_at']),
+  }
+}
+
+function normalizeAuthMeState(payload: ApiResponse): AuthMeState | null {
+  const session = normalizeSessionPayload(payload)
+  const dataRecord = isRecord(payload.data) ? payload.data : null
+  const fallbackUser = normalizeUser(payload.data ?? payload.user ?? payload.session)
+  const user = session?.user ?? fallbackUser
+
+  if (!user) {
+    return null
+  }
+
+  const socialAccountsRecord = isRecord(dataRecord?.socialAccounts)
+    ? (dataRecord.socialAccounts as Record<string, unknown>)
+    : isRecord(dataRecord?.social_accounts)
+      ? (dataRecord.social_accounts as Record<string, unknown>)
+      : isRecord(payload.socialAccounts)
+        ? (payload.socialAccounts as Record<string, unknown>)
+        : isRecord((payload as Record<string, unknown>).social_accounts)
+          ? ((payload as Record<string, unknown>).social_accounts as Record<string, unknown>)
+          : null
+
+  const threadsCandidate = socialAccountsRecord
+    ? socialAccountsRecord.threads ??
+      socialAccountsRecord.threads_account ??
+      socialAccountsRecord.thread
+    : undefined
+  const directThreadsCandidate =
+    socialAccountsRecord && looksLikeThreadsAccountRecord(socialAccountsRecord)
+      ? socialAccountsRecord
+      : undefined
+  const providerCandidate =
+    socialAccountsRecord &&
+    (socialAccountsRecord.platform === 'threads' ||
+      socialAccountsRecord.platform === 'THREADS' ||
+      socialAccountsRecord.provider === 'threads')
+      ? socialAccountsRecord
+      : undefined
+
+  const threads =
+    normalizeThreadsSocialAccount(threadsCandidate) ??
+    normalizeThreadsSocialAccount(directThreadsCandidate) ??
+    normalizeThreadsSocialAccount(providerCandidate)
+
+  return {
+    user,
+    socialAccounts: socialAccountsRecord
+      ? {
+          ...socialAccountsRecord,
+          threads: threads ?? undefined,
+        }
+      : null,
+  }
+}
+
 function getStoredAuthToken() {
   if (typeof localStorage === 'undefined') {
     return undefined
@@ -184,10 +333,7 @@ function setStoredAuthToken(token?: string) {
 }
 
 function buildRequestHeaders(additionalHeaders: Record<string, string> = {}) {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    ...additionalHeaders,
-  }
+  const headers = buildApiHeaders({ additionalHeaders })
 
   const token = getStoredAuthToken()
 
@@ -246,6 +392,12 @@ export async function register(payload: RegisterCredentials) {
 }
 
 export async function getCurrentUser() {
+  const authState = await getCurrentAuthState()
+
+  return authState?.user ?? null
+}
+
+export async function getCurrentAuthState() {
   const response = await fetch(buildApiUrl('/api/auth/me'), {
     method: 'GET',
     headers: buildRequestHeaders(),
@@ -260,25 +412,8 @@ export async function getCurrentUser() {
   }
 
   const data = (await response.json()) as ApiResponse
-  const session = normalizeSessionPayload(data)
-  let user = session?.user ?? null
 
-  if (!user) {
-    const fallbackUser = normalizeUser(data.data ?? data.user ?? data.session)
-
-    if (fallbackUser) {
-      user = mergeUserProfile(
-        fallbackUser,
-        normalizeProfile(isRecord(data.data) ? data.data.profile : data.profile),
-      )
-    }
-  }
-
-  if (!user) {
-    throw new Error('Data user aktif tidak valid.')
-  }
-
-  return user
+  return normalizeAuthMeState(data)
 }
 
 export function getCurrentAuthToken() {

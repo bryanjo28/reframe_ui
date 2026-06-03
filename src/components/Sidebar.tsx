@@ -14,6 +14,7 @@ const workspaceMenu: MenuItem[] = [
   { key: 'personalize', label: 'Personalize', icon: 'sparkles' },
   { key: 'generate-topic', label: 'Generate Topic', icon: 'sparkles' },
   { key: 'content-engine', label: 'Content Engine', icon: 'calendar' },
+  { key: 'auto-post', label: 'Auto Post', icon: 'clock' },
 ]
 
 const accountMenu: MenuItem[] = [

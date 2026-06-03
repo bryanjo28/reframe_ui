@@ -34,6 +34,12 @@ export function AppIcon({ name }: AppIconProps) {
           <path d="M7 2h2v2h6V2h2v2h3v18H4V4h3V2Zm12 8H5v10h14V10Z" />
         </svg>
       )
+    case 'clock':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 5h-2v6l5 3 .9-1.8-3.9-2.2V7Z" />
+        </svg>
+      )
     case 'link':
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -46,10 +52,22 @@ export function AppIcon({ name }: AppIconProps) {
           <path d="M11 5h2v14h-2zM5 11h14v2H5z" />
         </svg>
       )
+    case 'pencil':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m4 17.25V20h2.75L17.81 8.94l-2.75-2.75L4 17.25Zm14.71-9.04c.39-.39.39-1.02 0-1.41l-1.51-1.51a1 1 0 0 0-1.41 0l-1.18 1.18 2.75 2.75 1.35-1.01Z" />
+        </svg>
+      )
     case 'minus':
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 11h14v2H5z" />
+        </svg>
+      )
+    case 'trash':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 6h2v9h-2V9Zm4 0h2v9h-2V9ZM6 7h12l-1 14H7L6 7Z" />
         </svg>
       )
     case 'check':

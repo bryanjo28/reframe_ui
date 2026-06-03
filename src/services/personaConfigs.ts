@@ -1,4 +1,4 @@
-import { buildApiUrl } from '../config/api'
+import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
 
 const PERSONA_CONFIGS_ENDPOINT = '/api/persona-configs'
@@ -65,6 +65,64 @@ function unwrapListResponse(response: ConfigListResponse): PersonaConfigRecord[]
   return []
 }
 
+function readString(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function readNestedUserId(value: unknown) {
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  return (
+    readString(value.id) ||
+    readString(value.userId) ||
+    readString(value.user_id) ||
+    readString(value.ownerId) ||
+    readString(value.owner_id) ||
+    readString(value.createdByUserId) ||
+    readString(value.created_by_user_id)
+  )
+}
+
+function getRecordUserIdentifiers(record: PersonaConfigRecord) {
+  const directIdentifiers = [
+    record.userId,
+    record.user_id,
+    record.ownerId,
+    record.owner_id,
+    record.createdByUserId,
+    record.created_by_user_id,
+  ]
+    .map((value) => readString(value))
+    .filter((value): value is string => Boolean(value))
+
+  const nestedIdentifiers = [
+    readNestedUserId(record.user),
+    readNestedUserId(record.owner),
+    readNestedUserId(record.createdBy),
+    readNestedUserId(record.created_by),
+  ].filter((value): value is string => Boolean(value))
+
+  return [...directIdentifiers, ...nestedIdentifiers]
+}
+
+function getRecordTimestamp(record: PersonaConfigRecord) {
+  const rawTimestamp =
+    readString(record.updatedAt) ||
+    readString(record.updated_at) ||
+    readString(record.createdAt) ||
+    readString(record.created_at)
+
+  if (!rawTimestamp) {
+    return 0
+  }
+
+  const parsedTimestamp = Date.parse(rawTimestamp)
+
+  return Number.isFinite(parsedTimestamp) ? parsedTimestamp : 0
+}
+
 function unwrapItemResponse(response: ConfigItemResponse): PersonaConfigRecord | null {
   if (isRecord(response)) {
     const candidates = [response.data, response.personaConfig, response.persona_config]
@@ -82,23 +140,11 @@ function unwrapItemResponse(response: ConfigItemResponse): PersonaConfigRecord |
 }
 
 function isCurrentUserRecord(record: PersonaConfigRecord, userId: string) {
-  const directMatches = [
-    record.id,
-    record.userId,
-    record.user_id,
-    record.ownerId,
-    record.owner_id,
-    record.createdByUserId,
-    record.created_by_user_id,
-  ].filter(Boolean)
-
-  return directMatches.some((value) => value === userId)
+  return getRecordUserIdentifiers(record).some((value) => value === userId)
 }
 
 export async function listPersonaConfigs() {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
+  const headers = buildApiHeaders()
 
   const token = getCurrentAuthToken()
 
@@ -121,9 +167,7 @@ export async function listPersonaConfigs() {
 }
 
 export async function getPersonaConfigById(id: string) {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
+  const headers = buildApiHeaders()
 
   const token = getCurrentAuthToken()
 
@@ -151,10 +195,7 @@ export async function getPersonaConfigById(id: string) {
 }
 
 export async function createPersonaConfig(payload: PersonaConfigPayload) {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  }
+  const headers = buildApiHeaders({ withBody: true })
 
   const token = getCurrentAuthToken()
 
@@ -183,10 +224,7 @@ export async function createPersonaConfig(payload: PersonaConfigPayload) {
 }
 
 export async function updatePersonaConfig(id: string, payload: PersonaConfigPayload) {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  }
+  const headers = buildApiHeaders({ withBody: true })
 
   const token = getCurrentAuthToken()
 
@@ -215,9 +253,7 @@ export async function updatePersonaConfig(id: string, payload: PersonaConfigPayl
 }
 
 export async function deletePersonaConfig(id: string) {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
+  const headers = buildApiHeaders()
 
   const token = getCurrentAuthToken()
 
@@ -242,7 +278,19 @@ export async function findPersonaConfigForUser(userId: string) {
     return null
   }
 
-  const exactMatch = configs.find((record) => isCurrentUserRecord(record, userId))
+  const normalizedUserId = userId.trim()
+  const exactMatch = configs.find((record) => isCurrentUserRecord(record, normalizedUserId))
 
-  return exactMatch ?? null
+  if (exactMatch) {
+    return exactMatch
+  }
+
+  if (configs.length === 1) {
+    return configs[0]
+  }
+
+  const latestRecord = [...configs].sort((left, right) => getRecordTimestamp(right) - getRecordTimestamp(left))[0]
+  const hasOwnershipMetadata = getRecordUserIdentifiers(latestRecord).length > 0
+
+  return hasOwnershipMetadata ? null : latestRecord
 }

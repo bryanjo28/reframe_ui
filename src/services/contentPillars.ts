@@ -1,4 +1,4 @@
-import { buildApiUrl } from '../config/api'
+import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
 
 const CONTENT_PILLARS_ENDPOINT = '/api/content-pillars'
@@ -166,13 +166,7 @@ function readRecordValue(record: ContentPillarRecord, keys: string[]) {
 }
 
 function buildHeaders(withBody = false) {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
-
-  if (withBody) {
-    headers['Content-Type'] = 'application/json'
-  }
+  const headers = buildApiHeaders({ withBody })
 
   const token = getCurrentAuthToken()
 

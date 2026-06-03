@@ -115,6 +115,12 @@ const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: st
     description:
       'Tampilan awalnya sederhana: pilih sumber konten, review payload, lalu lanjut ke proses berikutnya.',
   },
+  'auto-post': {
+    eyebrow: 'Reframe Auto Post',
+    title: 'Draft post, pilih waktu, lalu siapkan auto post sederhana.',
+    description:
+      'Mode ini dipakai buat menyiapkan konten posting dan jadwal sebelum nanti tersambung ke queue backend.',
+  },
   'manual-post': {
     eyebrow: 'Reframe Scheduler',
     title: 'Kelola auto post yang sudah siap jalan.',

@@ -1,4 +1,4 @@
-import { buildApiUrl } from '../config/api'
+import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
 
 const PROMPT_TEMPLATES_ENDPOINT = '/api/prompt-templates'
@@ -90,9 +90,7 @@ function readRecordValue(record: PromptTemplateRecord, keys: string[]) {
 }
 
 function buildHeaders() {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
+  const headers = buildApiHeaders()
 
   const token = getCurrentAuthToken()
 

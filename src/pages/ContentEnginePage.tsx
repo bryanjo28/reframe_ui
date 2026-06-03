@@ -3,7 +3,9 @@ import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import {
   autoGenerateContentOutputs,
+  deleteContentOutput,
   listContentOutputs,
+  updateContentOutput,
   type ContentOutputRecord,
 } from '../services/contentOutputs'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
@@ -15,6 +17,12 @@ type ContentEnginePageProps = {
 
 type AutoScheduleMode = 'now' | 'later'
 type ContentEngineView = 'chooser' | 'auto' | 'list'
+type OutputEditForm = {
+  platform: string
+  status: string
+  content: string
+  formatOutput: string
+}
 
 function getRecordValue(record: ContentPillarRecord | null, keys: string[]) {
   if (!record) {
@@ -89,7 +97,7 @@ function getOutputValue(record: ContentOutputRecord | null, keys: string[]) {
   return ''
 }
 
-function getOutputTitle(record: ContentOutputRecord) {
+function getOutputTitle(record: ContentOutputRecord | null) {
   return (
     getOutputValue(record, ['title']) ||
     getOutputValue(record, ['topic']) ||
@@ -98,13 +106,57 @@ function getOutputTitle(record: ContentOutputRecord) {
   )
 }
 
-function getOutputPreview(record: ContentOutputRecord) {
+function getOutputContent(record: ContentOutputRecord | null) {
   return (
+    getOutputValue(record, ['content', 'contentText', 'content_text']) ||
     getOutputValue(record, ['contentOutput', 'content_output']) ||
     getOutputValue(record, ['output']) ||
     getOutputValue(record, ['result']) ||
     'Belum ada preview output.'
   )
+}
+
+function getOutputStatus(record: ContentOutputRecord) {
+  return getOutputValue(record, ['status', 'contentStatus', 'content_status', 'state']) || 'draft'
+}
+
+function getOutputEditForm(record: ContentOutputRecord | null): OutputEditForm {
+  return {
+    platform: getOutputValue(record, ['platform']) || 'threads',
+    status: getOutputStatus(record),
+    content: getOutputContent(record),
+    formatOutput: getOutputValue(record, ['formatOutput', 'format_output']) || 'single post',
+  }
+}
+
+function getOutputId(record: ContentOutputRecord) {
+  const id = typeof record.id === 'string' ? record.id.trim() : ''
+
+  if (!id || id === 'null' || id === 'undefined') {
+    return ''
+  }
+
+  return id
+}
+
+function normalizeOutputId(id: string) {
+  const trimmed = typeof id === 'string' ? id.trim() : ''
+
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') {
+    return ''
+  }
+
+  return trimmed
+}
+
+function getOutputPreview(record: ContentOutputRecord, limit = 140) {
+  const text = getOutputContent(record)
+
+  if (text.length <= limit) {
+    return text
+  }
+
+  return `${text.slice(0, limit).trim()}...`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -172,6 +224,10 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
   const [responseTopics, setResponseTopics] = useState<unknown[]>([])
   const [contentOutputs, setContentOutputs] = useState<ContentOutputRecord[]>([])
   const [selectedOutputId, setSelectedOutputId] = useState('')
+  const [isOutputEditorOpen, setIsOutputEditorOpen] = useState(false)
+  const [isSavingOutput, setIsSavingOutput] = useState(false)
+  const [isDeletingOutputId, setIsDeletingOutputId] = useState('')
+  const [outputEditForm, setOutputEditForm] = useState<OutputEditForm>(getOutputEditForm(null))
 
   useEffect(() => {
     let isMounted = true
@@ -274,6 +330,32 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
     [contentOutputs, selectedOutputId],
   )
 
+  useEffect(() => {
+    if (!isOutputEditorOpen) {
+      return
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsOutputEditorOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOutputEditorOpen])
+
+  useEffect(() => {
+    if (!isOutputEditorOpen || !selectedContentOutput) {
+      return
+    }
+
+    setOutputEditForm(getOutputEditForm(selectedContentOutput))
+  }, [isOutputEditorOpen, selectedContentOutput])
+
   const canSubmit =
     Boolean(selectedContentPillarId) &&
     targetCount >= 1 &&
@@ -347,8 +429,112 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
     setOutputsRefreshKey((current) => current + 1)
   }
 
-  function selectContentOutput(id: string) {
+  function openOutputEditor(id: string) {
+    if (!id || id === 'null' || id === 'undefined') {
+      return
+    }
+
+    console.log('[ContentEngine] openOutputEditor', { id })
     setSelectedOutputId(id)
+    setIsOutputEditorOpen(true)
+    setStatusMessage('')
+    setStatusTone('idle')
+  }
+
+  function closeOutputEditor() {
+    setIsOutputEditorOpen(false)
+    setIsSavingOutput(false)
+  }
+
+  function handleOutputFieldChange(field: keyof OutputEditForm, value: string) {
+    setOutputEditForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  async function handleSaveOutput(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const selectedOutputIdValue = normalizeOutputId(selectedOutputId)
+    const payload = {
+      id: selectedOutputIdValue,
+      status: outputEditForm.status.trim(),
+      content: outputEditForm.content.trim(),
+    }
+
+    console.log('[ContentEngine] handleSaveOutput', {
+      selectedOutputId,
+      selectedOutputIdValue,
+      selectedContentOutputId: selectedContentOutput?.id,
+      payload,
+    })
+
+    if (!selectedOutputIdValue) {
+      setStatusTone('error')
+      setStatusMessage('Output yang dipilih tidak valid.')
+      return
+    }
+
+    setIsSavingOutput(true)
+    setStatusTone('idle')
+    setStatusMessage('Menyimpan perubahan output...')
+
+    try {
+      await updateContentOutput(selectedOutputIdValue, payload)
+
+      toastSuccess('Output updated', 'Perubahan output sudah tersimpan.')
+      setStatusTone('success')
+      setStatusMessage('Output berhasil diupdate.')
+      setIsOutputEditorOpen(false)
+      setOutputsRefreshKey((current) => current + 1)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Gagal mengubah output.'
+      setStatusTone('error')
+      setStatusMessage(errorMessage)
+      toastError('Update output failed', errorMessage)
+    } finally {
+      setIsSavingOutput(false)
+    }
+  }
+
+  async function handleDeleteOutput(record: ContentOutputRecord) {
+    const outputId = getOutputId(record)
+
+    if (!outputId) {
+      return
+    }
+
+    const shouldDelete = window.confirm(`Hapus output "${getOutputTitle(record)}"?`)
+
+    if (!shouldDelete) {
+      return
+    }
+
+    setIsDeletingOutputId(outputId)
+    setStatusTone('idle')
+    setStatusMessage('Menghapus output...')
+
+    try {
+      await deleteContentOutput(outputId)
+
+      if (selectedOutputId === outputId) {
+        setIsOutputEditorOpen(false)
+        setSelectedOutputId('')
+      }
+
+      toastSuccess('Output deleted', 'Output berhasil dihapus.')
+      setStatusTone('success')
+      setStatusMessage('Output berhasil dihapus.')
+      setOutputsRefreshKey((current) => current + 1)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Gagal menghapus output.'
+      setStatusTone('error')
+      setStatusMessage(errorMessage)
+      toastError('Delete output failed', errorMessage)
+    } finally {
+      setIsDeletingOutputId('')
+    }
   }
 
   function renderListOutputsView() {
@@ -435,24 +621,23 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
                           getOutputValue(record, ['generatedAt', 'generated_at']) ||
                           '',
                       )
-                      const isSelected = record.id === selectedOutputId
+                      const outputId = getOutputId(record)
+                      const isSelected = outputId === selectedOutputId
 
                       return (
                         <tr
-                          key={record.id || `${title}-${index}`}
+                          key={outputId || `${title}-${index}`}
                           className={isSelected ? 'selected-row' : ''}
                         >
                           <td>
                             <button
                               type="button"
-                              className="table-link-button"
-                              onClick={() => record.id && selectContentOutput(record.id)}
+                              className="table-link-button content-output-preview-button"
+                              onClick={() => outputId && openOutputEditor(outputId)}
+                              disabled={!outputId}
                             >
-                              {title}
+                              {getOutputPreview(record)}
                             </button>
-                            <span className="table-subtext">
-                              {shortenText(getOutputPreview(record), 96)}
-                            </span>
                           </td>
                           <td>
                             <span className="chip active">{platform}</span>
@@ -460,13 +645,28 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
                           <td>{formatOutput}</td>
                           <td>{createdAt}</td>
                           <td>
-                            <button
-                              type="button"
-                              className="ghost-button table-action-button"
-                              onClick={() => record.id && selectContentOutput(record.id)}
-                            >
-                              Detail
-                            </button>
+                            <div className="table-action-group">
+                              <button
+                                type="button"
+                                className="table-icon-button table-icon-button-edit"
+                                onClick={() => outputId && openOutputEditor(outputId)}
+                                aria-label={`Edit output ${title}`}
+                                title="Edit output"
+                                disabled={!outputId || isSavingOutput}
+                              >
+                                <AppIcon name="pencil" />
+                              </button>
+                              <button
+                                type="button"
+                                className="table-icon-button table-icon-button-delete"
+                                onClick={() => void handleDeleteOutput(record)}
+                                aria-label={`Delete output ${title}`}
+                                title="Delete output"
+                                disabled={!outputId || isDeletingOutputId === outputId}
+                              >
+                                <AppIcon name="trash" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )
@@ -474,42 +674,6 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
                   </tbody>
                 </table>
               </div>
-
-              {selectedContentOutput ? (
-                <article className="content-output-detail-card">
-                  <div className="content-output-card-head">
-                    <div>
-                      <p className="eyebrow">Selected output</p>
-                      <h3>{getOutputTitle(selectedContentOutput)}</h3>
-                    </div>
-                    <span className="pill subtle">
-                      {getOutputValue(selectedContentOutput, ['platform']) || 'Unknown platform'}
-                    </span>
-                  </div>
-
-                  <div className="content-output-meta">
-                    <div className="content-output-meta-item">
-                      <span>Format</span>
-                      <strong>
-                        {getOutputValue(selectedContentOutput, ['formatOutput', 'format_output']) ||
-                          'Unknown format'}
-                      </strong>
-                    </div>
-                    <div className="content-output-meta-item">
-                      <span>Created At</span>
-                      <strong>
-                        {formatDate(
-                          getOutputValue(selectedContentOutput, ['createdAt', 'created_at']) ||
-                            getOutputValue(selectedContentOutput, ['generatedAt', 'generated_at']) ||
-                            '',
-                        )}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <p className="content-output-preview">{getOutputPreview(selectedContentOutput)}</p>
-                </article>
-              ) : null}
             </div>
           ) : (
             <div className="generate-empty-state">
@@ -521,6 +685,85 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
             </div>
           )}
         </article>
+
+        {isOutputEditorOpen && selectedContentOutput ? (
+          <div className="auth-overlay content-output-modal-overlay" onClick={closeOutputEditor}>
+            <div
+              className="content-output-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="content-output-modal-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <form className="content-output-modal-form" onSubmit={handleSaveOutput}>
+                <div className="content-output-modal-head">
+                  <div>
+                    <p className="eyebrow">Edit Output</p>
+                    <h3 id="content-output-modal-title">{getOutputTitle(selectedContentOutput)}</h3>
+                  </div>
+                  <button className="ghost-button" type="button" onClick={closeOutputEditor}>
+                    Close
+                  </button>
+                </div>
+
+                <div className="content-output-modal-meta content-output-modal-meta-edit">
+                  <label className="persona-field">
+                    <span>Platform</span>
+                    <input
+                      value={outputEditForm.platform}
+                      placeholder="threads"
+                      disabled
+                    />
+                  </label>
+                  <label className="persona-field">
+                    <span>Status</span>
+                    <div className="select-wrap">
+                      <select
+                        value={outputEditForm.status}
+                        onChange={(event) => handleOutputFieldChange('status', event.target.value)}
+                      >
+                        <option value="draft">Draft</option>
+                        <option value="approved">Approve</option>
+                      </select>
+                    </div>
+                  </label>
+                  <label className="persona-field">
+                    <span>Format</span>
+                    <input
+                      value={outputEditForm.formatOutput}
+                      placeholder="single post"
+                      disabled
+                    />
+                  </label>
+                </div>
+
+                <label className="content-output-modal-body">
+                  <span className="content-output-modal-label">Content Output</span>
+                  <textarea
+                    value={outputEditForm.content}
+                    onChange={(event) => handleOutputFieldChange('content', event.target.value)}
+                    rows={8}
+                    placeholder="Edit isi output di sini..."
+                  />
+                </label>
+
+                <div className="content-output-modal-actions">
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={closeOutputEditor}
+                    disabled={isSavingOutput}
+                  >
+                    Cancel
+                  </button>
+                  <button className="primary-button" type="submit" disabled={isSavingOutput}>
+                    {isSavingOutput ? 'Saving...' : 'Save changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
       </section>
     )
   }

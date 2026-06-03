@@ -1,4 +1,4 @@
-import { buildApiUrl } from '../config/api'
+import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
 
 const CONTENT_TOPICS_ENDPOINT = '/api/content-topics'
@@ -97,13 +97,7 @@ function unwrapListResponse(response: ContentTopicListResponse): ContentTopicRec
 }
 
 function buildHeaders(withBody = false) {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
-
-  if (withBody) {
-    headers['Content-Type'] = 'application/json'
-  }
+  const headers = buildApiHeaders({ withBody })
 
   const token = getCurrentAuthToken()
 

@@ -1,18 +1,29 @@
-import { buildApiUrl } from '../config/api'
+import { buildApiHeaders, buildApiUrl } from '../config/api'
+import { getCurrentAuthToken } from './authService'
 
 type ThreadsConnectResponse = {
   authorizationUrl: string
+  data?: {
+    authorizationUrl?: string
+  }
 }
 
-export async function getThreadsAuthorizationUrl(userId: string) {
+export async function getThreadsAuthorizationUrl() {
+  const token = getCurrentAuthToken()
+
+  if (!token) {
+    throw new Error('Token login belum tersedia. Silakan login ulang.')
+  }
+
   const url = buildApiUrl('/api/threads/connect')
-  url.searchParams.set('userId', userId)
 
   const response = await fetch(url.toString(), {
     method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
+    headers: buildApiHeaders({
+      additionalHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
   })
 
   if (!response.ok) {
@@ -20,10 +31,11 @@ export async function getThreadsAuthorizationUrl(userId: string) {
   }
 
   const data = (await response.json()) as ThreadsConnectResponse
+  const authorizationUrl = data.authorizationUrl || data.data?.authorizationUrl
 
-  if (!data.authorizationUrl) {
+  if (!authorizationUrl) {
     throw new Error('Authorization URL Threads tidak tersedia.')
   }
 
-  return data.authorizationUrl
+  return authorizationUrl
 }
