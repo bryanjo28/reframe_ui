@@ -570,13 +570,13 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
         <div>
           <p className="eyebrow">Reframe Generator</p>
           <h1>Generate content dari template, pillar, dan jumlah topic dalam satu panel.</h1>
-          <p className="page-description">
+          {/* <p className="page-description">
             Pilih prompt template lewat card, ambil content pillar milik user aktif, lalu
             kirim payload ke backend untuk diteruskan ke n8n.
-          </p>
+          </p> */}
         </div>
 
-        <div className="generate-hero-metrics">
+        <div className="generate-hero-metrics" style={{paddingTop:"15px"}}>
           <div className="metric-card">
             <span>Backend</span>
             <strong>Connected</strong>

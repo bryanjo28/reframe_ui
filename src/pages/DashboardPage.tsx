@@ -121,6 +121,12 @@ const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: st
     description:
       'Mode ini dipakai buat menyiapkan konten posting dan jadwal sebelum nanti tersambung ke queue backend.',
   },
+  'subscription-plans': {
+    eyebrow: 'Reframe Billing',
+    title: 'Lihat paket aktif dan paket yang sedang dimiliki akun ini.',
+    description:
+      'Card plan menampilkan status owned/current plan supaya user langsung tahu paket yang sedang aktif.',
+  },
   'manual-post': {
     eyebrow: 'Reframe Scheduler',
     title: 'Kelola auto post yang sudah siap jalan.',

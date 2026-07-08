@@ -18,6 +18,7 @@ const workspaceMenu: MenuItem[] = [
 ]
 
 const accountMenu: MenuItem[] = [
+  { key: 'subscription-plans', label: 'Subscription Plans', icon: 'calendar' },
   { key: 'connecting-apps', label: 'Connecting Apps', icon: 'link' },
 ]
 

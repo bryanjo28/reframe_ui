@@ -78,12 +78,12 @@ const personaFields: PersonaField[] = [
     placeholder: 'Contoh: Bangun trust, tingkatkan engagement, dan dorong klik affiliate link',
     multiline: true,
   },
-  {
-    key: 'platform',
-    label: 'Platform',
-    type: 'select',
-    options: ['Threads', 'Instagram', 'X / Twitter', 'LinkedIn'],
-  },
+  // {
+  //   key: 'platform',
+  //   label: 'Platform',
+  //   type: 'select',
+  //   options: ['Threads'],
+  // },
 ]
 
 function getRecordValue(record: PersonaConfigRecord | null, keys: string[]) {
@@ -110,7 +110,7 @@ function createFormValuesFromConfig(record: PersonaConfigRecord | null): Persona
     contentStyle: getRecordValue(record, ['contentStyle', 'content_style']),
     tone: getRecordValue(record, ['tone']),
     goal: getRecordValue(record, ['goal']),
-    platform: getRecordValue(record, ['platform']),
+    platform: getRecordValue(record, ['platform']) || 'threads',
   }
 }
 
@@ -331,9 +331,13 @@ export function CreatePersonaPage({
     try {
       const personaId = savedRecord?.id
       const wasExistingRecord = Boolean(personaId)
+      const payload: PersonaConfigPayload = {
+        ...formValues,
+        platform: 'threads',
+      }
       const nextRecord = personaId
-        ? await updatePersonaConfig(personaId, formValues)
-        : await createPersonaConfig(formValues)
+        ? await updatePersonaConfig(personaId, payload)
+        : await createPersonaConfig(payload)
 
       setSavedRecord(nextRecord)
       setSavedPersonas((current) =>

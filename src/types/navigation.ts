@@ -8,6 +8,7 @@ export type NavKey =
   | 'content-engine'
   | 'manual-post'
   | 'auto-post'
+  | 'subscription-plans'
   | 'connecting-apps'
 
 export type MenuItem = {

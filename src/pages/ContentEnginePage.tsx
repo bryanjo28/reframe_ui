@@ -116,7 +116,7 @@ function getOutputContent(record: ContentOutputRecord | null) {
   )
 }
 
-function getOutputStatus(record: ContentOutputRecord) {
+function getOutputStatus(record: ContentOutputRecord | null) {
   return getOutputValue(record, ['status', 'contentStatus', 'content_status', 'state']) || 'draft'
 }
 

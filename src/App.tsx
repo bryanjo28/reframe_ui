@@ -6,6 +6,7 @@ import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
 import { ManualPostPage } from './pages/ManualPostPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { AutoPostPage } from './pages/AutoPostPage'
+import { SubscriptionPlansPage } from './pages/SubscriptionPlansPage'
 import { ConnectingAppsPage } from './pages/ConnectingAppsPage'
 import { ThreadsCallbackPage } from './pages/ThreadsCallbackPage'
 import { ContentEnginePage } from './pages/ContentEnginePage'
@@ -48,6 +49,7 @@ function getStoredActivePage(): NavKey {
     value === 'content-engine' ||
     value === 'manual-post' ||
     value === 'auto-post' ||
+    value === 'subscription-plans' ||
     value === 'connecting-apps'
   ) {
     return value
@@ -404,6 +406,8 @@ function AppShell() {
               />
             ) : activePage === 'auto-post' ? (
               <AutoPostPage userId={currentUser?.id || ''} />
+            ) : activePage === 'subscription-plans' ? (
+              <SubscriptionPlansPage userId={currentUser?.id || ''} />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage />
             ) : (
