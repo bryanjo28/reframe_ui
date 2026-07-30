@@ -207,7 +207,7 @@ export function ConnectingAppsPage() {
         })}
       </div>
 
-      <div className="integration-note">
+      {/* <div className="integration-note">
         <AppIcon name="info" />
         <p>
           Flow Threads: FE memanggil backend connect dengan Bearer token login app,
@@ -215,7 +215,7 @@ export function ConnectingAppsPage() {
           untuk login dan approval. Setelah callback kembali, status final diambil
           lagi dari `GET /api/auth/me`.
         </p>
-      </div>
+      </div> */}
     </section>
   )
 }
