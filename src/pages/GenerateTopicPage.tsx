@@ -15,13 +15,6 @@ type SelectedTemplate = PromptTemplateRecord & {
   normalizedPrompt: string
 }
 
-type PayloadPreview = {
-  contentPillarId: string
-  templateId: string
-  templateText: string
-  jumlahTopics: number
-}
-
 type GeneratedTopic = string | Record<string, unknown>
 
 type NormalizedGeneratedTopic = {
@@ -312,15 +305,12 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
   const [promptTemplates, setPromptTemplates] = useState<SelectedTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
-  const [promptMode, setPromptMode] = useState<'library' | 'custom'>('library')
-  const [customPromptText, setCustomPromptText] = useState('')
   const [jumlahTopics, setJumlahTopics] = useState(5)
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
   const [isLoadingPillars, setIsLoadingPillars] = useState(true)
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [responsePreview, setResponsePreview] = useState('')
   const [responseTopics, setResponseTopics] = useState<GeneratedTopic[]>([])
   const [topicDrafts, setTopicDrafts] = useState<TopicDraft[]>([])
   const [savedTopicIndices, setSavedTopicIndices] = useState<number[]>([])
@@ -393,9 +383,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
   )
 
   const activeTemplateText =
-    promptMode === 'custom'
-      ? customPromptText.trim()
-      : selectedTemplate?.normalizedPrompt || selectedTemplate?.normalizedDescription || ''
+    selectedTemplate?.normalizedPrompt || selectedTemplate?.normalizedDescription || ''
 
   const selectedContentPillar = useMemo(
     () => contentPillars.find((pillar) => pillar.id === selectedContentPillarId) || null,
@@ -412,19 +400,9 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
     setSavingTopicIndices([])
   }, [normalizedResponseTopics])
 
-  const payloadPreview = useMemo<PayloadPreview>(
-    () => ({
-      contentPillarId: selectedContentPillarId,
-      templateId: promptMode === 'custom' ? '' : selectedTemplateId,
-      templateText: activeTemplateText,
-      jumlahTopics: jumlahTopics,
-    }),
-    [activeTemplateText, jumlahTopics, promptMode, selectedContentPillarId, selectedTemplateId],
-  )
-
   const canSubmitManual =
     Boolean(selectedContentPillarId) &&
-    (promptMode === 'custom' ? Boolean(customPromptText.trim()) : Boolean(selectedTemplateId)) &&
+    Boolean(selectedTemplateId) &&
     jumlahTopics >= 1 &&
     jumlahTopics <= maxTopics &&
     !isSubmitting &&
@@ -433,7 +411,6 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
   function resetResponseState() {
     setStatusTone('idle')
     setStatusMessage('')
-    setResponsePreview('')
     setResponseTopics([])
     setTopicDrafts([])
     setSavedTopicIndices([])
@@ -446,11 +423,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
     if (!canSubmitManual) {
       setStatusTone('error')
-      setStatusMessage(
-        promptMode === 'custom'
-          ? 'Lengkapi custom prompt, content pillar, dan jumlah topic dulu.'
-          : 'Lengkapi template, content pillar, dan jumlah topic dulu.',
-      )
+      setStatusMessage('Lengkapi template, content pillar, dan jumlah topic dulu.')
       return
     }
 
@@ -466,18 +439,15 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
     setStatusMessage('Mengirim payload ke backend...')
 
     void generateContentTopics({
-      contentPillarId: payloadPreview.contentPillarId,
-      templateText: payloadPreview.templateText,
-      jumlahTopics: payloadPreview.jumlahTopics,
-      templateId: payloadPreview.templateId || undefined,
+      contentPillarId: selectedContentPillarId,
+      templateText: activeTemplateText,
+      jumlahTopics,
+      templateId: selectedTemplateId || undefined,
     })
       .then((rawData) => {
-        const bodyText =
-          typeof rawData === 'string' ? rawData : JSON.stringify(rawData, null, 2)
         const topics = extractTopicsFromWebhookResponse(rawData)
         const usage = extractTokenUsageFromWebhookResponse(rawData)
 
-        setResponsePreview(bodyText || 'Response kosong dari backend.')
         setResponseTopics(topics)
         setTokenUsage(usage)
         setStatusTone('success')
@@ -562,7 +532,6 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
   const filteredPillars = contentPillars
   const templateCards = promptTemplates
-  const isCustomPromptMode = promptMode === 'custom'
 
   return (
     <section className="generate-page">
@@ -570,26 +539,22 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
         <div>
           <p className="eyebrow">Reframe Generator</p>
           <h1>Generate content dari template, pillar, dan jumlah topic dalam satu panel.</h1>
-          {/* <p className="page-description">
-            Pilih prompt template lewat card, ambil content pillar milik user aktif, lalu
-            kirim payload ke backend untuk diteruskan ke n8n.
-          </p> */}
         </div>
 
-        <div className="generate-hero-metrics" style={{paddingTop:"15px"}}>
+        {/* <div className="generate-hero-metrics" style={{paddingTop:"15px"}}>
           <div className="metric-card">
             <span>Backend</span>
             <strong>Connected</strong>
           </div>
           <div className="metric-card">
             <span>Topic limit</span>
-            <strong>Max {maxTopics}</strong>
+              <strong>Max {maxTopics}</strong>
           </div>
           <div className="metric-card">
             <span>User ID</span>
             <strong>{userId || 'Not ready'}</strong>
           </div>
-        </div>
+        </div> */}
       </header>
 
       {statusMessage ? (
@@ -605,66 +570,12 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">Prompt Templates</p>
-                <h2>Pilih template dari list yang tersedia</h2>
+                <h2>Pilih template default dari backend</h2>
               </div>
-              <div className="generate-template-actions">
-                <span className="pill subtle">{templateCards.length} loaded</span>
-                <button
-                  className={`ghost-button generate-mode-button${isCustomPromptMode ? ' active' : ''}`}
-                  type="button"
-                  onClick={() => {
-                    setPromptMode('custom')
-                    setSelectedTemplateId('')
-                  }}
-                >
-                  Create Own Prompt
-                </button>
-                <button
-                  className={`ghost-button generate-mode-button${!isCustomPromptMode ? ' active' : ''}`}
-                  type="button"
-                  onClick={() => setPromptMode('library')}
-                >
-                  Use Template
-                </button>
-              </div>
+              <span className="pill subtle">{templateCards.length} loaded</span>
             </div>
 
-            {isCustomPromptMode ? (
-              <div className="generate-custom-panel">
-                <div className="generate-empty-state custom-intro">
-                  <AppIcon name="sparkles" />
-                  <div>
-                    <strong>Custom prompt mode aktif</strong>
-                    <p>
-                      Tulis prompt sendiri, lalu `template_id` akan dikirim kosong ke backend.
-                    </p>
-                  </div>
-                </div>
-
-                <label className="persona-field full-width generate-custom-field">
-                  <span>Custom Prompt Text</span>
-                  <textarea
-                    value={customPromptText}
-                    onChange={(event) => setCustomPromptText(event.target.value)}
-                    placeholder="Tulis prompt yang akan dipakai untuk generate topics..."
-                    rows={10}
-                  />
-                </label>
-
-                <div className="generate-custom-footer">
-                  <span className="pill subtle">
-                    {customPromptText.trim() ? `${customPromptText.trim().split(/\s+/).length} words` : 'Empty'}
-                  </span>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => setPromptMode('library')}
-                  >
-                    Back to Template List
-                  </button>
-                </div>
-              </div>
-            ) : isLoadingTemplates ? (
+            {isLoadingTemplates ? (
               <div className="generate-empty-state">
                 <AppIcon name="sparkles" />
                 <div>
@@ -747,19 +658,16 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
               </div>
             </div>
 
-            {responsePreview ? (
+            {responseTopics.length ? (
               <div className="generate-response-stack">
-                {/* <pre className="generate-response-preview">{responsePreview}</pre> */}
-
-                {responseTopics.length ? (
-                  <div className="generate-topics-preview">
-                    <div className="panel-heading compact">
-                      <div>
-                        <p className="eyebrow">Parsed Topics</p>
-                        <h2>Topics</h2>
-                      </div>
-                      <span className="pill subtle">{responseTopics.length} items</span>
+                <div className="generate-topics-preview">
+                  <div className="panel-heading compact">
+                    <div>
+                      <p className="eyebrow">Parsed Topics</p>
+                      <h2>Topics</h2>
                     </div>
+                    <span className="pill subtle">{responseTopics.length} items</span>
+                  </div>
 
                     <div className="generate-topic-grid">
                       {normalizedResponseTopics.map((normalizedTopic, index) => {
@@ -852,7 +760,6 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
                       </p>
                     ) : null}
                   </div>
-                ) : null}
               </div>
             ) : (
               <div className="generate-empty-state">
@@ -871,7 +778,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">Generate Payload</p>
-                <h2>Review sebelum kirim</h2>
+                <h2>Kirim langsung ke backend</h2>
               </div>
               <span className={`pill${canSubmitManual ? ' subtle' : ''}`}>
                 {canSubmitManual ? 'Ready' : 'Needs setup'}
@@ -881,32 +788,15 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
             <div className="generate-summary">
               <div className="generate-summary-item">
                 <span>Template</span>
-                <strong>
-                  {isCustomPromptMode
-                    ? 'Custom prompt'
-                    : selectedTemplate?.normalizedName || 'Belum dipilih'}
-                </strong>
+                <strong>{selectedTemplate?.normalizedName || 'Belum dipilih'}</strong>
               </div>
               <div className="generate-summary-item">
                 <span>Content Pillar</span>
-                <strong>{selectedContentPillar ? getPillarTitle(selectedContentPillar) : 'Belum dipilih'}</strong>
-              </div>
-              <div className="generate-summary-item">
-                <span>User ID</span>
-                <strong>{userId || 'Belum tersedia'}</strong>
+                <strong>
+                  {selectedContentPillar ? getPillarTitle(selectedContentPillar) : 'Belum dipilih'}
+                </strong>
               </div>
             </div>
-
-            <label className="persona-field full-width">
-              <span>Template Text Preview</span>
-              <textarea
-                className="generate-preview-textarea"
-                value={activeTemplateText}
-                readOnly
-                rows={8}
-                placeholder="Template text akan muncul di sini"
-              />
-            </label>
 
             <label className="persona-field full-width">
               <span>Jumlah Topics</span>
@@ -948,13 +838,13 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
               </button>
             </div>
 
-            <div className="generate-note">
+            {/* <div className="generate-note">
               <AppIcon name="info" />
               <p>
-                Payload yang dikirim: `content_pillar_id`, `template_id`, `template_text`,
-                dan `jumlah_topics`.
+                Template prompt mengikuti template default dari backend. Payload yang dikirim
+                tetap `content_pillar_id`, `template_id`, `template_text`, dan `jumlah_topics`.
               </p>
-            </div>
+            </div> */}
           </form>
         </aside>
       </section>

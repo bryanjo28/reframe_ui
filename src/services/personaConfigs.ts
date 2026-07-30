@@ -143,6 +143,35 @@ function isCurrentUserRecord(record: PersonaConfigRecord, userId: string) {
   return getRecordUserIdentifiers(record).some((value) => value === userId)
 }
 
+async function readErrorMessage(response: Response, fallbackMessage: string) {
+  const responseText = await response.text()
+
+  if (!responseText.trim()) {
+    return fallbackMessage
+  }
+
+  try {
+    const parsed = JSON.parse(responseText) as unknown
+
+    if (isRecord(parsed)) {
+      const candidate =
+        readString(parsed.message) ||
+        readString(parsed.error) ||
+        readString(parsed.details) ||
+        readString(parsed.detail) ||
+        readString(parsed.title)
+
+      if (candidate) {
+        return candidate
+      }
+    }
+  } catch {
+    // Fall through to raw text.
+  }
+
+  return responseText.trim() || fallbackMessage
+}
+
 export async function listPersonaConfigs() {
   const headers = buildApiHeaders()
 
@@ -158,7 +187,7 @@ export async function listPersonaConfigs() {
   })
 
   if (!response.ok) {
-    throw new Error('Gagal mengambil persona configs.')
+    throw new Error(await readErrorMessage(response, 'Gagal mengambil persona configs.'))
   }
 
   const data = (await response.json()) as ConfigListResponse
@@ -181,7 +210,7 @@ export async function getPersonaConfigById(id: string) {
   })
 
   if (!response.ok) {
-    throw new Error('Gagal mengambil persona config.')
+    throw new Error(await readErrorMessage(response, 'Gagal mengambil persona config.'))
   }
 
   const data = (await response.json()) as ConfigItemResponse
@@ -210,7 +239,7 @@ export async function createPersonaConfig(payload: PersonaConfigPayload) {
   })
 
   if (!response.ok) {
-    throw new Error('Gagal membuat persona config.')
+    throw new Error(await readErrorMessage(response, 'Gagal membuat persona config.'))
   }
 
   const data = (await response.json()) as ConfigItemResponse
@@ -239,7 +268,7 @@ export async function updatePersonaConfig(id: string, payload: PersonaConfigPayl
   })
 
   if (!response.ok) {
-    throw new Error('Gagal memperbarui persona config.')
+    throw new Error(await readErrorMessage(response, 'Gagal memperbarui persona config.'))
   }
 
   const data = (await response.json()) as ConfigItemResponse
@@ -267,7 +296,7 @@ export async function deletePersonaConfig(id: string) {
   })
 
   if (!response.ok) {
-    throw new Error('Gagal menghapus persona config.')
+    throw new Error(await readErrorMessage(response, 'Gagal menghapus persona config.'))
   }
 }
 

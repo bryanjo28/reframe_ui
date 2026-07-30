@@ -29,10 +29,10 @@ export function PersonalizePage({ personaConfig, onPersonaSaved }: PersonalizePa
           <div className="personalize-picker-copy">
             <p className="eyebrow">Choose a flow</p>
             <h2>Pilih dulu yang mau kamu edit</h2>
-            <p>
+            {/* <p>
               Kita mulai dari card supaya tampilan awal lebih tenang. Setelah dipilih,
               baru form klasik yang muncul di bawah.
-            </p>
+            </p> */}
           </div>
 
           <div className="personalize-choice-grid">

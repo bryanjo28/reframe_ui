@@ -12,7 +12,6 @@ import { listContentPillars, type ContentPillarRecord } from '../services/conten
 
 type ContentEnginePageProps = {
   userId: string
-  onOpenManualPost: () => void
 }
 
 type AutoScheduleMode = 'now' | 'later'
@@ -23,6 +22,12 @@ type OutputEditForm = {
   content: string
   formatOutput: string
 }
+
+const outputStatusOptions = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'posted', label: 'Posted' },
+]
 
 function getRecordValue(record: ContentPillarRecord | null, keys: string[]) {
   if (!record) {
@@ -117,7 +122,26 @@ function getOutputContent(record: ContentOutputRecord | null) {
 }
 
 function getOutputStatus(record: ContentOutputRecord | null) {
-  return getOutputValue(record, ['status', 'contentStatus', 'content_status', 'state']) || 'draft'
+  return (
+    getOutputValue(record, ['status', 'contentStatus', 'content_status', 'state', 'post_status']) ||
+    'draft'
+  )
+}
+
+function formatOutputStatus(status: string) {
+  const normalized = status.trim().toLowerCase()
+
+  if (!normalized) {
+    return 'Draft'
+  }
+
+  return normalized
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function canEditOutputStatus(status: string) {
+  return status.trim().toLowerCase() !== 'posted'
 }
 
 function getOutputEditForm(record: ContentOutputRecord | null): OutputEditForm {
@@ -206,7 +230,7 @@ function extractTopicsFromWebhookResponse(response: unknown) {
   return []
 }
 
-export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePageProps) {
+export function ContentEnginePage({ userId }: ContentEnginePageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
@@ -329,6 +353,8 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
     () => contentOutputs.find((output) => output.id === selectedOutputId) || null,
     [contentOutputs, selectedOutputId],
   )
+  const selectedOutputStatus = getOutputStatus(selectedContentOutput)
+  const canChangeSelectedOutputStatus = canEditOutputStatus(selectedOutputStatus)
 
   useEffect(() => {
     if (!isOutputEditorOpen) {
@@ -353,7 +379,12 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
       return
     }
 
-    setOutputEditForm(getOutputEditForm(selectedContentOutput))
+    const nextForm = getOutputEditForm(selectedContentOutput)
+
+    setOutputEditForm({
+      ...nextForm,
+      status: canEditOutputStatus(nextForm.status) ? nextForm.status : 'posted',
+    })
   }, [isOutputEditorOpen, selectedContentOutput])
 
   const canSubmit =
@@ -543,10 +574,10 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
         <header className="page-header generate-hero">
           <div>
             <p className="eyebrow">Reframe Content Engine</p>
-            <h1>List Outputs</h1>
+            <h1>Generated Content</h1>
             <p className="page-description">
-              Lihat semua content output yang sudah digenerate untuk user aktif. Data diambil dari
-              tabel output, bukan dari topic.
+              Lihat semua content yang sudah digenerate untuk user aktif. Data diambil dari tabel
+              output, bukan dari topic.
             </p>
           </div>
         </header>
@@ -583,7 +614,7 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Content Outputs</p>
-              <h2>Konten yang sudah dibuat</h2>
+              <h2>Konten hasil generate</h2>
             </div>
             <span className="pill subtle">{contentOutputs.length} item</span>
           </div>
@@ -605,6 +636,7 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
                       <th>Output</th>
                       <th>Platform</th>
                       <th>Format</th>
+                      <th>Status</th>
                       <th>Created At</th>
                       <th>Action</th>
                     </tr>
@@ -616,6 +648,7 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
                       const formatOutput =
                         getOutputValue(record, ['formatOutput', 'format_output']) ||
                         'Unknown format'
+                      const status = getOutputStatus(record)
                       const createdAt = formatDate(
                         getOutputValue(record, ['createdAt', 'created_at']) ||
                           getOutputValue(record, ['generatedAt', 'generated_at']) ||
@@ -643,6 +676,11 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
                             <span className="chip active">{platform}</span>
                           </td>
                           <td>{formatOutput}</td>
+                          <td>
+                            <span className={`pill ${status === 'approved' ? '' : 'subtle'}`}>
+                              {formatOutputStatus(status)}
+                            </span>
+                          </td>
                           <td>{createdAt}</td>
                           <td>
                             <div className="table-action-group">
@@ -721,11 +759,20 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
                       <select
                         value={outputEditForm.status}
                         onChange={(event) => handleOutputFieldChange('status', event.target.value)}
+                        disabled={!canChangeSelectedOutputStatus}
                       >
-                        <option value="draft">Draft</option>
-                        <option value="approved">Approve</option>
+                        {outputStatusOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
+                    {!canChangeSelectedOutputStatus ? (
+                      <small className="field-hint">
+                        Status `posted` sudah final, jadi tidak bisa diubah dari sini.
+                      </small>
+                    ) : null}
                   </label>
                   <label className="persona-field">
                     <span>Format</span>
@@ -788,24 +835,15 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
               <p className="eyebrow">Choose a flow</p>
               <h2>Pilih dulu yang mau kamu edit</h2>
             </div>
-            <span className="pill subtle">3 option</span>
+            <span className="pill subtle">2 option</span>
           </div>
 
           <p className="page-description generate-chooser-copy">
-            Satu menu untuk pilih cara kerja content engine. Manual pakai topic terpilih, auto
-            langsung jalan dari pillar, dan list buat lihat hasil yang sudah jadi.
+            Satu menu untuk pilih cara kerja content engine. Auto langsung jalan dari pillar, dan
+            list buat lihat hasil yang sudah jadi.
           </p>
 
           <div className="generate-simple-chooser-grid">
-            <button
-              type="button"
-              className="generate-simple-choice"
-              onClick={onOpenManualPost}
-            >
-              <strong>Manual</strong>
-              <p>Generate content dari topic yang dipilih.</p>
-            </button>
-
             <button
               type="button"
               className="generate-simple-choice"
@@ -820,8 +858,8 @@ export function ContentEnginePage({ userId, onOpenManualPost }: ContentEnginePag
               className="generate-simple-choice"
               onClick={() => setViewMode('list')}
             >
-              <strong>List Outputs</strong>
-              <p>Lihat semua content output yang sudah dibuat user aktif.</p>
+              <strong>Generated Content</strong>
+              <p>Lihat semua content hasil generate yang sudah dibuat user aktif.</p>
             </button>
           </div>
         </article>

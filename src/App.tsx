@@ -395,10 +395,7 @@ function AppShell() {
             ) : activePage === 'generate-topic' ? (
               <GenerateTopicPage userId={currentUser?.id || ''} />
             ) : activePage === 'content-engine' ? (
-              <ContentEnginePage
-                userId={currentUser?.id || ''}
-                onOpenManualPost={() => setActivePage('manual-post')}
-              />
+              <ContentEnginePage userId={currentUser?.id || ''} />
             ) : activePage === 'manual-post' ? (
               <ManualPostPage
                 userId={currentUser?.id || ''}
