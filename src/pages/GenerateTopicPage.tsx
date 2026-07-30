@@ -260,7 +260,6 @@ function TemplateCard({
     >
       <div className="generate-card-topline">
         <span className="generate-card-chip">Template</span>
-        <span className="generate-card-id">{template.id || 'no-id'}</span>
       </div>
       <strong>{template.normalizedName}</strong>
       <p className="generate-card-summary">
@@ -291,7 +290,6 @@ function PillarCard({
     >
       <div className="generate-card-topline">
         <span className="generate-card-chip accent">Pillar</span>
-        <span className="generate-card-id">{pillar.id || 'no-id'}</span>
       </div>
       <strong>{getPillarTitle(pillar)}</strong>
       <p>{shortenText(getPillarDescription(pillar), 140)}</p>

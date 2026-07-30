@@ -3,7 +3,7 @@ import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import { listContentOutputs, type ContentOutputRecord } from '../services/contentOutputs'
 import { listPersonaConfigs, type PersonaConfigRecord } from '../services/personaConfigs'
-import { runThreadsAutoPost, scheduleThreadsAutoPost } from '../services/threadsAutoPost'
+import { scheduleThreadsAutoPost } from '../services/threadsAutoPost'
 
 type AutoPostPageProps = {
   userId: string
@@ -73,14 +73,6 @@ function normalizeDatetimeLocal(value: string) {
   return parsed.toISOString()
 }
 
-function buildPreviewPayload(form: AutoPostScheduleForm) {
-  return {
-    personaConfigId: form.personaConfigId,
-    limit: form.limit,
-    scheduledAt: normalizeDatetimeLocal(form.scheduledAt),
-  }
-}
-
 function isApprovedOutput(record: ContentOutputRecord): boolean {
   return record.status?.toLowerCase().trim() === 'approved'
 }
@@ -112,7 +104,6 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
   const [isLoadingPersonas, setIsLoadingPersonas] = useState(true)
   const [isLoadingOutputs, setIsLoadingOutputs] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isRunning, setIsRunning] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -222,8 +213,6 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
     !isSubmitting &&
     !isLoadingPersonas
 
-  const previewPayload = useMemo(() => buildPreviewPayload(form), [form])
-
   function updateForm(key: keyof AutoPostScheduleForm, value: string | number) {
     setForm((current) => ({
       ...current,
@@ -253,17 +242,20 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
     }
 
     console.log('[AutoPost] submitting payload', payload)
-    console.log('[AutoPost] approved outputs before schedule', approvedOutputs.map((r) => ({
-      id: r.id,
-      status: r.status,
-      scheduled_at: r.scheduled_at || r.scheduledAt,
-    })))
+    console.log(
+      '[AutoPost] approved outputs before schedule',
+      approvedOutputs.map((record) => ({
+        id: record.id,
+        status: record.status,
+        scheduled_at: record.scheduled_at || record.scheduledAt,
+      })),
+    )
 
     try {
       const response = await scheduleThreadsAutoPost(payload)
 
       console.log('[AutoPost] scheduleThreadsAutoPost response', response)
-      console.log('[AutoPost] scheduled_at sent →', scheduledAtIso)
+      console.log('[AutoPost] scheduled_at sent ->', scheduledAtIso)
       setStatusTone('success')
       setStatusMessage('Auto post berhasil dijadwalkan.')
       toastSuccess('Schedule sent', 'Request auto post sudah dikirim ke backend.')
@@ -274,21 +266,6 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
       toastError('Schedule failed', errorMessage)
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  async function handleRunNow() {
-    setIsRunning(true)
-
-    try {
-      const response = await runThreadsAutoPost()
-      console.log('[AutoPost] runThreadsAutoPost response', response)
-      toastSuccess('Job triggered', 'Auto post job berhasil dijalankan manual.')
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Gagal menjalankan auto post job.'
-      toastError('Run job failed', errorMessage)
-    } finally {
-      setIsRunning(false)
     }
   }
 
@@ -336,7 +313,9 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
               <p className="eyebrow">Schedule Form</p>
               <h2>Isi data auto post</h2>
             </div>
-            <span className={`pill${canSubmit ? ' subtle' : ''}`}>{canSubmit ? 'Ready' : 'Needs input'}</span>
+            <span className={`pill${canSubmit ? ' subtle' : ''}`}>
+              {canSubmit ? 'Ready' : 'Needs input'}
+            </span>
           </div>
 
           <label className="persona-field full-width">
@@ -454,7 +433,7 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                     </div>
                     <p className="auto-post-output-text">
                       {getOutputPreviewText(record).slice(0, 120)}
-                      {getOutputPreviewText(record).length > 120 ? '…' : ''}
+                      {getOutputPreviewText(record).length > 120 ? '...' : ''}
                     </p>
                   </div>
                 ))}
@@ -465,57 +444,6 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                 ) : null}
               </div>
             )}
-          </article>
-
-          <article className="panel generate-panel">
-            <div className="panel-heading compact">
-              <div>
-                <p className="eyebrow">Preview</p>
-                <h2>Payload ke backend</h2>
-              </div>
-              <span className="pill subtle">POST /api/threads/auto-post</span>
-            </div>
-
-            <div className="generate-summary auto-post-summary">
-              <div className="generate-summary-item">
-                <span>Persona Config ID</span>
-                <strong>{form.personaConfigId || 'Belum diisi'}</strong>
-              </div>
-              <div className="generate-summary-item">
-                <span>Limit</span>
-                <strong>{form.limit}</strong>
-              </div>
-              <div className="generate-summary-item">
-                <span>Scheduled At</span>
-                <strong>{form.scheduledAt || 'Belum diisi'}</strong>
-              </div>
-            </div>
-
-            <label className="persona-field full-width">
-              <span>Preview Payload</span>
-              <textarea
-                value={JSON.stringify(previewPayload, null, 2)}
-                readOnly
-                rows={8}
-                className="generate-preview-textarea"
-              />
-            </label>
-
-            <div className="auto-post-run-section">
-              <p className="field-hint">
-                Run Job memicu auto post secara manual — biasanya dijalankan otomatis oleh
-                backend/cron. Gunakan hanya untuk debug.
-              </p>
-              <button
-                type="button"
-                className="secondary-button auto-post-run-btn"
-                onClick={handleRunNow}
-                disabled={isRunning}
-              >
-                <AppIcon name="arrow-right" />
-                {isRunning ? 'Running...' : 'Run Job'}
-              </button>
-            </div>
           </article>
         </aside>
       </section>

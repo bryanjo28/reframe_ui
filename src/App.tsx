@@ -407,9 +407,9 @@ function AppShell() {
               <SubscriptionPlansPage userId={currentUser?.id || ''} />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage />
-            ) : (
-              <DashboardPage activePage={activePage} />
-            )}
+              ) : (
+                <DashboardPage activePage={activePage} userId={currentUser?.id || ''} />
+              )}
           </div>
         </main>
       </div>

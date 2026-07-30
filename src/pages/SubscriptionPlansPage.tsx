@@ -361,8 +361,8 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
             <strong>{isLoading ? '...' : plans.length}</strong>
           </div>
           <div className="metric-card">
-            <span>User ID</span>
-            <strong>{userId || 'Not ready'}</strong>
+            <span>Status</span>
+            <strong>{userId ? 'Logged in' : 'Not ready'}</strong>
           </div>
           <div className="metric-card">
             <span>Current plan</span>

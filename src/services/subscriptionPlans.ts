@@ -120,6 +120,7 @@ export type NormalizedSubscriptionPlan = {
   status: string
   active: boolean
   featured: boolean
+  monthlyAiCredits: number | null
   raw: SubscriptionPlanRecord
 }
 
@@ -216,6 +217,9 @@ export function normalizeSubscriptionPlan(record: SubscriptionPlanRecord): Norma
     status: extractStatus(record),
     active: isPlanActive(record),
     featured: isPlanFeatured(record),
+    monthlyAiCredits:
+      readFirstNumber(record, ['monthly_ai_credits', 'monthlyAiCredits', 'aiCredits', 'ai_credits']) ??
+      null,
     raw: record,
   }
 }

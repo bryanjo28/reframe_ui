@@ -1,6 +1,9 @@
+import { useEffect, useMemo, useState } from 'react'
 import { AppIcon } from './AppIcon'
 import type { MenuItem, NavKey } from '../types/navigation'
 import type { AuthUser } from '../services/authService'
+import { getCurrentSubscription, listSubscriptionPlans } from '../services/subscriptionPlans'
+import { getMyUsage } from '../services/usage'
 
 type SidebarProps = {
   activePage: NavKey
@@ -54,12 +57,70 @@ function SidebarSection({
 }
 
 export function Sidebar({ activePage, onNavigate, currentUser, onLogout }: SidebarProps) {
+  const [usedTokens, setUsedTokens] = useState(0)
+  const [tokenLimit, setTokenLimit] = useState<number | null>(null)
+  const [planName, setPlanName] = useState('Current plan')
+
   const displayName =
     currentUser?.accountName ||
     currentUser?.fullName ||
     currentUser?.name ||
     currentUser?.email ||
     'User'
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadUsage() {
+      try {
+        const [summary, currentSubscription, subscriptionPlans] = await Promise.all([
+          getMyUsage(),
+          getCurrentSubscription(),
+          listSubscriptionPlans(),
+        ])
+
+        if (!isMounted) {
+          return
+        }
+
+        const activePlan = currentSubscription
+          ? subscriptionPlans.find((plan) => {
+              return (
+                (currentSubscription.planId && plan.id === currentSubscription.planId) ||
+                (currentSubscription.planKey && plan.key === currentSubscription.planKey) ||
+                plan.name === currentSubscription.planName
+              )
+            })
+          : null
+
+        setUsedTokens(summary?.used ?? 0)
+        setTokenLimit(activePlan?.monthlyAiCredits ?? summary?.limit ?? null)
+        setPlanName(currentSubscription?.planName || activePlan?.name || summary?.planName || 'Current plan')
+      } catch {
+        if (!isMounted) {
+          return
+        }
+
+        setUsedTokens(0)
+        setTokenLimit(null)
+        setPlanName('Current plan')
+      }
+    }
+
+    void loadUsage()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const usagePercent = useMemo(() => {
+    if (!tokenLimit || tokenLimit <= 0) {
+      return 0
+    }
+
+    return Math.min(100, Math.max(0, (usedTokens / tokenLimit) * 100))
+  }, [tokenLimit, usedTokens])
 
   return (
     <aside className="sidebar">
@@ -90,10 +151,12 @@ export function Sidebar({ activePage, onNavigate, currentUser, onLogout }: Sideb
       <div className="sidebar-bottom">
         <div className="sidebar-card token-card">
           <p className="sidebar-card-label">Token Usage</p>
-          <strong>2,480 / 10,000</strong>
-          <span>Workflow Reframe AI siap dipantau dari sini.</span>
+          <strong>
+            {usedTokens.toLocaleString('id-ID')} / {(tokenLimit ?? 0).toLocaleString('id-ID')}
+          </strong>
+          <span>{planName} dipakai sebagai batas usage saat ini.</span>
           <div className="token-track" aria-hidden="true">
-            <span className="token-track-fill" />
+            <span className="token-track-fill" style={{ width: `${usagePercent}%` }} />
           </div>
         </div>
 

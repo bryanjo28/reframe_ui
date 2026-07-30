@@ -492,7 +492,7 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
                 </div>
                 <div className="auto-post-detail-card">
                   <span>Content Pillar</span>
-                  <strong>{getTopicValue(selectedTopic, ['contentPillarId', 'content_pillar_id']) || 'Belum ada'}</strong>
+                  <strong>{getTopicValue(selectedTopic, ['pillarName', 'pillar_name']) || 'Tersambung ke pillar'}</strong>
                 </div>
                 <div className="auto-post-detail-card">
                   <span>Topic Text</span>

@@ -1,83 +1,44 @@
 import type { NavKey } from '../types/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { listContentOutputs } from '../services/contentOutputs'
+import { listPersonaConfigs } from '../services/personaConfigs'
 
-type SummaryCard = {
+type FocusStat = {
   label: string
   value: string
   note: string
 }
 
-type ActionCard = {
-  eyebrow: string
+type OperationalItem = {
   title: string
   description: string
+  tone: 'ready' | 'active' | 'watch'
 }
 
-type ScheduleRow = {
-  title: string
-  schedule: string
-  status: string
-}
-
-const summaryCards: SummaryCard[] = [
+const operationalItems: OperationalItem[] = [
   {
-    label: 'Persona ready',
-    value: '12',
-    note: '3 masih perlu review.',
+    title: 'Persona review',
+    description: 'Rapikan persona yang masih draft atau belum final sebelum dipakai.',
+    tone: 'ready',
   },
   {
-    label: 'Content library',
-    value: '136',
-    note: 'Siap dipakai untuk generate dan content engine.',
+    title: 'Content pipeline',
+    description: 'Pantau batch approved, lanjutkan yang siap publish, dan bereskan yang pending.',
+    tone: 'active',
   },
   {
-    label: 'Content engine active',
-    value: '24',
-    note: 'Mix fixed time dan random slot.',
-  },
-]
-
-const actionCards: ActionCard[] = [
-  {
-    eyebrow: 'Persona',
-    title: 'Bentuk persona',
-    description: 'Isi persona, enhance dengan AI, lalu review sebelum dipakai.',
-  },
-  {
-    eyebrow: 'Pillar',
-    title: 'Susun content pillar',
-    description: 'Rapikan template content dan siapkan affiliate link opsional.',
-  },
-  {
-    eyebrow: 'Generate',
-    title: 'Generate batch content',
-    description: 'Pilih persona dan pillar, lalu hasilkan content sesuai kebutuhan.',
-  },
-  {
-    eyebrow: 'Schedule',
-    title: 'Kelola content engine',
-    description: 'Jadwalkan content dari library dan pantau queue aktif.',
-  },
-]
-
-const scheduleRows: ScheduleRow[] = [
-  {
-    title: 'Batch edukasi pagi',
-    schedule: 'Setiap hari, 08:30 WIB',
-    status: 'Active',
-  },
-  {
-    title: 'Promo affiliate weekend',
-    schedule: 'Random slot 18:00 - 21:00 WIB',
-    status: 'Queued',
+    title: 'Operational focus',
+    description: 'Awasi engine, queue, dan slot posting supaya alur tetap rapi setiap hari.',
+    tone: 'watch',
   },
 ]
 
 const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: string }> = {
   dashboard: {
     eyebrow: 'Reframe Overview',
-    title: 'Semua workflow inti Reframe dalam satu tempat.',
+    title: 'Dashboard Reframe yang lebih fokus.',
     description:
-      'Mulai dari persona, content pillar, generate topic, sampai content engine tanpa dashboard yang terlalu padat.',
+      'Tampilan utama sekarang diringkas ke 4 inti: persona ready, content ready, engine nyala, dan operational focus.',
   },
   personalize: {
     eyebrow: 'Reframe Personalize',
@@ -141,26 +102,108 @@ const pageMeta: Record<NavKey, { eyebrow: string; title: string; description: st
   },
 }
 
-export function DashboardPage({ activePage }: { activePage: NavKey }) {
+export function DashboardPage({
+  activePage,
+  userId,
+}: {
+  activePage: NavKey
+  userId: string
+}) {
   const meta = pageMeta[activePage]
+  const [personaReady, setPersonaReady] = useState(0)
+  const [contentReady, setContentReady] = useState(0)
+  const [engineActive, setEngineActive] = useState(0)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadDashboardStats() {
+      try {
+        const [personaConfigs, contentOutputs] = await Promise.all([
+          listPersonaConfigs(),
+          listContentOutputs(userId || undefined),
+        ])
+
+        if (!isMounted) {
+          return
+        }
+
+        const ownedPersonaConfigs = userId
+          ? personaConfigs.filter((record) => {
+              const ownerId =
+                (typeof record.userId === 'string' && record.userId) ||
+                (typeof record.user_id === 'string' && record.user_id) ||
+                (typeof record.ownerId === 'string' && record.ownerId) ||
+                (typeof record.owner_id === 'string' && record.owner_id) ||
+                ''
+
+              return !ownerId || ownerId === userId
+            })
+          : personaConfigs
+
+        const draftOutputs = contentOutputs.filter(
+          (record) => record.status?.trim().toLowerCase() === 'draft',
+        )
+        const activeEngineOutputs = contentOutputs.filter((record) => {
+          const status = record.status?.trim().toLowerCase() || ''
+          return ['approved', 'scheduled', 'queued', 'published', 'posted'].includes(status)
+        })
+
+        setPersonaReady(ownedPersonaConfigs.length)
+        setContentReady(draftOutputs.length)
+        setEngineActive(activeEngineOutputs.length)
+      } catch {
+        if (!isMounted) {
+          return
+        }
+
+        setPersonaReady(0)
+        setContentReady(0)
+        setEngineActive(0)
+      }
+    }
+
+    void loadDashboardStats()
+
+    return () => {
+      isMounted = false
+    }
+  }, [userId])
+
+  const focusStats = useMemo<FocusStat[]>(
+    () => [
+      {
+        label: 'Persona ready',
+        value: personaReady.toLocaleString('id-ID'),
+        note: 'Persona yang sudah siap dipakai ke workflow berikutnya.',
+      },
+      {
+        label: 'Content ready',
+        value: contentReady.toLocaleString('id-ID'),
+        note: 'Konten draft yang siap diproses lebih lanjut di engine.',
+      },
+      {
+        label: 'Engine nyala',
+        value: engineActive.toLocaleString('id-ID'),
+        note: 'Konten aktif yang sedang masuk alur engine atau schedule.',
+      },
+    ],
+    [contentReady, engineActive, personaReady],
+  )
 
   return (
-    <>
-      <section className="hero-panel dashboard-hero">
+    <section className="dashboard-focus-stack">
+      <section className="hero-panel dashboard-hero dashboard-hero-compact">
         <div>
           <p className="eyebrow">{meta.eyebrow}</p>
           <h1>{meta.title}</h1>
           <p className="hero-copy">{meta.description}</p>
         </div>
-        <div className="hero-actions">
-          <button className="ghost-button">Open Persona</button>
-          <button className="primary-button">Open Content Engine</button>
-        </div>
       </section>
 
-      <section className="stats-grid compact">
-        {summaryCards.map((card) => (
-          <article className="stat-card" key={card.label}>
+      <section className="dashboard-focus-grid">
+        {focusStats.map((card) => (
+          <article className="stat-card dashboard-focus-card" key={card.label}>
             <span className="stat-label">{card.label}</span>
             <strong>{card.value}</strong>
             <p>{card.note}</p>
@@ -168,41 +211,25 @@ export function DashboardPage({ activePage }: { activePage: NavKey }) {
         ))}
       </section>
 
-      <section className="quick-actions-grid">
-        {actionCards.map((card) => (
-          <article className="panel quick-action-card" key={card.title}>
-            <p className="eyebrow">{card.eyebrow}</p>
-            <h2>{card.title}</h2>
-            <p>{card.description}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="panel dashboard-focus-panel">
+      <section className="panel dashboard-ops-panel">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Operational Focus</p>
-            <h2>Schedule yang perlu dipantau</h2>
+            <h2>Yang perlu dijaga tetap jalan</h2>
           </div>
-          <span className="pill subtle">2 queue</span>
+          <span className="pill subtle">4 fokus inti</span>
         </div>
 
-        <div className="queue-list">
-          {scheduleRows.map((row) => (
-            <div className="queue-row" key={row.title}>
-              <div>
-                <strong>{row.title}</strong>
-                <p>{row.schedule}</p>
-              </div>
-              <div className="queue-actions">
-                <span className={`status-badge ${row.status.toLowerCase()}`}>
-                  {row.status}
-                </span>
-              </div>
-            </div>
+        <div className="dashboard-ops-grid">
+          {operationalItems.map((item) => (
+            <article className="dashboard-ops-card" key={item.title}>
+              <span className={`status-badge ${item.tone}`}>{item.tone}</span>
+              <strong>{item.title}</strong>
+              <p>{item.description}</p>
+            </article>
           ))}
         </div>
       </section>
-    </>
+    </section>
   )
 }

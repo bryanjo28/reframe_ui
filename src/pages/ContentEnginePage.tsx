@@ -684,16 +684,18 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                           <td>{createdAt}</td>
                           <td>
                             <div className="table-action-group">
-                              <button
-                                type="button"
-                                className="table-icon-button table-icon-button-edit"
-                                onClick={() => outputId && openOutputEditor(outputId)}
-                                aria-label={`Edit output ${title}`}
-                                title="Edit output"
-                                disabled={!outputId || isSavingOutput}
-                              >
-                                <AppIcon name="pencil" />
-                              </button>
+                              {canEditOutputStatus(status) ? (
+                                <button
+                                  type="button"
+                                  className="table-icon-button table-icon-button-edit"
+                                  onClick={() => outputId && openOutputEditor(outputId)}
+                                  aria-label={`Edit output ${title}`}
+                                  title="Edit output"
+                                  disabled={!outputId || isSavingOutput}
+                                >
+                                  <AppIcon name="pencil" />
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
                                 className="table-icon-button table-icon-button-delete"
@@ -768,11 +770,11 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                         ))}
                       </select>
                     </div>
-                    {!canChangeSelectedOutputStatus ? (
+                    {/* {!canChangeSelectedOutputStatus ? (
                       <small className="field-hint">
                         Status `posted` sudah final, jadi tidak bisa diubah dari sini.
                       </small>
-                    ) : null}
+                    ) : null} */}
                   </label>
                   <label className="persona-field">
                     <span>Format</span>
@@ -947,7 +949,6 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                   >
                     <div className="generate-card-topline">
                       <span className="generate-card-chip accent">Pillar</span>
-                      <span className="generate-card-id">{pillar.id || 'no-id'}</span>
                     </div>
                     <strong>{getPillarTitle(pillar)}</strong>
                     <p>{shortenText(getPillarDescription(pillar), 140)}</p>
