@@ -192,6 +192,16 @@ function AppShell() {
     setStoredActivePage(activePage)
   }, [activePage])
 
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const hasThreadsCallbackState =
+      searchParams.has('connected') || searchParams.has('error')
+
+    if (hasThreadsCallbackState) {
+      setActivePage('connecting-apps')
+    }
+  }, [])
+
   const handleStandaloneAuthenticated = useCallback(async (
     session: AuthSession,
     authMode: StandaloneAuthMode,

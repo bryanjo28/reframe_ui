@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
+import { useToast } from '../components/useToast'
 import {
   getCurrentAuthState,
   type ThreadsSocialAccountState,
@@ -51,10 +52,36 @@ function toThreadsConnectionView(
 }
 
 export function ConnectingAppsPage() {
+  const { success: toastSuccess, error: toastError } = useToast()
   const [isConnectingThreads, setIsConnectingThreads] = useState(false)
   const [isLoadingThreadsStatus, setIsLoadingThreadsStatus] = useState(true)
   const [connectionError, setConnectionError] = useState('')
   const [threadsConnection, setThreadsConnection] = useState<ThreadsConnectionView | null>(null)
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const connected = searchParams.get('connected')
+    const error = searchParams.get('error')
+
+    if (!connected && !error) {
+      return
+    }
+
+    if (connected === 'true') {
+      toastSuccess(
+        'Threads connected',
+        'Akun Threads berhasil terhubung dan status koneksi sudah diperbarui.',
+      )
+    }
+
+    if (error) {
+      const message = error.trim() || 'Terjadi error saat menyelesaikan koneksi Threads.'
+      setConnectionError(message)
+      toastError('Threads connection failed', message)
+    }
+
+    window.history.replaceState({}, document.title, window.location.pathname)
+  }, [toastError, toastSuccess])
 
   useEffect(() => {
     let cancelled = false
