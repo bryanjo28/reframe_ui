@@ -223,53 +223,6 @@ function isUnusedTopic(record: ContentTopicRecord) {
   return true
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function unwrapWebhookResponse(response: unknown) {
-  if (!isRecord(response)) {
-    return {}
-  }
-
-  return isRecord(response.data) ? response.data : response
-}
-
-function safeParseJson(text: string) {
-  try {
-    return JSON.parse(text) as unknown
-  } catch {
-    return null
-  }
-}
-
-function coerceWebhookResponse(response: unknown) {
-  if (typeof response === 'string') {
-    return safeParseJson(response) ?? response
-  }
-
-  return response
-}
-
-function extractTopicsFromWebhookResponse(response: unknown) {
-  const root = unwrapWebhookResponse(coerceWebhookResponse(response))
-  const parsedContent = isRecord(root.parsed_content) ? root.parsed_content : null
-  const topicsCandidate = parsedContent?.topics ?? root.topics
-
-  if (Array.isArray(topicsCandidate)) {
-    return topicsCandidate as unknown[]
-  }
-
-  const cleanedContent = typeof root.cleaned_content === 'string' ? root.cleaned_content : ''
-  const parsedCleaned = cleanedContent ? safeParseJson(cleanedContent) : null
-
-  if (isRecord(parsedCleaned) && Array.isArray(parsedCleaned.topics)) {
-    return parsedCleaned.topics as unknown[]
-  }
-
-  return []
-}
-
 export function ContentEnginePage({ userId }: ContentEnginePageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
