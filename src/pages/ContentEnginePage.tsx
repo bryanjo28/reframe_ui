@@ -237,7 +237,6 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
   const [isLoadingOutputs, setIsLoadingOutputs] = useState(false)
   const [outputsRefreshKey, setOutputsRefreshKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [responsePreview, setResponsePreview] = useState('')
   const [contentTopics, setContentTopics] = useState<ContentTopicRecord[]>([])
   const [isLoadingTopics, setIsLoadingTopics] = useState(true)
   const [contentOutputs, setContentOutputs] = useState<ContentOutputRecord[]>([])
@@ -459,8 +458,6 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
     setIsSubmitting(true)
     setStatusTone('idle')
     setStatusMessage('Mengirim auto-generate payload...')
-    setResponsePreview('')
-
     void autoGenerateContentOutputs({
       contentPillarId: selectedContentPillarId,
       targetCount,
@@ -470,7 +467,6 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
         const bodyText =
           typeof rawData === 'string' ? rawData : JSON.stringify(rawData, null, 2)
 
-        setResponsePreview(bodyText || 'Response kosong dari backend.')
         setStatusTone('success')
         if (scheduleMode === 'now') {
           setStatusMessage('Generate content berhasil. Silakan cek di list generated content.')
