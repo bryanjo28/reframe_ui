@@ -3,7 +3,7 @@ import { getCurrentAuthToken } from './authService'
 
 const CONTENT_OUTPUTS_ENDPOINT = '/api/content-outputs/generate'
 const CONTENT_OUTPUTS_LIST_ENDPOINT = '/api/content-outputs'
-// const CONTENT_OUTPUTS_DEMO_ENDPOINT = '/api/content-outputs/generate-demo'
+const CONTENT_OUTPUTS_DEMO_ENDPOINT = '/api/content-outputs/generate-demo'
 const REQUEST_TIMEOUT_MS = 25000
 
 export type CreateContentOutputPayload = {
@@ -77,17 +77,17 @@ function buildHeaders(withBody = false) {
   return headers
 }
 
-// function normalizeGenerateContentOutputDemoPayload(payload: GenerateContentOutputDemoPayload = {}) {
-//   return {
-//     persona: typeof payload.persona === 'string' ? payload.persona.trim() : '',
-//     targetAudience:
-//       typeof payload.targetAudience === 'string' ? payload.targetAudience.trim() : '',
-//     nicheTopicFocus:
-//       typeof payload.nicheTopicFocus === 'string' ? payload.nicheTopicFocus.trim() : '',
-//     contentStyle: typeof payload.contentStyle === 'string' ? payload.contentStyle.trim() : '',
-//     formatOutput: 'threads pendek',
-//   }
-// }
+function normalizeGenerateContentOutputDemoPayload(payload: GenerateContentOutputDemoPayload = {}) {
+  return {
+    persona: typeof payload.persona === 'string' ? payload.persona.trim() : '',
+    targetAudience:
+      typeof payload.targetAudience === 'string' ? payload.targetAudience.trim() : '',
+    nicheTopicFocus:
+      typeof payload.nicheTopicFocus === 'string' ? payload.nicheTopicFocus.trim() : '',
+    contentStyle: typeof payload.contentStyle === 'string' ? payload.contentStyle.trim() : '',
+    formatOutput: 'threads pendek',
+  }
+}
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController()
@@ -147,23 +147,23 @@ export async function createContentOutput(payload: CreateContentOutputPayload) {
   return data
 }
 
-// export async function generateContentOutputDemo(payload: GenerateContentOutputDemoPayload = {}) {
-//   const response = await fetchWithTimeout(buildApiUrl(CONTENT_OUTPUTS_DEMO_ENDPOINT), {
-//     method: 'POST',
-//     headers: buildHeaders(true),
-//     body: JSON.stringify(normalizeGenerateContentOutputDemoPayload(payload)),
-//   })
+export async function generateContentOutputDemo(payload: GenerateContentOutputDemoPayload = {}) {
+  const response = await fetchWithTimeout(buildApiUrl(CONTENT_OUTPUTS_DEMO_ENDPOINT), {
+    method: 'POST',
+    headers: buildHeaders(true),
+    body: JSON.stringify(normalizeGenerateContentOutputDemoPayload(payload)),
+  })
 
-//   const data = await readResponseBodyWithTimeout(response)
+  const data = await readResponseBodyWithTimeout(response)
 
-//   if (!response.ok) {
-//     const errorMessage = typeof data === 'string' ? data : 'Gagal generate demo content output.'
+  if (!response.ok) {
+    const errorMessage = typeof data === 'string' ? data : 'Gagal generate demo content output.'
 
-//     throw new Error(errorMessage || 'Gagal generate demo content output.')
-//   }
+    throw new Error(errorMessage || 'Gagal generate demo content output.')
+  }
 
-//   return data
-// }
+  return data
+}
 
 export async function autoGenerateContentOutputs(payload: AutoGenerateContentOutputsPayload) {
   const response = await fetchWithTimeout(
