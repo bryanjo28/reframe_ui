@@ -285,7 +285,6 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
   const [outputsRefreshKey, setOutputsRefreshKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [responsePreview, setResponsePreview] = useState('')
-  const [responseTopics, setResponseTopics] = useState<unknown[]>([])
   const [contentTopics, setContentTopics] = useState<ContentTopicRecord[]>([])
   const [isLoadingTopics, setIsLoadingTopics] = useState(true)
   const [contentOutputs, setContentOutputs] = useState<ContentOutputRecord[]>([])
@@ -508,7 +507,6 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
     setStatusTone('idle')
     setStatusMessage('Mengirim auto-generate payload...')
     setResponsePreview('')
-    setResponseTopics([])
 
     void autoGenerateContentOutputs({
       contentPillarId: selectedContentPillarId,
@@ -520,7 +518,6 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
           typeof rawData === 'string' ? rawData : JSON.stringify(rawData, null, 2)
 
         setResponsePreview(bodyText || 'Response kosong dari backend.')
-        setResponseTopics(extractTopicsFromWebhookResponse(rawData))
         setStatusTone('success')
         setStatusMessage('Payload auto-generate berhasil dikirim ke backend.')
         toastSuccess('Auto-generate sent', 'Payload content engine sudah dikirim.')
