@@ -473,6 +473,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
   const canSubmit =
     Boolean(selectedContentPillarId) &&
     selectedPillarTopics.length > 0 &&
+    selectedPillarTopics.length >= targetCount &&
     targetCount >= 1 &&
     targetCount <= 10 &&
     (scheduleMode === 'now' || Boolean(scheduledAt.trim())) &&
@@ -487,6 +488,8 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
       setStatusMessage(
         selectedContentPillarId && selectedPillarTopics.length === 0
           ? 'Topic available untuk pillar ini masih 0.'
+          : selectedContentPillarId && selectedPillarTopics.length < targetCount
+            ? `Topic available untuk pillar ini cuma ${selectedPillarTopics.length}, lebih kecil dari target ${targetCount}.`
           : 'Lengkapi pillar, target count, dan scheduled at dulu.',
       )
       return

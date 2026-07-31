@@ -304,6 +304,7 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
     form.targetCount <= 100 &&
     Boolean(form.scheduledAt.trim()) &&
     previewQueue.length > 0 &&
+    approvedOutputs.length >= form.targetCount &&
     !isSubmitting &&
     !isLoadingPersonas
 
@@ -322,6 +323,14 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
     if (!form.personaConfigId.trim() || !scheduledAtIso || form.targetCount < 1) {
       setStatusTone('error')
       setStatusMessage('Lengkapi persona, target, dan scheduled time dulu.')
+      return
+    }
+
+    if (approvedOutputs.length < form.targetCount) {
+      setStatusTone('error')
+      setStatusMessage(
+        `Approved content Threads untuk persona ini cuma ${approvedOutputs.length}, lebih kecil dari target ${form.targetCount}.`,
+      )
       return
     }
 
