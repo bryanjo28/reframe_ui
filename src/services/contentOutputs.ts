@@ -166,15 +166,18 @@ export async function generateContentOutputDemo(payload: GenerateContentOutputDe
 }
 
 export async function autoGenerateContentOutputs(payload: AutoGenerateContentOutputsPayload) {
-  const response = await fetchWithTimeout(buildApiUrl('/api/content-outputs/auto-generate'), {
-    method: 'POST',
-    headers: buildHeaders(true),
-    body: JSON.stringify({
-      contentPillarId: payload.contentPillarId,
-      targetCount: payload.targetCount,
-      scheduledAt: payload.scheduledAt,
-    }),
-  })
+  const response = await fetchWithTimeout(
+    buildApiUrl('/api/content-outputs/auto-generate/schedule'),
+    {
+      method: 'POST',
+      headers: buildHeaders(true),
+      body: JSON.stringify({
+        contentPillarId: payload.contentPillarId,
+        targetCount: payload.targetCount,
+        scheduledAt: payload.scheduledAt,
+      }),
+    },
+  )
 
   const data = await readResponseBodyWithTimeout(response)
 

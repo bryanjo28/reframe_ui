@@ -9,6 +9,7 @@ import {
   type ContentOutputRecord,
 } from '../services/contentOutputs'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
+import { listContentTopics, type ContentTopicRecord } from '../services/contentTopics'
 
 type ContentEnginePageProps = {
   userId: string
@@ -183,6 +184,45 @@ function getOutputPreview(record: ContentOutputRecord, limit = 140) {
   return `${text.slice(0, limit).trim()}...`
 }
 
+function getTopicPillarId(record: ContentTopicRecord) {
+  return (
+    (typeof record.contentPillarId === 'string' && record.contentPillarId.trim()) ||
+    (typeof record.content_pillar_id === 'string' && record.content_pillar_id.trim()) ||
+    ''
+  )
+}
+
+function getTopicLabel(record: ContentTopicRecord) {
+  return (
+    (typeof record.topic === 'string' && record.topic.trim()) ||
+    (typeof record.subcategory === 'string' && record.subcategory.trim()) ||
+    (typeof record.category === 'string' && record.category.trim()) ||
+    'Untitled topic'
+  )
+}
+
+function isUnusedTopic(record: ContentTopicRecord) {
+  const candidates = [record.usedAt, record.used_at]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'number') {
+      return candidate === 0
+    }
+
+    if (typeof candidate === 'string') {
+      const normalized = candidate.trim().toLowerCase()
+
+      if (!normalized) {
+        return true
+      }
+
+      return normalized === '0'
+    }
+  }
+
+  return true
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -246,6 +286,8 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [responsePreview, setResponsePreview] = useState('')
   const [responseTopics, setResponseTopics] = useState<unknown[]>([])
+  const [contentTopics, setContentTopics] = useState<ContentTopicRecord[]>([])
+  const [isLoadingTopics, setIsLoadingTopics] = useState(true)
   const [contentOutputs, setContentOutputs] = useState<ContentOutputRecord[]>([])
   const [selectedOutputId, setSelectedOutputId] = useState('')
   const [isOutputEditorOpen, setIsOutputEditorOpen] = useState(false)
@@ -300,6 +342,38 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
   useEffect(() => {
     let isMounted = true
 
+    async function loadTopics() {
+      setIsLoadingTopics(true)
+
+      try {
+        const topics = await listContentTopics()
+
+        if (!isMounted) {
+          return
+        }
+
+        setContentTopics(topics)
+      } catch {
+        if (isMounted) {
+          setContentTopics([])
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingTopics(false)
+        }
+      }
+    }
+
+    void loadTopics()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
     async function loadOutputs() {
       if (viewMode !== 'list') {
         return
@@ -348,6 +422,15 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
     () => contentPillars.find((pillar) => pillar.id === selectedContentPillarId) || null,
     [contentPillars, selectedContentPillarId],
   )
+  const selectedPillarTopics = useMemo(() => {
+    if (!selectedContentPillarId) {
+      return []
+    }
+
+    return contentTopics.filter((topic) => {
+      return getTopicPillarId(topic) === selectedContentPillarId && isUnusedTopic(topic)
+    })
+  }, [contentTopics, selectedContentPillarId])
 
   const selectedContentOutput = useMemo(
     () => contentOutputs.find((output) => output.id === selectedOutputId) || null,
@@ -389,6 +472,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
 
   const canSubmit =
     Boolean(selectedContentPillarId) &&
+    selectedPillarTopics.length > 0 &&
     targetCount >= 1 &&
     targetCount <= 10 &&
     (scheduleMode === 'now' || Boolean(scheduledAt.trim())) &&
@@ -400,7 +484,11 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
 
     if (!canSubmit) {
       setStatusTone('error')
-      setStatusMessage('Lengkapi pillar, target count, dan scheduled at dulu.')
+      setStatusMessage(
+        selectedContentPillarId && selectedPillarTopics.length === 0
+          ? 'Topic available untuk pillar ini masih 0.'
+          : 'Lengkapi pillar, target count, dan scheduled at dulu.',
+      )
       return
     }
 
@@ -969,31 +1057,52 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
           <article className="panel generate-panel">
             <div className="panel-heading compact">
               <div>
-                <p className="eyebrow">Latest Response</p>
-                <h2>Hasil auto-generate</h2>
+                <p className="eyebrow">Available Topics</p>
+                <h2>Topic untuk pillar ini</h2>
               </div>
-              <span className="pill subtle">Live</span>
+              <span className="pill subtle">
+                {selectedContentPillarId ? `${selectedPillarTopics.length} topic` : 'Pilih pillar'}
+              </span>
             </div>
 
-            {responsePreview ? (
-              <div className="generate-response-stack">
-                <pre className="generate-response-preview">{responsePreview}</pre>
-                {responseTopics.length ? (
-                  <div className="generate-empty-state">
-                    <AppIcon name="check" />
-                    <div>
-                      <strong>{responseTopics.length} topic parsed</strong>
-                      <p>Response backend sudah berhasil dibaca.</p>
+            {!selectedContentPillarId ? (
+              <div className="generate-empty-state">
+                <AppIcon name="info" />
+                <div>
+                  <strong>Pilih pillar dulu</strong>
+                  <p>Daftar topic available akan muncul setelah pillar dipilih.</p>
+                </div>
+              </div>
+            ) : isLoadingTopics ? (
+              <div className="generate-empty-state">
+                <AppIcon name="info" />
+                <div>
+                  <strong>Memuat topic...</strong>
+                </div>
+              </div>
+            ) : selectedPillarTopics.length ? (
+              <div className="auto-post-output-list">
+                {selectedPillarTopics.slice(0, 8).map((topic, index) => (
+                  <div key={topic.id || `${getTopicLabel(topic)}-${index}`} className="auto-post-output-item">
+                    <div className="auto-post-output-meta">
+                      <span className="pill subtle">#{index + 1}</span>
+                      {topic.category ? <span className="pill">{topic.category}</span> : null}
                     </div>
+                    <p className="auto-post-output-text">{shortenText(getTopicLabel(topic), 90)}</p>
                   </div>
+                ))}
+                {selectedPillarTopics.length > 8 ? (
+                  <p className="field-hint" style={{ textAlign: 'center', marginTop: '8px' }}>
+                    +{selectedPillarTopics.length - 8} topic lain tersedia.
+                  </p>
                 ) : null}
               </div>
             ) : (
               <div className="generate-empty-state">
-                <AppIcon name="check" />
+                <AppIcon name="info" />
                 <div>
-                  <strong>Belum ada response</strong>
-                  <p>Setelah request sukses, response auto-generate akan tampil di sini.</p>
+                  <strong>Belum ada topic untuk pillar ini</strong>
+                  <p>Pastikan endpoint content topics sudah punya data untuk pillar yang dipilih.</p>
                 </div>
               </div>
             )}
@@ -1005,28 +1114,11 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">Auto Generate</p>
-                <h2>Review sebelum kirim</h2>
+                <h2>Auto generate content</h2>
               </div>
               <span className={`pill${canSubmit ? ' subtle' : ''}`}>
                 {canSubmit ? 'Ready' : 'Needs setup'}
               </span>
-            </div>
-
-            <div className="generate-summary">
-              <div className="generate-summary-item">
-                <span>Content Pillar</span>
-                <strong>
-                  {selectedContentPillar ? getPillarTitle(selectedContentPillar) : 'Belum dipilih'}
-                </strong>
-              </div>
-              <div className="generate-summary-item">
-                <span>Target Count</span>
-                <strong>{targetCount}</strong>
-              </div>
-              <div className="generate-summary-item">
-                <span>Schedule</span>
-                <strong>{scheduleMode === 'now' ? 'Now' : 'Scheduled later'}</strong>
-              </div>
             </div>
 
             <div className="generate-mode-chooser content-engine-mode-chooser">
@@ -1036,8 +1128,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                 onClick={() => setScheduleMode('now')}
               >
                 <span className="generate-entry-pill">Now</span>
-                <strong>Produce manual sekarang</strong>
-                <p>Payload langsung dikirim dengan scheduledAt waktu sekarang.</p>
+                <strong>Produce now</strong>
               </button>
 
               <button
@@ -1046,10 +1137,18 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                 onClick={() => setScheduleMode('later')}
               >
                 <span className="generate-entry-pill accent">Schedule</span>
-                <strong>Schedule untuk nanti</strong>
-                <p>Isi waktu kirim lalu backend akan proses sesuai jadwal yang dipilih.</p>
+                <strong>Schedule</strong>
               </button>
             </div>
+
+            <label className="persona-field full-width">
+              <span>Content Pillar</span>
+              <input
+                type="text"
+                value={selectedContentPillar ? getPillarTitle(selectedContentPillar) : 'Belum dipilih'}
+                readOnly
+              />
+            </label>
 
             <label className="persona-field full-width">
               <span>Target Count</span>
@@ -1091,15 +1190,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                 />
                 <small className="field-hint">Pilih waktu kirim untuk payload auto-generate.</small>
               </label>
-            ) : (
-              <div className="generate-empty-state generate-now-state">
-                <AppIcon name="clock" />
-                <div>
-                  <strong>Run now</strong>
-                  <p>Payload akan dikirim dengan scheduledAt waktu sekarang.</p>
-                </div>
-              </div>
-            )}
+            ) : null}
 
             <div className="persona-actions persona-actions-preview generate-actions">
               <button className="primary-button" type="submit" disabled={!canSubmit}>
@@ -1107,10 +1198,12 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
               </button>
             </div>
 
-            <div className="generate-note">
-              <AppIcon name="info" />
-              <p>Payload yang dikirim: `contentPillarId`, `targetCount`, dan `scheduledAt`.</p>
-            </div>
+            {responsePreview ? (
+              <div className="generate-note">
+                <AppIcon name="info" />
+                <p>{shortenText(responsePreview, 180)}</p>
+              </div>
+            ) : null}
           </form>
         </aside>
       </section>

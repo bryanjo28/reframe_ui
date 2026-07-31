@@ -3,7 +3,11 @@ import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import { listContentOutputs, type ContentOutputRecord } from '../services/contentOutputs'
 import { listPersonaConfigs, type PersonaConfigRecord } from '../services/personaConfigs'
-import { scheduleThreadsAutoPost } from '../services/threadsAutoPost'
+import {
+  getScheduledJobById,
+  scheduleThreadsAutoPost,
+  type ScheduledJobRecord,
+} from '../services/threadsAutoPost'
 
 type AutoPostPageProps = {
   userId: string
@@ -11,7 +15,7 @@ type AutoPostPageProps = {
 
 type AutoPostScheduleForm = {
   personaConfigId: string
-  limit: number
+  targetCount: number
   scheduledAt: string
 }
 
@@ -40,6 +44,66 @@ function getRecordUserId(record: PersonaConfigRecord | null) {
     'createdByUserId',
     'created_by_user_id',
   ])
+}
+
+function getScheduledJobValue(record: ScheduledJobRecord | null, keys: string[]) {
+  if (!record) {
+    return ''
+  }
+
+  for (const key of keys) {
+    const value = record[key]
+
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+
+  return ''
+}
+
+function getScheduledJobId(record: ScheduledJobRecord | null) {
+  return getScheduledJobValue(record, ['id'])
+}
+
+function getScheduledJobUserId(record: ScheduledJobRecord | null) {
+  return getScheduledJobValue(record, ['userId', 'user_id'])
+}
+
+function getScheduledJobStatus(record: ScheduledJobRecord | null) {
+  return getScheduledJobValue(record, ['status']) || 'registered'
+}
+
+function getScheduledJobDate(record: ScheduledJobRecord | null) {
+  return getScheduledJobValue(record, ['scheduledAt', 'scheduled_at'])
+}
+
+function readScheduledJobIdFromResponse(response: unknown) {
+  if (!response || typeof response !== 'object') {
+    return ''
+  }
+
+  const candidates = [
+    response,
+    (response as Record<string, unknown>).data,
+    (response as Record<string, unknown>).item,
+    (response as Record<string, unknown>).scheduledJob,
+    (response as Record<string, unknown>).scheduled_job,
+  ]
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') {
+      continue
+    }
+
+    const value = (candidate as Record<string, unknown>).id
+
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+
+  return ''
 }
 
 function getPersonaLabel(record: PersonaConfigRecord) {
@@ -77,6 +141,22 @@ function isApprovedOutput(record: ContentOutputRecord): boolean {
   return record.status?.toLowerCase().trim() === 'approved'
 }
 
+function isThreadsPlatform(record: ContentOutputRecord): boolean {
+  return record.platform?.toLowerCase().trim() === 'threads'
+}
+
+function getOutputPersonaConfigId(record: ContentOutputRecord): string {
+  const candidates = [record.personaConfigId, record.persona_config_id]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim()
+    }
+  }
+
+  return ''
+}
+
 function getOutputPreviewText(record: ContentOutputRecord): string {
   return (
     record.content ||
@@ -94,16 +174,18 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
   const [contentOutputs, setContentOutputs] = useState<ContentOutputRecord[]>([])
   const [form, setForm] = useState<AutoPostScheduleForm>({
     personaConfigId: '',
-    limit: 5,
+    targetCount: 5,
     scheduledAt: '',
   })
   const [statusMessage, setStatusMessage] = useState(
-    'Pilih persona lalu atur limit dan waktu schedule.',
+    'Pilih persona lalu atur target dan waktu schedule.',
   )
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
   const [isLoadingPersonas, setIsLoadingPersonas] = useState(true)
   const [isLoadingOutputs, setIsLoadingOutputs] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [registeredScheduleCount, setRegisteredScheduleCount] = useState(0)
+  const [latestScheduledJob, setLatestScheduledJob] = useState<ScheduledJobRecord | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -193,23 +275,35 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
     [form.personaConfigId, personaConfigs],
   )
 
-  const approvedOutputs = useMemo(
-    () => contentOutputs.filter(isApprovedOutput),
-    [contentOutputs],
-  )
+  const personaScopedOutputs = useMemo(() => {
+    if (!form.personaConfigId.trim()) {
+      return []
+    }
 
-  const unapprovedCount = contentOutputs.length - approvedOutputs.length
+    return contentOutputs.filter((record) => {
+      return getOutputPersonaConfigId(record) === form.personaConfigId.trim()
+    })
+  }, [contentOutputs, form.personaConfigId])
+
+  const approvedOutputs = useMemo(() => {
+    return personaScopedOutputs.filter((record) => {
+      return isApprovedOutput(record) && isThreadsPlatform(record)
+    })
+  }, [personaScopedOutputs])
+
+  const excludedOutputCount = Math.max(personaScopedOutputs.length - approvedOutputs.length, 0)
 
   const previewQueue = useMemo(
-    () => approvedOutputs.slice(0, form.limit),
-    [approvedOutputs, form.limit],
+    () => approvedOutputs.slice(0, form.targetCount),
+    [approvedOutputs, form.targetCount],
   )
 
   const canSubmit =
     Boolean(form.personaConfigId.trim()) &&
-    form.limit >= 1 &&
-    form.limit <= 100 &&
+    form.targetCount >= 1 &&
+    form.targetCount <= 100 &&
     Boolean(form.scheduledAt.trim()) &&
+    previewQueue.length > 0 &&
     !isSubmitting &&
     !isLoadingPersonas
 
@@ -225,9 +319,15 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
 
     const scheduledAtIso = normalizeDatetimeLocal(form.scheduledAt)
 
-    if (!form.personaConfigId.trim() || !scheduledAtIso || form.limit < 1) {
+    if (!form.personaConfigId.trim() || !scheduledAtIso || form.targetCount < 1) {
       setStatusTone('error')
-      setStatusMessage('Lengkapi persona, limit, dan scheduled time dulu.')
+      setStatusMessage('Lengkapi persona, target, dan scheduled time dulu.')
+      return
+    }
+
+    if (!previewQueue[0]?.id) {
+      setStatusTone('error')
+      setStatusMessage('Belum ada approved content Threads untuk persona ini.')
       return
     }
 
@@ -237,8 +337,8 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
 
     const payload = {
       personaConfigId: form.personaConfigId.trim(),
-      limit: form.limit,
       scheduledAt: scheduledAtIso,
+      limit: form.targetCount,
     }
 
     console.log('[AutoPost] submitting payload', payload)
@@ -247,15 +347,46 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
       approvedOutputs.map((record) => ({
         id: record.id,
         status: record.status,
+        platform: record.platform,
+        personaConfigId: getOutputPersonaConfigId(record),
         scheduled_at: record.scheduled_at || record.scheduledAt,
       })),
     )
 
     try {
       const response = await scheduleThreadsAutoPost(payload)
+      const scheduledJobId = readScheduledJobIdFromResponse(response)
 
       console.log('[AutoPost] scheduleThreadsAutoPost response', response)
-      console.log('[AutoPost] scheduled_at sent ->', scheduledAtIso)
+      console.log('[AutoPost] scheduleValue sent ->', scheduledAtIso)
+
+      if (scheduledJobId) {
+        try {
+          const scheduledJob = await getScheduledJobById(scheduledJobId)
+
+          console.log('[AutoPost] getScheduledJobById response', scheduledJob)
+          setLatestScheduledJob(scheduledJob)
+
+          if (!userId || !getScheduledJobUserId(scheduledJob) || getScheduledJobUserId(scheduledJob) === userId) {
+            setRegisteredScheduleCount((current) => current + 1)
+          }
+        } catch (scheduledJobError) {
+          console.log('[AutoPost] getScheduledJobById failed', scheduledJobError)
+          setLatestScheduledJob({
+            id: scheduledJobId,
+            scheduledAt: scheduledAtIso,
+            status: 'registered',
+          })
+          setRegisteredScheduleCount((current) => current + 1)
+        }
+      } else {
+        setLatestScheduledJob({
+          scheduledAt: scheduledAtIso,
+          status: 'registered',
+        })
+        setRegisteredScheduleCount((current) => current + 1)
+      }
+
       setStatusTone('success')
       setStatusMessage('Auto post berhasil dijadwalkan.')
       toastSuccess('Schedule sent', 'Request auto post sudah dikirim ke backend.')
@@ -276,12 +407,12 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
           <p className="eyebrow">Reframe Auto Post</p>
           <h1>Schedule auto post.</h1>
           <p className="page-description">
-            Pilih persona, tentukan limit konten yang mau di-schedule, lalu set waktu postingnya.
+            Pilih persona, tentukan target konten approved yang mau di-schedule, lalu set waktu postingnya.
             Hanya konten berstatus <strong>approved</strong> yang akan ikut batch.
           </p>
         </div>
 
-        <div className="generate-hero-metrics">
+        <div className="generate-hero-metrics pt-2">
           <div className="metric-card">
             <span>Flow</span>
             <strong>Threads auto post</strong>
@@ -293,8 +424,12 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
           <div className="metric-card">
             <span>Approved</span>
             <strong>
-              {isLoadingOutputs ? '...' : `${approvedOutputs.length} / ${contentOutputs.length}`}
+              {isLoadingOutputs ? '...' : `${approvedOutputs.length} / ${personaScopedOutputs.length}`}
             </strong>
+          </div>
+          <div className="metric-card">
+            <span>Auto post terdaftar</span>
+            <strong>{registeredScheduleCount}x</strong>
           </div>
         </div>
       </header>
@@ -357,18 +492,18 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
           )}
 
           <label className="persona-field">
-            <span>Limit</span>
+            <span>Target</span>
             <input
               type="number"
               min={1}
               max={100}
-              value={form.limit}
+              value={form.targetCount}
               onChange={(event) =>
-                updateForm('limit', Number.parseInt(event.target.value || '0', 10) || 1)
+                updateForm('targetCount', Number.parseInt(event.target.value || '0', 10) || 1)
               }
               placeholder="5"
             />
-            <small className="field-hint">Jumlah konten yang akan masuk batch schedule.</small>
+            <small className="field-hint">Jumlah konten approved yang akan diambil untuk batch auto post.</small>
           </label>
 
           <label className="persona-field full-width">
@@ -386,6 +521,27 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
               {isSubmitting ? 'Menjadwalkan...' : 'Schedule'}
             </button>
           </div>
+
+          {latestScheduledJob ? (
+            <div className="integration-note">
+              <AppIcon name="check" />
+              <p>
+                Auto post terdaftar {registeredScheduleCount}x.
+                {getScheduledJobId(latestScheduledJob)
+                  ? ` Job ID: ${getScheduledJobId(latestScheduledJob)}.`
+                  : ''}
+                {getScheduledJobUserId(latestScheduledJob)
+                  ? ` User: ${getScheduledJobUserId(latestScheduledJob)}.`
+                  : ''}
+                {getScheduledJobDate(latestScheduledJob)
+                  ? ` Scheduled: ${getScheduledJobDate(latestScheduledJob)}.`
+                  : ''}
+                {getScheduledJobStatus(latestScheduledJob)
+                  ? ` Status: ${getScheduledJobStatus(latestScheduledJob)}.`
+                  : ''}
+              </p>
+            </div>
+          ) : null}
         </form>
 
         <aside className="generate-side-column auto-post-side-column">
@@ -395,15 +551,15 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                 <p className="eyebrow">Approved Content</p>
                 <h2>Preview antrian post</h2>
               </div>
-              <span className="pill subtle">approved only</span>
+              <span className="pill subtle">approved + Threads</span>
             </div>
 
             <div className="integration-note">
               <AppIcon name="info" />
               <p>
-                Hanya konten berstatus <strong>approved</strong> yang akan ikut batch auto post.
-                {unapprovedCount > 0 && !isLoadingOutputs
-                  ? ` ${unapprovedCount} konten lain belum approved dan tidak akan ikut.`
+                Hanya konten persona ini dengan status <strong>approved</strong> untuk platform <strong>Threads</strong> yang akan ikut batch auto post.
+                {excludedOutputCount > 0 && !isLoadingOutputs
+                  ? ` ${excludedOutputCount} konten persona ini tidak cocok filter dan tidak akan ikut.`
                   : null}
               </p>
             </div>
@@ -415,12 +571,20 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                   <strong>Memuat content outputs...</strong>
                 </div>
               </div>
+            ) : !form.personaConfigId.trim() ? (
+              <div className="generate-empty-state">
+                <AppIcon name="info" />
+                <div>
+                  <strong>Pilih persona dulu</strong>
+                  <p>Daftar content output akan difilter setelah persona dipilih.</p>
+                </div>
+              </div>
             ) : approvedOutputs.length === 0 ? (
               <div className="generate-empty-state">
                 <AppIcon name="info" />
                 <div>
-                  <strong>Tidak ada konten approved</strong>
-                  <p>Approve konten di Content Engine dulu sebelum schedule auto post.</p>
+                  <strong>Belum ada approved content untuk persona ini</strong>
+                  <p>Pastikan ada content output persona ini yang approved dan platform-nya Threads.</p>
                 </div>
               </div>
             ) : (
@@ -437,9 +601,9 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
                     </p>
                   </div>
                 ))}
-                {approvedOutputs.length > form.limit ? (
+                {approvedOutputs.length > form.targetCount ? (
                   <p className="field-hint" style={{ textAlign: 'center', marginTop: '8px' }}>
-                    +{approvedOutputs.length - form.limit} konten approved lain tidak masuk limit ini.
+                    +{approvedOutputs.length - form.targetCount} konten approved lain tidak masuk target ini.
                   </p>
                 ) : null}
               </div>

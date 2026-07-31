@@ -401,9 +401,12 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
   const canSubmitManual =
     Boolean(selectedContentPillarId) &&
     Boolean(selectedTemplateId) &&
+    contentPillars.length > 0 &&
+    promptTemplates.length > 0 &&
     jumlahTopics >= 1 &&
     jumlahTopics <= maxTopics &&
     !isSubmitting &&
+    !isLoadingPillars &&
     !isLoadingTemplates
 
   function resetResponseState() {
@@ -421,7 +424,11 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
     if (!canSubmitManual) {
       setStatusTone('error')
-      setStatusMessage('Lengkapi template, content pillar, dan jumlah topic dulu.')
+      setStatusMessage(
+        !contentPillars.length || !promptTemplates.length
+          ? 'Sumber generate belum tersedia. Pastikan pillar dan template ada dulu.'
+          : 'Lengkapi template, content pillar, dan jumlah topic dulu.',
+      )
       return
     }
 
@@ -764,7 +771,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
                 <AppIcon name="check" />
                 <div>
                   <strong>Belum ada response</strong>
-                  <p>Setelah request sukses, response dari N8N akan tampil di sini.</p>
+                  {/* <p>Setelah request sukses, response dari N8N akan tampil di sini.</p> */}
                 </div>
               </div>
             )}
