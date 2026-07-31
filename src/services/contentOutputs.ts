@@ -60,6 +60,10 @@ export type ContentOutputRecord = {
   created_at?: string
   scheduledAt?: string
   scheduled_at?: string
+  scheduledJobId?: string
+  scheduled_job_id?: string
+  externalPostId?: string
+  external_post_id?: string
   personaConfigId?: string
   persona_config_id?: string
   [key: string]: unknown
@@ -302,6 +306,8 @@ function normalizeContentOutputRecord(record: ContentOutputRecord) {
     generatedAt: asString(record.generatedAt) || asString(record.generated_at) || '',
     createdAt: asString(record.createdAt) || asString(record.created_at) || '',
     scheduledAt: asString(record.scheduledAt) || asString(record.scheduled_at) || '',
+    scheduledJobId: asString(record.scheduledJobId) || asString(record.scheduled_job_id) || '',
+    externalPostId: asString(record.externalPostId) || asString(record.external_post_id) || '',
   }
 }
 

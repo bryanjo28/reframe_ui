@@ -27,7 +27,6 @@ type OutputEditForm = {
 const outputStatusOptions = [
   { value: 'draft', label: 'Draft' },
   { value: 'approved', label: 'Approved' },
-  { value: 'posted', label: 'Posted' },
 ]
 
 function getRecordValue(record: ContentPillarRecord | null, keys: string[]) {
@@ -142,6 +141,10 @@ function formatOutputStatus(status: string) {
 }
 
 function canEditOutputStatus(status: string) {
+  return status.trim().toLowerCase() !== 'posted'
+}
+
+function canDeleteOutputStatus(status: string) {
   return status.trim().toLowerCase() !== 'posted'
 }
 
@@ -417,7 +420,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
 
     setOutputEditForm({
       ...nextForm,
-      status: canEditOutputStatus(nextForm.status) ? nextForm.status : 'posted',
+      status: nextForm.status.trim().toLowerCase() === 'approved' ? 'approved' : 'draft',
     })
   }, [isOutputEditorOpen, selectedContentOutput])
 
@@ -573,8 +576,9 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
 
   async function handleDeleteOutput(record: ContentOutputRecord) {
     const outputId = getOutputId(record)
+    const status = getOutputStatus(record)
 
-    if (!outputId) {
+    if (!outputId || !canDeleteOutputStatus(status)) {
       return
     }
 
@@ -684,7 +688,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {contentOutputs.map((record, index) => {
+	                    {contentOutputs.map((record, index) => {
                       const title = getOutputTitle(record)
                       const platform = getOutputValue(record, ['platform']) || 'Unknown platform'
                       const formatOutput =
@@ -696,8 +700,9 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                           getOutputValue(record, ['generatedAt', 'generated_at']) ||
                           '',
                       )
-                      const outputId = getOutputId(record)
-                      const isSelected = outputId === selectedOutputId
+	                      const outputId = getOutputId(record)
+	                      const isSelected = outputId === selectedOutputId
+                        const canDeleteOutput = canDeleteOutputStatus(status)
 
                       return (
                         <tr
@@ -725,31 +730,33 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                           </td>
                           <td>{createdAt}</td>
                           <td>
-                            <div className="table-action-group">
-                              {canEditOutputStatus(status) ? (
-                                <button
-                                  type="button"
+	                            <div className="table-action-group">
+	                              {canEditOutputStatus(status) ? (
+	                                <button
+	                                  type="button"
                                   className="table-icon-button table-icon-button-edit"
                                   onClick={() => outputId && openOutputEditor(outputId)}
                                   aria-label={`Edit output ${title}`}
                                   title="Edit output"
                                   disabled={!outputId || isSavingOutput}
+	                                >
+	                                  <AppIcon name="pencil" />
+	                                </button>
+	                              ) : null}
+                              {canDeleteOutput ? (
+                                <button
+                                  type="button"
+                                  className="table-icon-button table-icon-button-delete"
+                                  onClick={() => void handleDeleteOutput(record)}
+                                  aria-label={`Delete output ${title}`}
+                                  title="Delete output"
+                                  disabled={!outputId || isDeletingOutputId === outputId}
                                 >
-                                  <AppIcon name="pencil" />
+                                  <AppIcon name="trash" />
                                 </button>
                               ) : null}
-                              <button
-                                type="button"
-                                className="table-icon-button table-icon-button-delete"
-                                onClick={() => void handleDeleteOutput(record)}
-                                aria-label={`Delete output ${title}`}
-                                title="Delete output"
-                                disabled={!outputId || isDeletingOutputId === outputId}
-                              >
-                                <AppIcon name="trash" />
-                              </button>
-                            </div>
-                          </td>
+	                            </div>
+	                          </td>
                         </tr>
                       )
                     })}
@@ -814,7 +821,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                     </div>
                     {/* {!canChangeSelectedOutputStatus ? (
                       <small className="field-hint">
-                        Status `posted` sudah final, jadi tidak bisa diubah dari sini.
+                        Status `posted` dikontrol backend, jadi tidak bisa diubah dari sini.
                       </small>
                     ) : null} */}
                   </label>

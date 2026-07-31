@@ -32,6 +32,15 @@ type ScheduledJobItemResponse =
       scheduled_job?: unknown
     }
 
+type ScheduledJobListResponse =
+  | ScheduledJobRecord[]
+  | {
+      data?: unknown
+      items?: unknown
+      scheduledJobs?: unknown
+      scheduled_jobs?: unknown
+    }
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -54,6 +63,26 @@ function unwrapScheduledJobResponse(response: ScheduledJobItemResponse): Schedul
   }
 
   return response
+}
+
+function unwrapScheduledJobListResponse(response: ScheduledJobListResponse): ScheduledJobRecord[] {
+  if (Array.isArray(response)) {
+    return response as ScheduledJobRecord[]
+  }
+
+  if (!isRecord(response)) {
+    return []
+  }
+
+  const candidates = [response.data, response.items, response.scheduledJobs, response.scheduled_jobs]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate as ScheduledJobRecord[]
+    }
+  }
+
+  return []
 }
 
 async function readErrorMessage(response: Response, fallbackMessage: string) {
@@ -156,4 +185,18 @@ export async function getScheduledJobById(id: string) {
   }
 
   return scheduledJob
+}
+
+export async function listScheduledJobs() {
+  const response = await fetch(buildApiUrl(SCHEDULED_JOBS_ENDPOINT), {
+    method: 'GET',
+    headers: buildHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Gagal mengambil scheduled jobs.'))
+  }
+
+  const data = (await response.json()) as ScheduledJobListResponse
+  return unwrapScheduledJobListResponse(data)
 }
