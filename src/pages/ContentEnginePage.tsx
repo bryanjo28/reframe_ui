@@ -463,10 +463,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
       targetCount,
       scheduledAt: scheduledAtSource.toISOString(),
     })
-      .then((rawData) => {
-        const bodyText =
-          typeof rawData === 'string' ? rawData : JSON.stringify(rawData, null, 2)
-
+      .then(() => {
         setStatusTone('success')
         if (scheduleMode === 'now') {
           setStatusMessage('Generate content berhasil. Silakan cek di list generated content.')
