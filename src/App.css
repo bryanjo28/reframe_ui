@@ -3583,6 +3583,24 @@ th {
 .integration-status {
   display: flex;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.integration-unlink-button {
+  padding: 7px 11px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.86rem;
+}
+
+.integration-unlink-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+.integration-unlink-button:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .status-inline {

@@ -5,7 +5,10 @@ import {
   getCurrentAuthState,
   type ThreadsSocialAccountState,
 } from '../services/authService'
-import { getThreadsAuthorizationUrl } from '../services/threadsAuth'
+import {
+  deleteThreadsConnection,
+  getThreadsAuthorizationUrl,
+} from '../services/threadsAuth'
 
 type ThreadsConnectionView = {
   connected: boolean
@@ -54,6 +57,7 @@ function toThreadsConnectionView(
 export function ConnectingAppsPage() {
   const { success: toastSuccess, error: toastError } = useToast()
   const [isConnectingThreads, setIsConnectingThreads] = useState(false)
+  const [isDeletingThreads, setIsDeletingThreads] = useState(false)
   const [isLoadingThreadsStatus, setIsLoadingThreadsStatus] = useState(true)
   const [connectionError, setConnectionError] = useState('')
   const [threadsConnection, setThreadsConnection] = useState<ThreadsConnectionView | null>(null)
@@ -144,6 +148,27 @@ export function ConnectingAppsPage() {
     }
   }
 
+  async function handleThreadsDelete() {
+    try {
+      setConnectionError('')
+      setIsDeletingThreads(true)
+
+      await deleteThreadsConnection()
+      setThreadsConnection(null)
+      toastSuccess('Threads unlinked', 'Koneksi akun Threads berhasil dihapus.')
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Terjadi error saat menghapus koneksi Threads.'
+
+      setConnectionError(message)
+      toastError('Threads unlink failed', message)
+    } finally {
+      setIsDeletingThreads(false)
+    }
+  }
+
   return (
     <section className="connecting-page">
       <header className="page-header">
@@ -200,6 +225,15 @@ export function ConnectingAppsPage() {
                     <AppIcon name="check" />
                     Terhubung
                   </span>
+                  <button
+                    className="ghost-button integration-unlink-button"
+                    type="button"
+                    onClick={handleThreadsDelete}
+                    disabled={isDeletingThreads || isConnectingThreads || isLoadingThreadsStatus}
+                  >
+                    <AppIcon name="link" />
+                    {isDeletingThreads ? 'Menghapus...' : 'Unlink'}
+                  </button>
                 </div>
               ) : needsReconnect ? (
                 <div className="integration-status">
@@ -211,6 +245,15 @@ export function ConnectingAppsPage() {
                   >
                     <AppIcon name={isConnectingThreads ? 'link' : 'plus'} />
                     {isConnectingThreads ? 'Menghubungkan...' : 'Reconnect Threads'}
+                  </button>
+                  <button
+                    className="ghost-button integration-unlink-button"
+                    type="button"
+                    onClick={handleThreadsDelete}
+                    disabled={isDeletingThreads || isConnectingThreads || isLoadingThreadsStatus}
+                  >
+                    <AppIcon name="link" />
+                    {isDeletingThreads ? 'Menghapus...' : 'Unlink'}
                   </button>
                 </div>
               ) : isThreads ? (
