@@ -472,8 +472,16 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
 
         setResponsePreview(bodyText || 'Response kosong dari backend.')
         setStatusTone('success')
-        setStatusMessage('Payload auto-generate berhasil dikirim ke backend.')
-        toastSuccess('Auto-generate sent', 'Payload content engine sudah dikirim.')
+        if (scheduleMode === 'now') {
+          setStatusMessage('Generate content berhasil. Silakan cek di list generated content.')
+          toastSuccess(
+            'Generate content berhasil',
+            'Silakan cek hasilnya di list generated content.',
+          )
+        } else {
+          setStatusMessage('Schedule auto-generate berhasil dikirim ke backend.')
+          toastSuccess('Schedule sent', 'Payload content engine sudah dijadwalkan.')
+        }
       })
       .catch((error) => {
         setStatusTone('error')
@@ -1151,12 +1159,6 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
               </button>
             </div>
 
-            {responsePreview ? (
-              <div className="generate-note">
-                <AppIcon name="info" />
-                <p>{shortenText(responsePreview, 180)}</p>
-              </div>
-            ) : null}
           </form>
         </aside>
       </section>
