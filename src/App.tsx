@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import './App.css'
 import { AuthPage } from './pages/AuthPage'
 import { Sidebar } from './components/Sidebar'
+import { AppIcon } from './components/AppIcon'
 import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
 import { ManualPostPage } from './pages/ManualPostPage'
 import { DashboardPage } from './pages/DashboardPage'
@@ -93,6 +94,9 @@ function AppShell() {
   const [authError, setAuthError] = useState('')
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [activePage, setActivePage] = useState<NavKey>(getStoredActivePage)
+  const [isSidebarMobile, setIsSidebarMobile] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [personaStatus, setPersonaStatus] = useState<PersonaStatus>('idle')
   const [personaConfig, setPersonaConfig] = useState<PersonaConfigRecord | null>(null)
   const [demoModeActive, setDemoModeActive] = useState(false)
@@ -193,6 +197,51 @@ function AppShell() {
   }, [activePage])
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 920px)')
+
+    const syncSidebarMode = (matches: boolean) => {
+      setIsSidebarMobile(matches)
+      setIsSidebarOpen(false)
+
+      if (matches) {
+        setIsSidebarCollapsed(false)
+      }
+    }
+
+    syncSidebarMode(mediaQuery.matches)
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      syncSidebarMode(event.matches)
+    }
+
+    mediaQuery.addEventListener('change', handleChange)
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isSidebarMobile || typeof document === 'undefined') {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+
+    if (isSidebarOpen) {
+      document.body.style.overflow = 'hidden'
+    }
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isSidebarMobile, isSidebarOpen])
+
+  useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
     const hasThreadsCallbackState =
       searchParams.has('connected') || searchParams.has('error')
@@ -249,6 +298,14 @@ function AppShell() {
     setPersonaConfig(nextConfig)
     setActivePage('personalize')
   }
+
+  const handleNavigate = useCallback((page: NavKey) => {
+    setActivePage(page)
+
+    if (isSidebarMobile) {
+      setIsSidebarOpen(false)
+    }
+  }, [isSidebarMobile])
 
   let content: ReactNode
 
@@ -387,12 +444,39 @@ function AppShell() {
     )
   } else {
     content = (
-      <div className="dashboard-shell">
+      <div className={`dashboard-shell${isSidebarCollapsed && !isSidebarMobile ? ' sidebar-collapsed' : ''}`}>
+        {isSidebarMobile ? (
+          <button
+            className="mobile-sidebar-trigger"
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            aria-label="Buka sidebar"
+            aria-expanded={isSidebarOpen}
+          >
+            <AppIcon name="menu" />
+            <span>Menu</span>
+          </button>
+        ) : null}
+
+        {isSidebarMobile && isSidebarOpen ? (
+          <button
+            className="sidebar-backdrop"
+            type="button"
+            aria-label="Tutup sidebar"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        ) : null}
+
         <Sidebar
           activePage={activePage}
-          onNavigate={setActivePage}
+          onNavigate={handleNavigate}
           currentUser={currentUser}
           onLogout={handleLogout}
+          isCollapsed={isSidebarCollapsed}
+          isMobile={isSidebarMobile}
+          isOpen={isSidebarMobile ? isSidebarOpen : true}
+          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
+          onClose={() => setIsSidebarOpen(false)}
         />
 
         <main className="content-area">
