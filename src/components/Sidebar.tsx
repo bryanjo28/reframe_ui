@@ -154,7 +154,7 @@ export function Sidebar({
             aria-label={isMobile ? 'Tutup sidebar' : isCollapsed ? 'Buka sidebar' : 'Collapse sidebar'}
             aria-expanded={isMobile ? isOpen : !isCollapsed}
           >
-            <AppIcon name={isMobile ? 'close' : 'panel-left'} />
+            <AppIcon name={isMobile ? 'close' : 'menu'} />
           </button>
         </div>
 
