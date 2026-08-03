@@ -8,6 +8,10 @@ type ThreadsConnectResponse = {
   }
 }
 
+type ThreadsDeleteResponse = {
+  message?: string
+}
+
 export async function getThreadsAuthorizationUrl() {
   const token = getCurrentAuthToken()
 
@@ -38,4 +42,41 @@ export async function getThreadsAuthorizationUrl() {
   }
 
   return authorizationUrl
+}
+
+export async function deleteThreadsConnection() {
+  const token = getCurrentAuthToken()
+
+  if (!token) {
+    throw new Error('Token login belum tersedia. Silakan login ulang.')
+  }
+
+  const url = buildApiUrl('/api/threads/delete')
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: buildApiHeaders({
+      withBody: true,
+      additionalHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+    body: JSON.stringify({}),
+  })
+
+  if (!response.ok) {
+    let message = 'Gagal menghapus koneksi Threads.'
+
+    try {
+      const data = (await response.json()) as ThreadsDeleteResponse
+
+      if (typeof data.message === 'string' && data.message.trim()) {
+        message = data.message
+      }
+    } catch {
+      // Keep the default error message when response body is not JSON.
+    }
+
+    throw new Error(message)
+  }
 }

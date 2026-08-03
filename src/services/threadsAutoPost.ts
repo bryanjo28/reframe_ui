@@ -2,11 +2,116 @@ import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
 
 const THREADS_AUTO_POST_ENDPOINT = '/api/threads/auto-post'
+const SCHEDULED_JOBS_ENDPOINT = '/api/scheduled-jobs'
 
 export type ScheduleThreadsAutoPostPayload = {
   personaConfigId: string
-  limit: number
   scheduledAt: string
+  limit: number
+}
+
+export type ScheduledJobRecord = {
+  id?: string
+  userId?: string
+  user_id?: string
+  status?: string
+  type?: string
+  scheduledAt?: string
+  scheduled_at?: string
+  personaConfigId?: string
+  persona_config_id?: string
+  [key: string]: unknown
+}
+
+type ScheduledJobItemResponse =
+  | ScheduledJobRecord
+  | {
+      data?: unknown
+      item?: unknown
+      scheduledJob?: unknown
+      scheduled_job?: unknown
+    }
+
+type ScheduledJobListResponse =
+  | ScheduledJobRecord[]
+  | {
+      data?: unknown
+      items?: unknown
+      scheduledJobs?: unknown
+      scheduled_jobs?: unknown
+    }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function readString(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function unwrapScheduledJobResponse(response: ScheduledJobItemResponse): ScheduledJobRecord | null {
+  if (!isRecord(response)) {
+    return null
+  }
+
+  const candidates = [response.data, response.item, response.scheduledJob, response.scheduled_job]
+
+  for (const candidate of candidates) {
+    if (isRecord(candidate)) {
+      return candidate as ScheduledJobRecord
+    }
+  }
+
+  return response
+}
+
+function unwrapScheduledJobListResponse(response: ScheduledJobListResponse): ScheduledJobRecord[] {
+  if (Array.isArray(response)) {
+    return response as ScheduledJobRecord[]
+  }
+
+  if (!isRecord(response)) {
+    return []
+  }
+
+  const candidates = [response.data, response.items, response.scheduledJobs, response.scheduled_jobs]
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate as ScheduledJobRecord[]
+    }
+  }
+
+  return []
+}
+
+async function readErrorMessage(response: Response, fallbackMessage: string) {
+  const responseText = await response.text()
+
+  if (!responseText.trim()) {
+    return fallbackMessage
+  }
+
+  try {
+    const parsed = JSON.parse(responseText) as unknown
+
+    if (isRecord(parsed)) {
+      const candidate =
+        readString(parsed.message) ||
+        readString(parsed.error) ||
+        readString(parsed.details) ||
+        readString(parsed.detail) ||
+        readString(parsed.title)
+
+      if (candidate) {
+        return candidate
+      }
+    }
+  } catch {
+    // Fall through to raw text.
+  }
+
+  return responseText.trim() || fallbackMessage
 }
 
 function buildHeaders(withBody = false) {
@@ -21,7 +126,7 @@ function buildHeaders(withBody = false) {
 }
 
 export async function runThreadsAutoPost() {
-  const response = await fetch(buildApiUrl(`${THREADS_AUTO_POST_ENDPOINT}/run`), {
+  const response = await fetch(buildApiUrl('/api/threads/auto-post/run'), {
     method: 'POST',
     headers: buildHeaders(true),
     body: JSON.stringify({}),
@@ -45,8 +150,8 @@ export async function scheduleThreadsAutoPost(payload: ScheduleThreadsAutoPostPa
     headers: buildHeaders(true),
     body: JSON.stringify({
       personaConfigId: payload.personaConfigId,
-      limit: payload.limit,
       scheduledAt: payload.scheduledAt,
+      limit: payload.limit,
     }),
   })
 
@@ -60,4 +165,38 @@ export async function scheduleThreadsAutoPost(payload: ScheduleThreadsAutoPostPa
   }
 
   return data
+}
+
+export async function getScheduledJobById(id: string) {
+  const response = await fetch(buildApiUrl(`${SCHEDULED_JOBS_ENDPOINT}/${id}`), {
+    method: 'GET',
+    headers: buildHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Gagal mengambil scheduled job.'))
+  }
+
+  const data = (await response.json()) as ScheduledJobItemResponse
+  const scheduledJob = unwrapScheduledJobResponse(data)
+
+  if (!scheduledJob) {
+    throw new Error('Scheduled job tidak ditemukan.')
+  }
+
+  return scheduledJob
+}
+
+export async function listScheduledJobs() {
+  const response = await fetch(buildApiUrl(SCHEDULED_JOBS_ENDPOINT), {
+    method: 'GET',
+    headers: buildHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'Gagal mengambil scheduled jobs.'))
+  }
+
+  const data = (await response.json()) as ScheduledJobListResponse
+  return unwrapScheduledJobListResponse(data)
 }
