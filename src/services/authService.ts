@@ -1,6 +1,7 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
 
 const AUTH_TOKEN_STORAGE_KEY = 'reframe.authToken'
+const AUTH_STATE_CACHE_TTL_MS = 10_000
 
 export type AuthCredentials = {
   email: string
@@ -29,6 +30,11 @@ export type AuthSession = {
   user: AuthUser
 }
 
+export type RegisterResult = {
+  emailConfirmationRequired: boolean
+  session: AuthSession | null
+}
+
 export type ThreadsSocialAccountState = {
   connected?: boolean
   needsReconnect?: boolean
@@ -50,9 +56,20 @@ export type AuthMeState = {
   } | null
 }
 
+let authStateCache:
+  | {
+      expiresAt: number
+      token: string
+      value: AuthMeState | null
+    }
+  | null = null
+
+let authStateRequest: Promise<AuthMeState | null> | null = null
+
 type ApiResponse = {
   success?: boolean
   message?: string
+  emailConfirmationRequired?: boolean
   data?: unknown
   user?: unknown
   profile?: unknown
@@ -359,8 +376,33 @@ async function parseAuthResponse(response: Response) {
   return session
 }
 
+async function parseRegisterResponse(response: Response) {
+  const data = (await response.json()) as ApiResponse
+  const session = normalizeSessionPayload(data)
+  const emailConfirmationRequired = Boolean(data.emailConfirmationRequired)
+
+  if (emailConfirmationRequired) {
+    setStoredAuthToken(undefined)
+
+    return {
+      emailConfirmationRequired,
+      session: null,
+    } satisfies RegisterResult
+  }
+
+  if (session?.token) {
+    setStoredAuthToken(session.token)
+  }
+
+  return {
+    emailConfirmationRequired,
+    session,
+  } satisfies RegisterResult
+}
+
 export function clearAuthSession() {
   setStoredAuthToken(undefined)
+  authStateCache = null
 }
 
 export async function login(payload: AuthCredentials) {
@@ -388,7 +430,7 @@ export async function register(payload: RegisterCredentials) {
     throw new Error('Register gagal. Periksa input yang dimasukkan.')
   }
 
-  return parseAuthResponse(response)
+  return parseRegisterResponse(response)
 }
 
 export async function getCurrentUser() {
@@ -398,12 +440,29 @@ export async function getCurrentUser() {
 }
 
 export async function getCurrentAuthState() {
+  const token = getStoredAuthToken() || ''
+
+  if (authStateCache && authStateCache.token === token && authStateCache.expiresAt > Date.now()) {
+    return authStateCache.value
+  }
+
+  if (authStateRequest) {
+    return authStateRequest
+  }
+
+  authStateRequest = (async () => {
   const response = await fetch(buildApiUrl('/api/auth/me'), {
     method: 'GET',
     headers: buildRequestHeaders(),
   })
 
   if (response.status === 401) {
+    authStateCache = {
+      expiresAt: Date.now() + AUTH_STATE_CACHE_TTL_MS,
+      token,
+      value: null,
+    }
+
     return null
   }
 
@@ -413,7 +472,22 @@ export async function getCurrentAuthState() {
 
   const data = (await response.json()) as ApiResponse
 
-  return normalizeAuthMeState(data)
+  const normalizedState = normalizeAuthMeState(data)
+
+  authStateCache = {
+    expiresAt: Date.now() + AUTH_STATE_CACHE_TTL_MS,
+    token,
+    value: normalizedState,
+  }
+
+  return normalizedState
+  })()
+
+  try {
+    return await authStateRequest
+  } finally {
+    authStateRequest = null
+  }
 }
 
 export function getCurrentAuthToken() {

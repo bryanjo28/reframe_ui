@@ -3,6 +3,7 @@ import { getCurrentAuthToken } from './authService'
 
 const SUBSCRIPTION_PLANS_ENDPOINT = '/api/subscription-plans'
 const CURRENT_SUBSCRIPTION_ENDPOINT = '/api/subscriptions/me'
+const SUBSCRIPTION_CACHE_TTL_MS = 30_000
 
 type ApiRecord = Record<string, unknown>
 
@@ -19,7 +20,16 @@ function getBoolean(value: unknown) {
 }
 
 function getNumber(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+
+  return undefined
 }
 
 function readFirstString(record: ApiRecord, keys: string[]) {
@@ -132,6 +142,23 @@ export type NormalizedCurrentSubscription = {
   active: boolean
   raw: CurrentSubscriptionRecord
 }
+
+let subscriptionPlansCache:
+  | {
+      expiresAt: number
+      value: NormalizedSubscriptionPlan[]
+    }
+  | null = null
+
+let currentSubscriptionCache:
+  | {
+      expiresAt: number
+      value: NormalizedCurrentSubscription | null
+    }
+  | null = null
+
+let subscriptionPlansRequest: Promise<NormalizedSubscriptionPlan[]> | null = null
+let currentSubscriptionRequest: Promise<NormalizedCurrentSubscription | null> | null = null
 
 function buildAuthorizedHeaders() {
   const headers = buildApiHeaders()
@@ -259,6 +286,15 @@ export function normalizeCurrentSubscription(record: CurrentSubscriptionRecord):
 }
 
 export async function listSubscriptionPlans() {
+  if (subscriptionPlansCache && subscriptionPlansCache.expiresAt > Date.now()) {
+    return subscriptionPlansCache.value
+  }
+
+  if (subscriptionPlansRequest) {
+    return subscriptionPlansRequest
+  }
+
+  subscriptionPlansRequest = (async () => {
   const response = await fetch(buildApiUrl(SUBSCRIPTION_PLANS_ENDPOINT), {
     method: 'GET',
     headers: buildAuthorizedHeaders(),
@@ -270,20 +306,49 @@ export async function listSubscriptionPlans() {
 
   const payload = (await response.json()) as unknown
   const records = unwrapListPayload(payload)
-
-  return records
+  const plans = records
     .filter(isRecord)
     .map(normalizeSubscriptionPlan)
-    .filter((plan) => plan.active)
+
+  const explicitlyActivePlans = plans.filter((plan) => plan.active)
+  const normalizedPlans = explicitlyActivePlans.length > 0 ? explicitlyActivePlans : plans
+
+  subscriptionPlansCache = {
+    expiresAt: Date.now() + SUBSCRIPTION_CACHE_TTL_MS,
+    value: normalizedPlans,
+  }
+
+  return normalizedPlans
+  })()
+
+  try {
+    return await subscriptionPlansRequest
+  } finally {
+    subscriptionPlansRequest = null
+  }
 }
 
 export async function getCurrentSubscription() {
+  if (currentSubscriptionCache && currentSubscriptionCache.expiresAt > Date.now()) {
+    return currentSubscriptionCache.value
+  }
+
+  if (currentSubscriptionRequest) {
+    return currentSubscriptionRequest
+  }
+
+  currentSubscriptionRequest = (async () => {
   const response = await fetch(buildApiUrl(CURRENT_SUBSCRIPTION_ENDPOINT), {
     method: 'GET',
     headers: buildAuthorizedHeaders(),
   })
 
   if (response.status === 401) {
+    currentSubscriptionCache = {
+      expiresAt: Date.now() + SUBSCRIPTION_CACHE_TTL_MS,
+      value: null,
+    }
+
     return null
   }
 
@@ -301,12 +366,40 @@ export async function getCurrentSubscription() {
     payload.data ?? payload.subscription ?? payload.currentSubscription ?? payload.current_subscription
 
   if (isRecord(candidate)) {
-    return normalizeCurrentSubscription(candidate)
+    const normalizedSubscription = normalizeCurrentSubscription(candidate)
+
+    currentSubscriptionCache = {
+      expiresAt: Date.now() + SUBSCRIPTION_CACHE_TTL_MS,
+      value: normalizedSubscription,
+    }
+
+    return normalizedSubscription
   }
 
   if (Array.isArray(candidate) && candidate.length > 0 && isRecord(candidate[0])) {
-    return normalizeCurrentSubscription(candidate[0])
+    const normalizedSubscription = normalizeCurrentSubscription(candidate[0])
+
+    currentSubscriptionCache = {
+      expiresAt: Date.now() + SUBSCRIPTION_CACHE_TTL_MS,
+      value: normalizedSubscription,
+    }
+
+    return normalizedSubscription
   }
 
-  return normalizeCurrentSubscription(payload)
+  const normalizedSubscription = normalizeCurrentSubscription(payload)
+
+  currentSubscriptionCache = {
+    expiresAt: Date.now() + SUBSCRIPTION_CACHE_TTL_MS,
+    value: normalizedSubscription,
+  }
+
+  return normalizedSubscription
+  })()
+
+  try {
+    return await currentSubscriptionRequest
+  } finally {
+    currentSubscriptionRequest = null
+  }
 }

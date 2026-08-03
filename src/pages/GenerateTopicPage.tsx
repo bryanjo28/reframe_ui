@@ -3,16 +3,9 @@ import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import { createContentTopic, generateContentTopics } from '../services/contentTopics'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
-import { listPromptTemplates, type PromptTemplateRecord } from '../services/promptTemplates'
 
 type GenerateTopicPageProps = {
   userId: string
-}
-
-type SelectedTemplate = PromptTemplateRecord & {
-  normalizedName: string
-  normalizedDescription: string
-  normalizedPrompt: string
 }
 
 type GeneratedTopic = string | Record<string, unknown>
@@ -52,7 +45,7 @@ const topicCategoryOptions = [
   'tutorial'
 ]
 
-function getRecordValue(record: ContentPillarRecord | PromptTemplateRecord | null, keys: string[]) {
+function getRecordValue(record: ContentPillarRecord | null, keys: string[]) {
   if (!record) {
     return ''
   }
@@ -68,7 +61,7 @@ function getRecordValue(record: ContentPillarRecord | PromptTemplateRecord | nul
   return ''
 }
 
-function getRecordUserId(record: ContentPillarRecord | PromptTemplateRecord | null) {
+function getRecordUserId(record: ContentPillarRecord | null) {
   return getRecordValue(record, ['userId', 'user_id', 'ownerId', 'owner_id'])
 }
 
@@ -87,45 +80,12 @@ function getPillarDescription(record: ContentPillarRecord) {
   )
 }
 
-function getTemplateTitle(record: PromptTemplateRecord) {
-  return getRecordValue(record, ['name', 'title', 'promptName', 'prompt_name']) || 'Prompt Template'
-}
-
-function getTemplateDescription(record: PromptTemplateRecord) {
-  return (
-    getRecordValue(record, ['description', 'summary', 'excerpt']) ||
-    'Pilih card template ini untuk dipakai ke payload generate.'
-  )
-}
-
-function getTemplatePrompt(record: PromptTemplateRecord) {
-  return (
-    getRecordValue(record, ['prompt', 'template', 'content', 'body']) ||
-    getRecordValue(record, ['systemPrompt', 'system_prompt']) ||
-    'Tidak ada isi template yang bisa ditampilkan.'
-  )
-}
-
 function shortenText(text: string, limit = 120) {
   if (text.length <= limit) {
     return text
   }
 
   return `${text.slice(0, limit).trim()}...`
-}
-
-function excerptWords(text: string, wordLimit = 120) {
-  const words = text.trim().split(/\s+/).filter(Boolean)
-
-  if (!words.length) {
-    return ''
-  }
-
-  if (words.length <= wordLimit) {
-    return text.trim()
-  }
-
-  return `${words.slice(0, wordLimit).join(' ')}...`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -242,36 +202,6 @@ function normalizeGeneratedTopic(topic: GeneratedTopic, index = 0): NormalizedGe
   }
 }
 
-function TemplateCard({
-  template,
-  selected,
-  onClick,
-}: {
-  template: SelectedTemplate
-  selected: boolean
-  onClick: (id: string) => void
-}) {
-  return (
-    <button
-      type="button"
-      className={`generate-card template-card${selected ? ' selected' : ''}`}
-      onClick={() => template.id && onClick(template.id)}
-      disabled={!template.id}
-    >
-      <div className="generate-card-topline">
-        <span className="generate-card-chip">Template</span>
-      </div>
-      <strong>{template.normalizedName}</strong>
-      <p className="generate-card-summary">
-        {shortenText(template.normalizedDescription, 120)}
-      </p>
-      <p className="generate-card-excerpt">
-        {excerptWords(template.normalizedPrompt || template.normalizedDescription, 50)}
-      </p>
-    </button>
-  )
-}
-
 function PillarCard({
   pillar,
   selected,
@@ -301,13 +231,10 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
-  const [promptTemplates, setPromptTemplates] = useState<SelectedTemplate[]>([])
-  const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [jumlahTopics, setJumlahTopics] = useState(5)
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
   const [isLoadingPillars, setIsLoadingPillars] = useState(true)
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [responseTopics, setResponseTopics] = useState<GeneratedTopic[]>([])
   const [topicDrafts, setTopicDrafts] = useState<TopicDraft[]>([])
@@ -320,13 +247,9 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
     async function loadWorkspaceData() {
       setIsLoadingPillars(true)
-      setIsLoadingTemplates(true)
 
       try {
-        const [pillars, templates] = await Promise.all([
-          listContentPillars(),
-          listPromptTemplates(),
-        ])
+        const pillars = await listContentPillars()
 
         if (!isMounted) {
           return
@@ -341,29 +264,17 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
         setContentPillars(ownedPillars)
         setSelectedContentPillarId((current) => current || ownedPillars[0]?.id || '')
-
-        const normalizedTemplates = templates.map((template) => ({
-          ...template,
-          normalizedName: getTemplateTitle(template),
-          normalizedDescription: getTemplateDescription(template),
-          normalizedPrompt: getTemplatePrompt(template),
-        }))
-
-        setPromptTemplates(normalizedTemplates)
-        setSelectedTemplateId((current) => current || normalizedTemplates[0]?.id || '')
       } catch (error) {
         if (!isMounted) {
           return
         }
 
         setContentPillars([])
-        setPromptTemplates([])
         setStatusTone('error')
         setStatusMessage(error instanceof Error ? error.message : 'Gagal memuat workspace data.')
       } finally {
         if (isMounted) {
           setIsLoadingPillars(false)
-          setIsLoadingTemplates(false)
         }
       }
     }
@@ -374,14 +285,6 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
       isMounted = false
     }
   }, [userId])
-
-  const selectedTemplate = useMemo(
-    () => promptTemplates.find((template) => template.id === selectedTemplateId) || null,
-    [promptTemplates, selectedTemplateId],
-  )
-
-  const activeTemplateText =
-    selectedTemplate?.normalizedPrompt || selectedTemplate?.normalizedDescription || ''
 
   const selectedContentPillar = useMemo(
     () => contentPillars.find((pillar) => pillar.id === selectedContentPillarId) || null,
@@ -400,14 +303,11 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
   const canSubmitManual =
     Boolean(selectedContentPillarId) &&
-    Boolean(selectedTemplateId) &&
     contentPillars.length > 0 &&
-    promptTemplates.length > 0 &&
     jumlahTopics >= 1 &&
     jumlahTopics <= maxTopics &&
     !isSubmitting &&
-    !isLoadingPillars &&
-    !isLoadingTemplates
+    !isLoadingPillars
 
   function resetResponseState() {
     setStatusTone('idle')
@@ -425,9 +325,9 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
     if (!canSubmitManual) {
       setStatusTone('error')
       setStatusMessage(
-        !contentPillars.length || !promptTemplates.length
-          ? 'Sumber generate belum tersedia. Pastikan pillar dan template ada dulu.'
-          : 'Lengkapi template, content pillar, dan jumlah topic dulu.',
+        !contentPillars.length
+          ? 'Sumber generate belum tersedia. Pastikan pillar ada dulu.'
+          : 'Pilih content pillar dan jumlah topic dulu.',
       )
       return
     }
@@ -445,9 +345,8 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
     void generateContentTopics({
       contentPillarId: selectedContentPillarId,
-      templateText: activeTemplateText,
+      templateText: '',
       jumlahTopics,
-      templateId: selectedTemplateId || undefined,
     })
       .then((rawData) => {
         const topics = extractTopicsFromWebhookResponse(rawData)
@@ -536,14 +435,13 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
   }
 
   const filteredPillars = contentPillars
-  const templateCards = promptTemplates
 
   return (
     <section className="generate-page">
       <header className="page-header generate-hero">
         <div>
           <p className="eyebrow">Reframe Generator</p>
-          <h1>Generate content dari template, pillar, dan jumlah topic dalam satu panel.</h1>
+          <h1>Generate content dari content pillar dan jumlah topic dalam satu panel.</h1>
         </div>
 
         {/* <div className="generate-hero-metrics" style={{paddingTop:"15px"}}>
@@ -571,45 +469,6 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
       <section className="generate-layout">
         <div className="generate-main-column">
-          <article className="panel generate-panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Prompt Templates</p>
-                <h2>Pilih template default dari backend</h2>
-              </div>
-              <span className="pill subtle">{templateCards.length} loaded</span>
-            </div>
-
-            {isLoadingTemplates ? (
-              <div className="generate-empty-state">
-                <AppIcon name="sparkles" />
-                <div>
-                  <strong>Memuat prompt templates...</strong>
-                  <p>GET list sedang diambil supaya card template bisa langsung dipilih.</p>
-                </div>
-              </div>
-            ) : templateCards.length ? (
-              <div className="generate-card-grid">
-                {templateCards.map((template) => (
-                  <TemplateCard
-                    key={template.id || template.normalizedName}
-                    template={template}
-                    selected={template.id === selectedTemplateId}
-                    onClick={(id) => setSelectedTemplateId(id)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="generate-empty-state">
-                <AppIcon name="sparkles" />
-                <div>
-                  <strong>Belum ada template tersimpan</strong>
-                  <p>Pastikan endpoint list prompt template sudah mengembalikan data.</p>
-                </div>
-              </div>
-            )}
-          </article>
-
           <article className="panel generate-panel">
             <div className="panel-heading">
               <div>
@@ -782,8 +641,8 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
           <form className="panel generate-panel generate-form-panel" onSubmit={handleSubmit}>
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Generate Payload</p>
-                <h2>Kirim langsung ke backend</h2>
+                <p className="eyebrow"></p>
+                <h2>Generate Topic</h2>
               </div>
               <span className={`pill${canSubmitManual ? ' subtle' : ''}`}>
                 {canSubmitManual ? 'Ready' : 'Needs setup'}
@@ -791,10 +650,6 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
             </div>
 
             <div className="generate-summary">
-              <div className="generate-summary-item">
-                <span>Template</span>
-                <strong>{selectedTemplate?.normalizedName || 'Belum dipilih'}</strong>
-              </div>
               <div className="generate-summary-item">
                 <span>Content Pillar</span>
                 <strong>
@@ -846,8 +701,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
             {/* <div className="generate-note">
               <AppIcon name="info" />
               <p>
-                Template prompt mengikuti template default dari backend. Payload yang dikirim
-                tetap `content_pillar_id`, `template_id`, `template_text`, dan `jumlah_topics`.
+                Generate topic sementara hanya memakai content pillar dari user aktif.
               </p>
             </div> */}
           </form>
