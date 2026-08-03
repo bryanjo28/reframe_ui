@@ -205,6 +205,11 @@ export function ConnectingAppsPage() {
                   ? 'Memeriksa status koneksi...'
                   : 'Belum terhubung'
             : app.handle
+          const statusText = isConnected
+            ? 'Terhubung'
+            : needsReconnect
+              ? 'Perlu reconnect'
+              : null
 
           return (
             <article className="integration-card" key={app.name}>
@@ -216,25 +221,24 @@ export function ConnectingAppsPage() {
                 <div className="integration-copy">
                   <strong>{app.name}</strong>
                   <p>{handle}</p>
+                  {statusText ? (
+                    <span className={`integration-status-text${isConnected ? ' connected' : ''}`}>
+                      {statusText}
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
               {isConnected ? (
-                <div className="integration-status">
-                  <span className="status-inline success">
-                    <AppIcon name="check" />
-                    Terhubung
-                  </span>
-                  <button
-                    className="ghost-button integration-unlink-button"
-                    type="button"
-                    onClick={handleThreadsDelete}
-                    disabled={isDeletingThreads || isConnectingThreads || isLoadingThreadsStatus}
-                  >
-                    <AppIcon name="link" />
-                    {isDeletingThreads ? 'Menghapus...' : 'Unlink'}
-                  </button>
-                </div>
+                <button
+                  className="ghost-button integration-unlink-button"
+                  type="button"
+                  onClick={handleThreadsDelete}
+                  disabled={isDeletingThreads || isConnectingThreads || isLoadingThreadsStatus}
+                >
+                  <AppIcon name="close" />
+                  {isDeletingThreads ? 'Menghapus...' : 'Unlink'}
+                </button>
               ) : needsReconnect ? (
                 <div className="integration-status">
                   <button
@@ -252,7 +256,7 @@ export function ConnectingAppsPage() {
                     onClick={handleThreadsDelete}
                     disabled={isDeletingThreads || isConnectingThreads || isLoadingThreadsStatus}
                   >
-                    <AppIcon name="link" />
+                    <AppIcon name="close" />
                     {isDeletingThreads ? 'Menghapus...' : 'Unlink'}
                   </button>
                 </div>

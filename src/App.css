@@ -3665,6 +3665,19 @@ th {
   margin: 0;
 }
 
+.integration-status-text {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  color: #fbbf24;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.integration-status-text.connected {
+  color: #14dd80;
+}
+
 .integration-status {
   display: flex;
   align-items: center;
@@ -3673,6 +3686,10 @@ th {
 }
 
 .integration-unlink-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 7px 11px;
   color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
@@ -3682,6 +3699,7 @@ th {
 .integration-unlink-button svg {
   width: 13px;
   height: 13px;
+  fill: #ffffff;
 }
 
 .integration-unlink-button:hover {
