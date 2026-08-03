@@ -12,6 +12,7 @@ import { ThreadsCallbackPage } from './pages/ThreadsCallbackPage'
 import { ContentEnginePage } from './pages/ContentEnginePage'
 import { GenerateTopicPage } from './pages/GenerateTopicPage'
 import { PersonalizePage } from './pages/PersonalizePage'
+import { CheckEmailPage } from './pages/CheckEmailPage'
 import type { NavKey } from './types/navigation'
 import { ToastProvider } from './components/Toast'
 import {
@@ -27,8 +28,30 @@ import {
 } from './services/personaConfigs'
 
 type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'error'
-type PersonaStatus = 'idle' | 'loading' | 'ready' | 'error'
+type PersonaStatus = 'idle' | 'loading' | 'ready'
+type UnauthenticatedView = 'login' | 'check-email'
 const ACTIVE_PAGE_STORAGE_KEY = 'reframe.activePage'
+const PENDING_VERIFICATION_EMAIL_STORAGE_KEY = 'reframe.pendingVerificationEmail'
+
+function getStoredPendingVerificationEmail() {
+  if (typeof localStorage === 'undefined') {
+    return ''
+  }
+
+  return localStorage.getItem(PENDING_VERIFICATION_EMAIL_STORAGE_KEY) || ''
+}
+
+function setStoredPendingVerificationEmail(email?: string) {
+  if (typeof localStorage === 'undefined') {
+    return
+  }
+
+  if (email) {
+    localStorage.setItem(PENDING_VERIFICATION_EMAIL_STORAGE_KEY, email)
+  } else {
+    localStorage.removeItem(PENDING_VERIFICATION_EMAIL_STORAGE_KEY)
+  }
+}
 
 function getStoredActivePage(): NavKey {
   if (typeof localStorage === 'undefined') {
@@ -65,9 +88,14 @@ function setStoredActivePage(page: NavKey) {
 }
 
 function AppShell() {
+  const isAuthCallbackRoute =
+    typeof window !== 'undefined' && window.location.pathname === '/auth/callback'
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
   const [authError, setAuthError] = useState('')
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
+  const [unauthenticatedView, setUnauthenticatedView] = useState<UnauthenticatedView>('login')
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState(getStoredPendingVerificationEmail)
+  const [authHelperMessage, setAuthHelperMessage] = useState('')
   const [activePage, setActivePage] = useState<NavKey>(getStoredActivePage)
   const [isSidebarMobile, setIsSidebarMobile] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -95,7 +123,7 @@ function AppShell() {
       }
 
       setPersonaConfig(null)
-      setPersonaStatus('error')
+      setPersonaStatus('ready')
     }
   }, [])
 
@@ -121,11 +149,15 @@ function AppShell() {
       if (!user) {
         clearAuthSession()
         resetWorkspaceState()
+        setUnauthenticatedView('login')
         setAuthStatus('unauthenticated')
         return
       }
 
       setCurrentUser(user)
+      setStoredPendingVerificationEmail(undefined)
+      setPendingVerificationEmail('')
+      setAuthHelperMessage('')
       setAuthStatus('authenticated')
 
       void loadPersonaConfig(user.id, runId)
@@ -142,8 +174,12 @@ function AppShell() {
   }, [loadPersonaConfig])
 
   useEffect(() => {
+    if (isAuthCallbackRoute) {
+      return
+    }
+
     void hydrateAuthState()
-  }, [hydrateAuthState])
+  }, [hydrateAuthState, isAuthCallbackRoute])
 
   useEffect(() => {
     setStoredActivePage(activePage)
@@ -204,9 +240,28 @@ function AppShell() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!isAuthCallbackRoute) {
+      return
+    }
+
+    clearAuthSession()
+    resetWorkspaceState()
+    setUnauthenticatedView('login')
+    setStoredPendingVerificationEmail(undefined)
+    setPendingVerificationEmail('')
+    setAuthHelperMessage('Email berhasil diverifikasi. Silakan login untuk masuk ke dashboard.')
+    setAuthStatus('unauthenticated')
+    window.history.replaceState({}, document.title, '/')
+  }, [isAuthCallbackRoute])
+
   const handleAuthenticated = useCallback(async (session: AuthSession) => {
     setCurrentUser(session.user)
     setAuthStatus('authenticated')
+    setUnauthenticatedView('login')
+    setStoredPendingVerificationEmail(undefined)
+    setPendingVerificationEmail('')
+    setAuthHelperMessage('')
     setActivePage('dashboard')
     await loadPersonaConfig(session.user.id)
   }, [loadPersonaConfig])
@@ -218,6 +273,8 @@ function AppShell() {
       clearAuthSession()
     } finally {
       resetWorkspaceState()
+      setUnauthenticatedView('login')
+      setAuthHelperMessage('')
       setAuthStatus('unauthenticated')
     }
   }, [])
@@ -240,13 +297,8 @@ function AppShell() {
   if (authStatus === 'loading') {
     content = (
       <div className="bootstrap-shell">
-        <section className="panel bootstrap-card">
-          <p className="eyebrow">Bootstrapping</p>
-          <h1>Memeriksa session login...</h1>
-          <p className="page-description">
-            Kami sedang cek apakah user sudah login. Setelah itu baru kita lanjut ke
-            persona config.
-          </p>
+        <section className="bootstrap-loading" aria-live="polite">
+          <h1>Memuat dashboard...</h1>
         </section>
       </div>
     )
@@ -264,38 +316,33 @@ function AppShell() {
       </div>
     )
   } else if (authStatus === 'unauthenticated') {
-    content = (
+    content = unauthenticatedView === 'check-email' ? (
+      <CheckEmailPage
+        email={pendingVerificationEmail}
+        onBackToLogin={() => {
+          setUnauthenticatedView('login')
+          setAuthHelperMessage('Setelah verifikasi email selesai, login dulu untuk masuk ke dashboard.')
+        }}
+      />
+    ) : (
       <AuthPage
         onAuthenticated={(session) => void handleAuthenticated(session)}
-        initialMode="register"
+        onRegisterRequiresEmail={(email) => {
+          setStoredPendingVerificationEmail(email)
+          setPendingVerificationEmail(email)
+          setUnauthenticatedView('check-email')
+          setAuthHelperMessage('')
+        }}
+        initialMode="login"
         allowRegister
+        helperMessage={authHelperMessage}
       />
     )
   } else if (personaStatus === 'loading' || personaStatus === 'idle') {
     content = (
       <div className="bootstrap-shell">
-        <section className="panel bootstrap-card">
-          <p className="eyebrow">Bootstrapping</p>
-          <h1>Memuat persona config...</h1>
-          <p className="page-description">
-            Session login sudah valid. Sekarang kami cek persona config milik user
-            aktif sebelum masuk dashboard.
-          </p>
-        </section>
-      </div>
-    )
-  } else if (personaStatus === 'error') {
-    content = (
-      <div className="bootstrap-shell">
-        <section className="panel bootstrap-card">
-          <p className="eyebrow">Bootstrapping</p>
+        <section className="bootstrap-loading" aria-live="polite">
           <h1>Memuat dashboard...</h1>
-          <p className="page-description">
-            Persona config belum terbaca, jadi kami lanjutkan ke dashboard dulu.
-          </p>
-          <button className="primary-button" type="button" onClick={() => void hydrateAuthState()}>
-            Coba lagi
-          </button>
         </section>
       </div>
     )

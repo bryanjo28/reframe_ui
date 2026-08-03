@@ -141,6 +141,10 @@ export function Sidebar({
     return Math.min(100, Math.max(0, (usedTokens / tokenLimit) * 100))
   }, [tokenLimit, usedTokens])
 
+  const tokenLimitLabel = tokenLimit !== null && tokenLimit > 0
+    ? tokenLimit.toLocaleString('id-ID')
+    : '-'
+
   return (
     <aside
       className={`sidebar${isCollapsed ? ' collapsed' : ''}${isMobile ? ' mobile' : ''}${isOpen ? ' open' : ''}`}
@@ -190,7 +194,7 @@ export function Sidebar({
           <div className="sidebar-card token-card">
             <p className="sidebar-card-label">Token Usage</p>
             <strong>
-              {usedTokens.toLocaleString('id-ID')} / {(tokenLimit ?? 0).toLocaleString('id-ID')}
+              {usedTokens.toLocaleString('id-ID')} / {tokenLimitLabel}
             </strong>
             <span>{planName} dipakai sebagai batas usage saat ini.</span>
             <div className="token-track" aria-hidden="true">

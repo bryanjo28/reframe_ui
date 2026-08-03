@@ -379,8 +379,8 @@ export function CreatePersonaPage({
   const visiblePersonas = sortPersonaConfigsDescending(savedPersonas)
 
   return (
-    <section className="persona-page">
-      <header className="page-header">
+    <section className={`persona-page${isInitialSetup ? ' persona-page-initial' : ''}`}>
+      <header className={`page-header${isInitialSetup ? ' persona-page-header-initial' : ''}`}>
         <p className="eyebrow">Workspace</p>
         <h1>{isInitialSetup ? 'Lengkapi Persona Pertama' : 'Reframe Persona Studio'}</h1>
         <p className="page-description">
@@ -396,7 +396,7 @@ export function CreatePersonaPage({
         </div>
       ) : null}
 
-      <section className="persona-layout">
+      <section className={`persona-layout${isInitialSetup ? ' persona-layout-initial' : ''}`}>
         <article className="panel persona-form-panel">
           <div className="panel-heading">
             <div>
@@ -434,51 +434,53 @@ export function CreatePersonaPage({
         </article>
 
         <aside className="persona-side-column">
-          <article className="panel persona-db-card">
-            <div className="panel-heading compact">
-              <div>
-                <p className="eyebrow">Persona Config</p>
-                <h2>{hasExistingConfig ? 'Saved Versions' : 'Belum ada record'}</h2>
+          {!isInitialSetup ? (
+            <article className="panel persona-db-card">
+              <div className="panel-heading compact">
+                <div>
+                  <p className="eyebrow">Persona Config</p>
+                  <h2>{hasExistingConfig ? 'Saved Versions' : 'Belum ada record'}</h2>
+                </div>
+                <span className={`status-badge ${hasExistingConfig ? 'ready' : 'draft'}`}>
+                  {hasExistingConfig ? 'Synced' : 'Empty'}
+                </span>
               </div>
-              <span className={`status-badge ${hasExistingConfig ? 'ready' : 'draft'}`}>
-                {hasExistingConfig ? 'Synced' : 'Empty'}
-              </span>
-            </div>
 
-            <div className="pillar-rail-toolbar">
-              <p className="persona-db-time">
-                {visiblePersonas.length
-                  ? `${visiblePersonas.length} version tersimpan`
-                  : 'Belum ada version tersimpan'}
-              </p>
-            </div>
+              <div className="pillar-rail-toolbar">
+                <p className="persona-db-time">
+                  {visiblePersonas.length
+                    ? `${visiblePersonas.length} version tersimpan`
+                    : 'Belum ada version tersimpan'}
+                </p>
+              </div>
 
-            {isLoadingList ? (
-              <div className="persona-preview-block">
-                <p>Memuat daftar persona...</p>
-              </div>
-            ) : visiblePersonas.length ? (
-              <div className="pillar-version-list">
-                {visiblePersonas.map((persona) => (
-                  <PersonaVersionCard
-                    key={persona.id || getRecordValue(persona, ['persona'])}
-                    persona={persona}
-                    isSelected={persona.id === savedRecord?.id}
-                    onClick={handleSelectPersona}
-                    disabled={isLoadingDetail}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="persona-preview-block">
-                <p>Belum ada persona lain untuk dipilih. Klik New Persona untuk mulai dari kosong.</p>
-              </div>
-            )}
+              {isLoadingList ? (
+                <div className="persona-preview-block">
+                  <p>Memuat daftar persona...</p>
+                </div>
+              ) : visiblePersonas.length ? (
+                <div className="pillar-version-list">
+                  {visiblePersonas.map((persona) => (
+                    <PersonaVersionCard
+                      key={persona.id || getRecordValue(persona, ['persona'])}
+                      persona={persona}
+                      isSelected={persona.id === savedRecord?.id}
+                      onClick={handleSelectPersona}
+                      disabled={isLoadingDetail}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="persona-preview-block">
+                  <p>Belum ada persona lain untuk dipilih. Klik New Persona untuk mulai dari kosong.</p>
+                </div>
+              )}
 
-            {isLoadingDetail ? (
-              <p className="persona-db-time">Memuat persona yang dipilih...</p>
-            ) : null}
-          </article>
+              {isLoadingDetail ? (
+                <p className="persona-db-time">Memuat persona yang dipilih...</p>
+              ) : null}
+            </article>
+          ) : null}
 
           <article className="panel persona-guidance-card">
             <p className="eyebrow">Tips</p>

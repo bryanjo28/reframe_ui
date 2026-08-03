@@ -12,6 +12,19 @@ type PersonalizePageProps = {
 
 export function PersonalizePage({ personaConfig, onPersonaSaved }: PersonalizePageProps) {
   const [activeTab, setActiveTab] = useState<PersonalizeTab | null>(null)
+  const isInitialSetup = !personaConfig
+
+  if (isInitialSetup) {
+    return (
+      <CreatePersonaPage
+        personaConfig={personaConfig}
+        isInitialSetup
+        onSaved={(nextConfig) => {
+          onPersonaSaved?.(nextConfig)
+        }}
+      />
+    )
+  }
 
   return (
     <section className="persona-page">
@@ -19,8 +32,7 @@ export function PersonalizePage({ personaConfig, onPersonaSaved }: PersonalizePa
         <p className="eyebrow">Workspace</p>
         <h1>Personalize</h1>
         <p className="page-description">
-          Satu menu untuk atur Persona dan Content Pillar. User pilih dulu lewat card,
-          lalu halaman form lama tampil di bawah.
+          Satu menu untuk atur Persona dan Content Pillar. User pilih dulu lewat card, lalu halaman form lama tampil di bawah.
         </p>
       </header>
 
@@ -29,10 +41,6 @@ export function PersonalizePage({ personaConfig, onPersonaSaved }: PersonalizePa
           <div className="personalize-picker-copy">
             <p className="eyebrow">Choose a flow</p>
             <h2>Pilih dulu yang mau kamu edit</h2>
-            {/* <p>
-              Kita mulai dari card supaya tampilan awal lebih tenang. Setelah dipilih,
-              baru form klasik yang muncul di bawah.
-            </p> */}
           </div>
 
           <div className="personalize-choice-grid">

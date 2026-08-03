@@ -5,16 +5,20 @@ type AuthMode = 'login' | 'register'
 
 type AuthPageProps = {
   onAuthenticated: (session: AuthSession, mode: AuthMode) => void
+  onRegisterRequiresEmail?: (email: string) => void
   initialMode?: AuthMode
   allowRegister?: boolean
   onBack?: () => void
+  helperMessage?: string
 }
 
 export function AuthPage({
   onAuthenticated,
+  onRegisterRequiresEmail,
   initialMode = 'login',
   allowRegister = true,
   onBack,
+  helperMessage = '',
 }: AuthPageProps) {
   const [mode, setMode] = useState<AuthMode>(initialMode)
   const [email, setEmail] = useState('')
@@ -29,12 +33,24 @@ export function AuthPage({
     setErrorMessage('')
 
     try {
-      const session =
-        mode === 'login'
-          ? await login({ email, password })
-          : await register({ email, accountName, password })
+      if (mode === 'login') {
+        const session = await login({ email, password })
+        onAuthenticated(session, mode)
+        return
+      }
 
-      onAuthenticated(session, mode)
+      const result = await register({ email, accountName, password })
+
+      if (result.emailConfirmationRequired) {
+        onRegisterRequiresEmail?.(email)
+        return
+      }
+
+      if (!result.session) {
+        throw new Error('Register berhasil, tapi session belum tersedia. Silakan login.')
+      }
+
+      onAuthenticated(result.session, mode)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Auth gagal. Coba lagi.')
     } finally {
@@ -76,6 +92,12 @@ export function AuthPage({
               : 'Daftar dulu supaya backend bisa simpan user profile dan persona config yang pertama.'}
           </p>
         </div>
+
+        {helperMessage ? (
+          <div className="integration-note">
+            <p>{helperMessage}</p>
+          </div>
+        ) : null}
 
         <div className="auth-tabs" role="tablist" aria-label="Auth mode">
           <button
@@ -131,11 +153,11 @@ export function AuthPage({
                 />
               </label>
               <label className="auth-field">
-                <span>Account Name</span>
+                <span>Username</span>
                 <input
                   value={accountName}
                   onChange={(event) => setAccountName(event.target.value)}
-                  placeholder="nama akun kamu"
+                  placeholder="username kamu"
                   autoComplete="name"
                   required
                 />
