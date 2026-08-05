@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import { createContentTopic, generateContentTopics } from '../services/contentTopics'
@@ -241,6 +241,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
   const [savedTopicIndices, setSavedTopicIndices] = useState<number[]>([])
   const [savingTopicIndices, setSavingTopicIndices] = useState<number[]>([])
   const [tokenUsage, setTokenUsage] = useState<TokenUsageSummary | null>(null)
+  const pillarsRailRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -294,6 +295,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
     () => responseTopics.map((topic, index) => normalizeGeneratedTopic(topic, index)),
     [responseTopics],
   )
+  const filteredPillars = contentPillars
 
   useEffect(() => {
     setTopicDrafts(normalizedResponseTopics)
@@ -434,14 +436,27 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
     setJumlahTopics(Math.min(maxTopics, Math.max(1, nextValue)))
   }
 
-  const filteredPillars = contentPillars
+  function scrollPillars(direction: 'left' | 'right') {
+    const rail = pillarsRailRef.current
+
+    if (!rail) {
+      return
+    }
+
+    const amount = Math.max(rail.clientWidth * 0.82, 280)
+
+    rail.scrollBy({
+      left: direction === 'right' ? amount : -amount,
+      behavior: 'smooth',
+    })
+  }
 
   return (
     <section className="generate-page">
       <header className="page-header generate-hero">
         <div>
           <p className="eyebrow">Reframe Generator</p>
-          <h1>Generate content dari content pillar dan jumlah topic dalam satu panel.</h1>
+          <h1>Generate Topic</h1>
         </div>
 
         {/* <div className="generate-hero-metrics" style={{paddingTop:"15px"}}>
@@ -475,7 +490,29 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
                 <p className="eyebrow">Content Pillars</p>
                 <h2>Pilih pillar milik user aktif</h2>
               </div>
-              <span className="pill subtle">{filteredPillars.length} pillar</span>
+              <div className="pillars-panel-meta">
+                <span className="pill subtle">{filteredPillars.length} pillar</span>
+                {filteredPillars.length > 2 ? (
+                  <div className="pillars-carousel-actions">
+                    <button
+                      className="ghost-button pillars-carousel-button"
+                      type="button"
+                      onClick={() => scrollPillars('left')}
+                      aria-label="Pillar sebelumnya"
+                    >
+                      <AppIcon name="chevron-left" />
+                    </button>
+                    <button
+                      className="ghost-button pillars-carousel-button"
+                      type="button"
+                      onClick={() => scrollPillars('right')}
+                      aria-label="Pillar berikutnya"
+                    >
+                      <AppIcon name="chevron-right" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {isLoadingPillars ? (
@@ -486,18 +523,20 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
                   <p>Sedang ambil daftar pillar yang bisa dipakai untuk generate.</p>
                 </div>
               </div>
-            ) : filteredPillars.length ? (
-              <div className="generate-card-grid pillars-grid">
-                {filteredPillars.map((pillar) => (
-                  <PillarCard
-                    key={pillar.id || getPillarTitle(pillar)}
-                    pillar={pillar}
-                    selected={pillar.id === selectedContentPillarId}
-                    onClick={(id) => setSelectedContentPillarId(id)}
-                  />
-                ))}
-              </div>
-            ) : (
+	            ) : filteredPillars.length ? (
+                <div className="pillars-carousel">
+                  <div className="pillars-rail" ref={pillarsRailRef}>
+                    {filteredPillars.map((pillar) => (
+                      <PillarCard
+                        key={pillar.id || getPillarTitle(pillar)}
+                        pillar={pillar}
+                        selected={pillar.id === selectedContentPillarId}
+                        onClick={(id) => setSelectedContentPillarId(id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+	            ) : (
               <div className="generate-empty-state">
                 <AppIcon name="layers" />
                 <div>

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import {
   autoGenerateContentOutputs,
   deleteContentOutput,
   listContentOutputs,
+  retryContentOutputPost,
   updateContentOutput,
   type ContentOutputRecord,
 } from '../services/contentOutputs'
@@ -27,7 +28,11 @@ type OutputEditForm = {
 const outputStatusOptions = [
   { value: 'draft', label: 'Draft' },
   { value: 'approved', label: 'Approved' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'posted', label: 'Posted' },
 ]
+
+const outputsPerPage = 5
 
 function getRecordValue(record: ContentPillarRecord | null, keys: string[]) {
   if (!record) {
@@ -122,6 +127,12 @@ function getOutputContent(record: ContentOutputRecord | null) {
 }
 
 function getOutputStatus(record: ContentOutputRecord | null) {
+  const externalPostId = getOutputValue(record, ['externalPostId', 'external_post_id'])
+
+  if (externalPostId) {
+    return 'posted'
+  }
+
   return (
     getOutputValue(record, ['status', 'contentStatus', 'content_status', 'state', 'post_status']) ||
     'draft'
@@ -146,6 +157,41 @@ function canEditOutputStatus(status: string) {
 
 function canDeleteOutputStatus(status: string) {
   return status.trim().toLowerCase() !== 'posted'
+}
+
+function canRetryOutputStatus(status: string) {
+  return status.trim().toLowerCase() === 'failed'
+}
+
+function normalizeDatetimeLocal(value: string) {
+  if (!value.trim()) {
+    return ''
+  }
+
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
+
+  if (!match) {
+    return ''
+  }
+
+  const [, year, month, day, hour, minute] = match
+  const asDate = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute))
+
+  if (Number.isNaN(asDate.getTime())) {
+    return ''
+  }
+
+  return asDate.toISOString()
+}
+
+function toDatetimeLocalValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0')
+
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 function getOutputEditForm(record: ContentOutputRecord | null): OutputEditForm {
@@ -228,6 +274,7 @@ function isUnusedTopic(record: ContentTopicRecord) {
 
 export function ContentEnginePage({ userId }: ContentEnginePageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
+  const pillarsRailRef = useRef<HTMLDivElement | null>(null)
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
   const [targetCount, setTargetCount] = useState(10)
@@ -247,6 +294,10 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
   const [isOutputEditorOpen, setIsOutputEditorOpen] = useState(false)
   const [isSavingOutput, setIsSavingOutput] = useState(false)
   const [isDeletingOutputId, setIsDeletingOutputId] = useState('')
+  const [currentOutputsPage, setCurrentOutputsPage] = useState(1)
+  const [retryingOutputId, setRetryingOutputId] = useState('')
+  const [retryModalOutputId, setRetryModalOutputId] = useState('')
+  const [retryScheduledAt, setRetryScheduledAt] = useState('')
   const [outputEditForm, setOutputEditForm] = useState<OutputEditForm>(getOutputEditForm(null))
 
   useEffect(() => {
@@ -345,6 +396,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
         }
 
         setContentOutputs(outputs)
+        setCurrentOutputsPage(1)
         setSelectedOutputId((current) => {
           const hasCurrent = current && outputs.some((output) => output.id === current)
           return hasCurrent ? current : outputs[0]?.id || ''
@@ -390,8 +442,17 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
     () => contentOutputs.find((output) => output.id === selectedOutputId) || null,
     [contentOutputs, selectedOutputId],
   )
+  const retryModalOutput = useMemo(
+    () => contentOutputs.find((output) => output.id === retryModalOutputId) || null,
+    [contentOutputs, retryModalOutputId],
+  )
   const selectedOutputStatus = getOutputStatus(selectedContentOutput)
   const canChangeSelectedOutputStatus = canEditOutputStatus(selectedOutputStatus)
+  const totalOutputPages = Math.max(1, Math.ceil(contentOutputs.length / outputsPerPage))
+  const paginatedOutputs = useMemo(() => {
+    const startIndex = (currentOutputsPage - 1) * outputsPerPage
+    return contentOutputs.slice(startIndex, startIndex + outputsPerPage)
+  }, [contentOutputs, currentOutputsPage])
 
   useEffect(() => {
     if (!isOutputEditorOpen) {
@@ -420,9 +481,13 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
 
     setOutputEditForm({
       ...nextForm,
-      status: nextForm.status.trim().toLowerCase() === 'approved' ? 'approved' : 'draft',
+      status: nextForm.status.trim().toLowerCase(),
     })
   }, [isOutputEditorOpen, selectedContentOutput])
+
+  useEffect(() => {
+    setCurrentOutputsPage((current) => Math.min(current, totalOutputPages))
+  }, [totalOutputPages])
 
   const canSubmit =
     Boolean(selectedContentPillarId) &&
@@ -522,11 +587,46 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
     setIsSavingOutput(false)
   }
 
+  function scrollPillars(direction: 'left' | 'right') {
+    const rail = pillarsRailRef.current
+
+    if (!rail) {
+      return
+    }
+
+    const amount = Math.max(rail.clientWidth * 0.82, 280)
+
+    rail.scrollBy({
+      left: direction === 'right' ? amount : -amount,
+      behavior: 'smooth',
+    })
+  }
+
   function handleOutputFieldChange(field: keyof OutputEditForm, value: string) {
     setOutputEditForm((current) => ({
       ...current,
       [field]: value,
     }))
+  }
+
+  function openRetryModal(record: ContentOutputRecord) {
+    const outputId = getOutputId(record)
+
+    if (!outputId) {
+      return
+    }
+
+    setRetryModalOutputId(outputId)
+    setRetryScheduledAt(toDatetimeLocalValue(new Date(Date.now() + 5 * 60 * 1000)))
+  }
+
+  function closeRetryModal() {
+    if (retryingOutputId) {
+      return
+    }
+
+    setRetryModalOutputId('')
+    setRetryScheduledAt('')
   }
 
   async function handleSaveOutput(event: FormEvent<HTMLFormElement>) {
@@ -614,6 +714,46 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
     }
   }
 
+  async function handleRetryOutput() {
+    if (!retryModalOutput) {
+      return
+    }
+
+    const outputId = getOutputId(retryModalOutput)
+    const scheduledAtIso = normalizeDatetimeLocal(retryScheduledAt)
+
+    if (!outputId || !scheduledAtIso) {
+      setStatusTone('error')
+      setStatusMessage('Pilih jadwal retry yang valid dulu.')
+      return
+    }
+
+    setRetryingOutputId(outputId)
+    setStatusTone('idle')
+    setStatusMessage('Menjadwalkan retry post...')
+
+    try {
+      await retryContentOutputPost({
+        contentOutputId: outputId,
+        scheduledAt: scheduledAtIso,
+      })
+
+      setRetryModalOutputId('')
+      setRetryScheduledAt('')
+      toastSuccess('Retry scheduled', 'Retry post berhasil dijadwalkan.')
+      setStatusTone('success')
+      setStatusMessage('Retry post berhasil dijadwalkan.')
+      setOutputsRefreshKey((current) => current + 1)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Gagal menjadwalkan retry post.'
+      setStatusTone('error')
+      setStatusMessage(errorMessage)
+      toastError('Retry failed', errorMessage)
+    } finally {
+      setRetryingOutputId('')
+    }
+  }
+
   function renderListOutputsView() {
     return (
       <section className="generate-page">
@@ -688,27 +828,28 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                     </tr>
                   </thead>
                   <tbody>
-	                    {contentOutputs.map((record, index) => {
-                      const title = getOutputTitle(record)
-                      const platform = getOutputValue(record, ['platform']) || 'Unknown platform'
+		                    {paginatedOutputs.map((record, index) => {
+	                      const title = getOutputTitle(record)
+	                      const platform = getOutputValue(record, ['platform']) || 'Unknown platform'
                       const formatOutput =
                         getOutputValue(record, ['formatOutput', 'format_output']) ||
                         'Unknown format'
                       const status = getOutputStatus(record)
-                      const createdAt = formatDate(
-                        getOutputValue(record, ['createdAt', 'created_at']) ||
-                          getOutputValue(record, ['generatedAt', 'generated_at']) ||
-                          '',
-                      )
-	                      const outputId = getOutputId(record)
-	                      const isSelected = outputId === selectedOutputId
-                        const canDeleteOutput = canDeleteOutputStatus(status)
+	                      const createdAt = formatDate(
+	                        getOutputValue(record, ['createdAt', 'created_at']) ||
+	                          getOutputValue(record, ['generatedAt', 'generated_at']) ||
+	                          '',
+	                      )
+		                      const outputId = getOutputId(record)
+		                      const isSelected = outputId === selectedOutputId
+	                        const canDeleteOutput = canDeleteOutputStatus(status)
+                        const canRetryOutput = canRetryOutputStatus(status)
 
-                      return (
-                        <tr
-                          key={outputId || `${title}-${index}`}
-                          className={isSelected ? 'selected-row' : ''}
-                        >
+	                      return (
+	                        <tr
+	                          key={outputId || `${title}-${index}-${currentOutputsPage}`}
+	                          className={isSelected ? 'selected-row' : ''}
+	                        >
                           <td>
                             <button
                               type="button"
@@ -729,22 +870,34 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                             </span>
                           </td>
                           <td>{createdAt}</td>
-                          <td>
-	                            <div className="table-action-group">
-	                              {canEditOutputStatus(status) ? (
+	                          <td>
+		                            <div className="table-action-group">
+                                {canRetryOutput ? (
+                                  <button
+                                    type="button"
+                                    className="table-icon-button table-icon-button-retry"
+                                    onClick={() => openRetryModal(record)}
+                                    aria-label={`Retry output ${title}`}
+                                    title="Retry output"
+                                    disabled={!outputId || retryingOutputId === outputId}
+                                  >
+                                    <AppIcon name="refresh" />
+                                  </button>
+                                ) : null}
+                                {canEditOutputStatus(status) ? (
+                                  <button
+                                    type="button"
+                                    className="table-icon-button table-icon-button-edit"
+                                    onClick={() => outputId && openOutputEditor(outputId)}
+                                    aria-label={`Edit output ${title}`}
+                                    title="Edit output"
+                                    disabled={!outputId || isSavingOutput}
+                                  >
+                                    <AppIcon name="pencil" />
+                                  </button>
+                                ) : null}
+	                              {canDeleteOutput ? (
 	                                <button
-	                                  type="button"
-                                  className="table-icon-button table-icon-button-edit"
-                                  onClick={() => outputId && openOutputEditor(outputId)}
-                                  aria-label={`Edit output ${title}`}
-                                  title="Edit output"
-                                  disabled={!outputId || isSavingOutput}
-	                                >
-	                                  <AppIcon name="pencil" />
-	                                </button>
-	                              ) : null}
-                              {canDeleteOutput ? (
-                                <button
                                   type="button"
                                   className="table-icon-button table-icon-button-delete"
                                   onClick={() => void handleDeleteOutput(record)}
@@ -754,17 +907,53 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                                 >
                                   <AppIcon name="trash" />
                                 </button>
-                              ) : null}
-	                            </div>
-	                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
+	                              ) : null}
+		                            </div>
+		                          </td>
+	                        </tr>
+	                      )
+	                    })}
+	                  </tbody>
+	                </table>
+	              </div>
+                {totalOutputPages > 1 ? (
+                  <div className="table-pagination">
+                    <button
+                      className="ghost-button table-pagination-button"
+                      type="button"
+                      onClick={() => setCurrentOutputsPage((current) => Math.max(1, current - 1))}
+                      disabled={currentOutputsPage === 1}
+                    >
+                      <AppIcon name="chevron-left" />
+                      Prev
+                    </button>
+                    <div className="table-pagination-pages">
+                      {Array.from({ length: totalOutputPages }, (_, index) => index + 1).map((page) => (
+                        <button
+                          key={page}
+                          className={`table-pagination-page${page === currentOutputsPage ? ' active' : ''}`}
+                          type="button"
+                          onClick={() => setCurrentOutputsPage(page)}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      className="ghost-button table-pagination-button"
+                      type="button"
+                      onClick={() =>
+                        setCurrentOutputsPage((current) => Math.min(totalOutputPages, current + 1))
+                      }
+                      disabled={currentOutputsPage === totalOutputPages}
+                    >
+                      Next
+                      <AppIcon name="chevron-right" />
+                    </button>
+                  </div>
+                ) : null}
+	            </div>
+	          ) : (
             <div className="generate-empty-state">
               <AppIcon name="check" />
               <div>
@@ -775,7 +964,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
           )}
         </article>
 
-        {isOutputEditorOpen && selectedContentOutput ? (
+	        {isOutputEditorOpen && selectedContentOutput ? (
           <div className="auth-overlay content-output-modal-overlay" onClick={closeOutputEditor}>
             <div
               className="content-output-modal"
@@ -807,11 +996,11 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                   <label className="persona-field">
                     <span>Status</span>
                     <div className="select-wrap">
-                      <select
-                        value={outputEditForm.status}
-                        onChange={(event) => handleOutputFieldChange('status', event.target.value)}
-                        disabled={!canChangeSelectedOutputStatus}
-                      >
+	                      <select
+	                        value={outputEditForm.status}
+	                        onChange={(event) => handleOutputFieldChange('status', event.target.value)}
+	                        disabled={!canChangeSelectedOutputStatus}
+	                      >
                         {outputStatusOptions.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
@@ -846,24 +1035,79 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                 </label>
 
                 <div className="content-output-modal-actions">
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={closeOutputEditor}
-                    disabled={isSavingOutput}
-                  >
-                    Cancel
-                  </button>
-                  <button className="primary-button" type="submit" disabled={isSavingOutput}>
-                    {isSavingOutput ? 'Saving...' : 'Save changes'}
-                  </button>
-                </div>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={closeOutputEditor}
+                      disabled={isSavingOutput}
+                    >
+                      {canChangeSelectedOutputStatus ? 'Cancel' : 'Close'}
+                    </button>
+                    {canChangeSelectedOutputStatus ? (
+                      <button className="primary-button" type="submit" disabled={isSavingOutput}>
+                        {isSavingOutput ? 'Saving...' : 'Save changes'}
+                      </button>
+                    ) : null}
+	                </div>
               </form>
             </div>
           </div>
-        ) : null}
-      </section>
-    )
+	        ) : null}
+
+          {retryModalOutput ? (
+            <div className="auth-overlay content-output-modal-overlay" onClick={closeRetryModal}>
+              <div
+                className="content-output-modal retry-output-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="retry-output-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="content-output-modal-head">
+                  <div>
+                    <p className="eyebrow">Retry Post</p>
+                    <h3 id="retry-output-modal-title">{getOutputTitle(retryModalOutput)}</h3>
+                  </div>
+                  <button className="ghost-button" type="button" onClick={closeRetryModal}>
+                    Close
+                  </button>
+                </div>
+
+                <div className="retry-output-modal-body">
+                  <label className="persona-field full-width">
+                    <span>Scheduled At</span>
+                    <input
+                      type="datetime-local"
+                      value={retryScheduledAt}
+                      onChange={(event) => setRetryScheduledAt(event.target.value)}
+                    />
+                    <small className="field-hint">Pilih waktu retry posting yang baru.</small>
+                  </label>
+                </div>
+
+                <div className="content-output-modal-actions">
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={closeRetryModal}
+                    disabled={Boolean(retryingOutputId)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={() => void handleRetryOutput()}
+                    disabled={!retryScheduledAt.trim() || Boolean(retryingOutputId)}
+                  >
+                    {retryingOutputId ? 'Scheduling...' : 'Schedule retry'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+	      </section>
+	    )
   }
 
   if (viewMode === 'chooser') {
@@ -900,7 +1144,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
               className="generate-simple-choice"
               onClick={() => setViewMode('auto')}
             >
-              <strong>Auto</strong>
+              <strong>Auto Create</strong>
               <p>Generate langsung dari content pillar dengan schedule.</p>
             </button>
 
@@ -976,7 +1220,29 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                 <p className="eyebrow">Content Pillars</p>
                 <h2>Pilih pillar milik user aktif</h2>
               </div>
-              <span className="pill subtle">{contentPillars.length} pillar</span>
+              <div className="pillars-panel-meta">
+                <span className="pill subtle">{contentPillars.length} pillar</span>
+                {contentPillars.length > 2 ? (
+                  <div className="pillars-carousel-actions">
+                    <button
+                      className="ghost-button pillars-carousel-button"
+                      type="button"
+                      onClick={() => scrollPillars('left')}
+                      aria-label="Pillar sebelumnya"
+                    >
+                      <AppIcon name="chevron-left" />
+                    </button>
+                    <button
+                      className="ghost-button pillars-carousel-button"
+                      type="button"
+                      onClick={() => scrollPillars('right')}
+                      aria-label="Pillar berikutnya"
+                    >
+                      <AppIcon name="chevron-right" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {isLoadingPillars ? (
@@ -988,21 +1254,23 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
                 </div>
               </div>
             ) : contentPillars.length ? (
-              <div className="generate-card-grid pillars-grid">
-                {contentPillars.map((pillar) => (
-                  <button
-                    key={pillar.id || getPillarTitle(pillar)}
-                    type="button"
-                    className={`generate-card pillar-card${pillar.id === selectedContentPillarId ? ' selected' : ''}`}
-                    onClick={() => pillar.id && setSelectedContentPillarId(pillar.id)}
-                  >
-                    <div className="generate-card-topline">
-                      <span className="generate-card-chip accent">Pillar</span>
-                    </div>
-                    <strong>{getPillarTitle(pillar)}</strong>
-                    <p>{shortenText(getPillarDescription(pillar), 140)}</p>
-                  </button>
-                ))}
+              <div className="pillars-carousel">
+                <div className="pillars-rail" ref={pillarsRailRef}>
+                  {contentPillars.map((pillar) => (
+                    <button
+                      key={pillar.id || getPillarTitle(pillar)}
+                      type="button"
+                      className={`generate-card pillar-card${pillar.id === selectedContentPillarId ? ' selected' : ''}`}
+                      onClick={() => pillar.id && setSelectedContentPillarId(pillar.id)}
+                    >
+                      <div className="generate-card-topline">
+                        <span className="generate-card-chip accent">Pillar</span>
+                      </div>
+                      <strong>{getPillarTitle(pillar)}</strong>
+                      <p>{shortenText(getPillarDescription(pillar), 140)}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="generate-empty-state">

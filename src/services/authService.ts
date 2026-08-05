@@ -36,6 +36,7 @@ export type RegisterResult = {
 }
 
 export type ThreadsSocialAccountState = {
+  status?: string
   connected?: boolean
   needsReconnect?: boolean
   username?: string
@@ -244,6 +245,7 @@ function normalizeThreadsSocialAccount(candidate: unknown) {
     return null
   }
 
+  const status = getStringFromKeys(candidate, ['status'])
   const expiresAt =
     getStringFromKeys(candidate, ['expiresAt', 'expires_at']) ||
     getString(candidate.expiresAt)
@@ -258,14 +260,20 @@ function normalizeThreadsSocialAccount(candidate: unknown) {
   const connectedOverride = getBooleanFromKeys(candidate, ['connected'])
   const needsReconnectOverride = getBooleanFromKeys(candidate, ['needsReconnect', 'needs_reconnect'])
   const hasConnectionRow = Boolean(token || refreshToken || accountId || threadsId || username)
+  const isDisconnectedStatus = status === 'disconnected'
+  const inferredConnected = hasConnectionRow && !isExpired && hasValidExpiry && !isDisconnectedStatus
 
   return {
     ...candidate,
+    status,
     connected:
       connectedOverride ??
-      (hasConnectionRow && !isExpired && hasValidExpiry),
+      inferredConnected,
     needsReconnect:
-      needsReconnectOverride ?? (hasConnectionRow ? !Boolean(connectedOverride ?? (!isExpired && hasValidExpiry)) : undefined),
+      needsReconnectOverride ??
+      (hasConnectionRow && !isDisconnectedStatus
+        ? !Boolean(connectedOverride ?? inferredConnected)
+        : false),
     username,
     accountId,
     threadsId,

@@ -51,7 +51,7 @@ export async function deleteThreadsConnection() {
     throw new Error('Token login belum tersedia. Silakan login ulang.')
   }
 
-  const url = buildApiUrl('/threads/delete')
+  const url = buildApiUrl('api/threads/delete')
 
   const response = await fetch(url.toString(), {
     method: 'DELETE',
