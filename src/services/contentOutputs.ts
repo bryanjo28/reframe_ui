@@ -33,6 +33,11 @@ export type UpdateContentOutputPayload = {
   content?: string
 }
 
+export type RetryContentOutputPayload = {
+  contentOutputId: string
+  scheduledAt: string
+}
+
 export type ContentOutputRecord = {
   id?: string
   userId?: string
@@ -237,6 +242,27 @@ export async function deleteContentOutput(id: string) {
     const errorMessage = typeof data === 'string' ? data : 'Gagal menghapus content output.'
 
     throw new Error(errorMessage || 'Gagal menghapus content output.')
+  }
+
+  return data
+}
+
+export async function retryContentOutputPost(payload: RetryContentOutputPayload) {
+  const response = await fetchWithTimeout(buildApiUrl('/api/threads/auto-post/retry'), {
+    method: 'POST',
+    headers: buildHeaders(true),
+    body: JSON.stringify({
+      contentOutputId: payload.contentOutputId,
+      scheduledAt: payload.scheduledAt,
+    }),
+  })
+
+  const data = await readResponseBodyWithTimeout(response)
+
+  if (!response.ok) {
+    const errorMessage = typeof data === 'string' ? data : 'Gagal menjadwalkan retry post.'
+
+    throw new Error(errorMessage || 'Gagal menjadwalkan retry post.')
   }
 
   return data

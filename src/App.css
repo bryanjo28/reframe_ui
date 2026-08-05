@@ -1226,6 +1226,72 @@ th {
   border-color: rgba(248, 113, 113, 0.34);
 }
 
+.table-icon-button-retry {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.2);
+}
+
+.table-icon-button-retry:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(96, 165, 250, 0.34);
+}
+
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.table-pagination-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-pagination-button svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.table-pagination-pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-pagination-page {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #263246;
+  border-radius: 10px;
+  background: #101826;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.table-pagination-page:hover {
+  border-color: #4f46e5;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.table-pagination-page.active {
+  border-color: #4f46e5;
+  background: #312e81;
+  color: #ffffff;
+}
+
 .auto-post-side-column {
   display: grid;
   gap: 20px;
@@ -3133,6 +3199,112 @@ th {
   gap: 14px;
 }
 
+.pillars-carousel {
+  display: grid;
+  gap: 14px;
+}
+
+.pillars-panel-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.pillars-carousel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid #22314a;
+}
+
+.pillars-carousel-button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  justify-content: center;
+  color: #ffffff;
+  background: transparent;
+  border-radius: 999px;
+}
+
+.pillars-carousel-button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.pillars-carousel-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pillars-carousel-button:disabled {
+  opacity: 0.38;
+}
+
+.pillars-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, calc((100% - 16px) / 2));
+  gap: 16px;
+  align-items: stretch;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: #42536d transparent;
+  padding: 2px 2px 12px;
+  margin: 0 -2px;
+}
+
+.pillars-rail::-webkit-scrollbar {
+  height: 6px;
+}
+
+.pillars-rail::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pillars-rail::-webkit-scrollbar-thumb {
+  background: #42536d;
+  border-radius: 999px;
+}
+
+.pillars-rail .pillar-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-width: 0;
+  scroll-snap-align: start;
+  height: 236px;
+  box-shadow: 0 12px 32px rgba(3, 8, 20, 0.18);
+}
+
+.pillar-card .generate-card-topline {
+  margin-bottom: 10px;
+}
+
+.pillar-card strong {
+  display: -webkit-box;
+  min-height: 58px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.pillar-card p {
+  display: -webkit-box;
+  margin-top: 6px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
 .generate-card {
   text-align: left;
   padding: 16px;
@@ -3721,6 +3893,15 @@ th {
   padding-inline: 18px;
 }
 
+.retry-output-modal {
+  width: min(520px, 100%);
+}
+
+.retry-output-modal-body {
+  display: grid;
+  gap: 12px;
+}
+
 .content-output-card {
   display: grid;
   gap: 14px;
@@ -3874,6 +4055,45 @@ th {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.threads-disconnect-modal-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.threads-disconnect-modal {
+  width: min(100%, 420px);
+  background: #111827;
+  border: 1px solid #263246;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 24px 80px rgba(3, 8, 20, 0.45);
+}
+
+.threads-disconnect-modal-head {
+  display: grid;
+  gap: 10px;
+}
+
+.threads-disconnect-modal-head h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.threads-disconnect-modal-head p {
+  margin: 0;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+.threads-disconnect-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
 }
 
 .integration-unlink-button {
@@ -4175,6 +4395,36 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .pillars-carousel-actions {
+    flex-shrink: 0;
+  }
+
+  .pillars-carousel-button {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .pillars-rail {
+    grid-auto-columns: 100%;
+    gap: 12px;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .pillars-rail .pillar-card {
+    height: 224px;
+  }
+
+  .pillars-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pillars-panel-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .generate-inline-action {
     flex-direction: column;
   }
@@ -4206,7 +4456,7 @@ th {
   .stat-card,
   .integration-card,
   .integration-note {
-    padding: 16px;
+    padding: 14px;
   }
 
   .panel-heading,
@@ -4227,6 +4477,89 @@ th {
   .primary-button {
     width: 100%;
     justify-content: center;
+  }
+
+  .generate-mode-switcher {
+    gap: 8px;
+  }
+
+  .generate-mode-switcher .ghost-button,
+  .generate-mode-switcher .pill {
+    min-height: 38px;
+    padding: 9px 12px;
+    font-size: 0.88rem;
+  }
+
+  .content-output-table-wrap {
+    border-radius: 12px;
+  }
+
+  .content-output-table {
+    min-width: 620px;
+  }
+
+  .content-output-table th,
+  .content-output-table td {
+    padding: 12px 10px;
+    font-size: 0.88rem;
+  }
+
+  .content-output-table th {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+  }
+
+  .table-link-button {
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+
+  .content-output-preview-button {
+    -webkit-line-clamp: 4;
+    line-height: 1.5;
+  }
+
+  .table-action-group {
+    gap: 6px;
+  }
+
+  .table-icon-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+
+  .table-icon-button svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .table-pagination {
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .table-pagination-button {
+    min-height: 38px;
+    padding: 9px 12px;
+    font-size: 0.88rem;
+  }
+
+  .table-pagination-button {
+    display: none;
+  }
+
+  .table-pagination-pages {
+    gap: 6px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .table-pagination-page {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    font-size: 0.86rem;
   }
 
   .persona-actions {

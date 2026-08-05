@@ -106,6 +106,24 @@ export function AppIcon({ name }: AppIconProps) {
           <path d="M4 4h16v16H4V4Zm2 2v12h4V6H6Zm6 0v12h6V6h-6Z" />
         </svg>
       )
+    case 'chevron-left':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m14.7 6.3-1.4-1.4L6.2 12l7.1 7.1 1.4-1.4-5.7-5.7 5.7-5.7Z" />
+        </svg>
+      )
+    case 'chevron-right':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m9.3 17.7 1.4 1.4 7.1-7.1-7.1-7.1-1.4 1.4 5.7 5.7-5.7 5.7Z" />
+        </svg>
+      )
+    case 'refresh':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 5a7 7 0 1 1-6.32 10H3l3.5 4L10 15H7.74A5 5 0 1 0 8.2 9.03L10 11h-5V6l1.78 1.95A6.96 6.96 0 0 1 12 5Z" />
+        </svg>
+      )
     default:
       return null
   }

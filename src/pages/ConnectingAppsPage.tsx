@@ -11,6 +11,7 @@ import {
 } from '../services/threadsAuth'
 
 type ThreadsConnectionView = {
+  status?: string
   connected: boolean
   needsReconnect: boolean
   username?: string
@@ -44,6 +45,7 @@ function toThreadsConnectionView(
   }
 
   return {
+    status: typeof threads.status === 'string' ? threads.status : undefined,
     connected: Boolean(threads.connected),
     needsReconnect: Boolean(threads.needsReconnect),
     username: threads.username || threads.accountId,
@@ -61,6 +63,7 @@ export function ConnectingAppsPage() {
   const [isLoadingThreadsStatus, setIsLoadingThreadsStatus] = useState(true)
   const [connectionError, setConnectionError] = useState('')
   const [threadsConnection, setThreadsConnection] = useState<ThreadsConnectionView | null>(null)
+  const [isDisconnectModalOpen, setIsDisconnectModalOpen] = useState(false)
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -155,6 +158,7 @@ export function ConnectingAppsPage() {
 
       await deleteThreadsConnection()
       setThreadsConnection(null)
+      setIsDisconnectModalOpen(false)
       toastSuccess('Threads unlinked', 'Koneksi akun Threads berhasil dihapus.')
     } catch (error) {
       const message =
@@ -233,11 +237,11 @@ export function ConnectingAppsPage() {
                 <button
                   className="ghost-button integration-unlink-button"
                   type="button"
-                  onClick={handleThreadsDelete}
+                  onClick={() => setIsDisconnectModalOpen(true)}
                   disabled={isDeletingThreads || isConnectingThreads || isLoadingThreadsStatus}
                 >
                   <AppIcon name="close" />
-                  {isDeletingThreads ? 'Menghapus...' : 'Unlink'}
+                  {isDeletingThreads ? 'Disconnecting...' : 'Disconnect'}
                 </button>
               ) : needsReconnect ? (
                 <div className="integration-status">
@@ -253,11 +257,11 @@ export function ConnectingAppsPage() {
                   <button
                     className="ghost-button integration-unlink-button"
                     type="button"
-                    onClick={handleThreadsDelete}
+                    onClick={() => setIsDisconnectModalOpen(true)}
                     disabled={isDeletingThreads || isConnectingThreads || isLoadingThreadsStatus}
                   >
                     <AppIcon name="close" />
-                    {isDeletingThreads ? 'Menghapus...' : 'Unlink'}
+                    {isDeletingThreads ? 'Disconnecting...' : 'Disconnect'}
                   </button>
                 </div>
               ) : isThreads ? (
@@ -268,7 +272,7 @@ export function ConnectingAppsPage() {
                   disabled={isConnectingThreads || isLoadingThreadsStatus}
                 >
                   <AppIcon name={isConnectingThreads ? 'link' : 'plus'} />
-                  {isConnectingThreads ? 'Menghubungkan...' : 'Hubungkan Threads'}
+                  {isConnectingThreads ? 'Menghubungkan...' : 'Connect Threads'}
                 </button>
               ) : (
                 <button className="connect-button" type="button">
@@ -280,6 +284,52 @@ export function ConnectingAppsPage() {
           )
         })}
       </div>
+
+      {isDisconnectModalOpen ? (
+        <div
+          className="auth-overlay threads-disconnect-modal-overlay"
+          onClick={() => {
+            if (!isDeletingThreads) {
+              setIsDisconnectModalOpen(false)
+            }
+          }}
+        >
+          <div
+            className="threads-disconnect-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="threads-disconnect-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="threads-disconnect-modal-head">
+              <h3 id="threads-disconnect-modal-title">Disconnect Threads?</h3>
+              <p>
+                Koneksi Threads akan diputus. Setelah itu status akun menjadi disconnected
+                dan action berikutnya adalah connect lagi.
+              </p>
+            </div>
+            <div className="threads-disconnect-modal-actions">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setIsDisconnectModalOpen(false)}
+                disabled={isDeletingThreads}
+              >
+                Batal
+              </button>
+              <button
+                className="connect-button"
+                type="button"
+                onClick={handleThreadsDelete}
+                disabled={isDeletingThreads}
+              >
+                <AppIcon name="close" />
+                {isDeletingThreads ? 'Disconnecting...' : 'Disconnect'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* <div className="integration-note">
         <AppIcon name="info" />
