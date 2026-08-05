@@ -4,6 +4,7 @@ import type { MenuItem, NavKey } from '../types/navigation'
 import type { AuthUser } from '../services/authService'
 import { getCurrentSubscription, listSubscriptionPlans } from '../services/subscriptionPlans'
 import { getMyUsage } from '../services/usage'
+import type { AppTheme } from '../types/navigation'
 
 type SidebarProps = {
   activePage: NavKey
@@ -13,6 +14,8 @@ type SidebarProps = {
   isCollapsed: boolean
   isMobile: boolean
   isOpen: boolean
+  theme: AppTheme
+  onToggleTheme: () => void
   onToggleCollapse: () => void
   onClose: () => void
 }
@@ -73,6 +76,8 @@ export function Sidebar({
   isCollapsed,
   isMobile,
   isOpen,
+  theme,
+  onToggleTheme,
   onToggleCollapse,
   onClose,
 }: SidebarProps) {
@@ -187,6 +192,17 @@ export function Sidebar({
           onNavigate={onNavigate}
           isCollapsed={isCollapsed}
         />
+
+        <button
+          type="button"
+          className={`menu-item sidebar-theme-toggle${theme === 'light' ? ' active-theme' : ''}`}
+          onClick={onToggleTheme}
+          title={isCollapsed ? 'Toggle light mode' : undefined}
+          aria-label="Toggle light mode"
+        >
+          <AppIcon name="sun" />
+          {!isCollapsed ? <span>{theme === 'light' ? 'Light Mode On' : 'Light Mode'}</span> : null}
+        </button>
       </div>
 
       <div className="sidebar-bottom">

@@ -13,7 +13,7 @@ import { ContentEnginePage } from './pages/ContentEnginePage'
 import { GenerateTopicPage } from './pages/GenerateTopicPage'
 import { PersonalizePage } from './pages/PersonalizePage'
 import { CheckEmailPage } from './pages/CheckEmailPage'
-import type { NavKey } from './types/navigation'
+import type { AppTheme, NavKey } from './types/navigation'
 import { ToastProvider } from './components/Toast'
 import {
   clearAuthSession,
@@ -32,6 +32,23 @@ type PersonaStatus = 'idle' | 'loading' | 'ready'
 type UnauthenticatedView = 'login' | 'check-email'
 const ACTIVE_PAGE_STORAGE_KEY = 'reframe.activePage'
 const PENDING_VERIFICATION_EMAIL_STORAGE_KEY = 'reframe.pendingVerificationEmail'
+const APP_THEME_STORAGE_KEY = 'reframe.appTheme'
+
+function getStoredTheme(): AppTheme {
+  if (typeof localStorage === 'undefined') {
+    return 'dark'
+  }
+
+  return localStorage.getItem(APP_THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark'
+}
+
+function setStoredTheme(theme: AppTheme) {
+  if (typeof localStorage === 'undefined') {
+    return
+  }
+
+  localStorage.setItem(APP_THEME_STORAGE_KEY, theme)
+}
 
 function getStoredPendingVerificationEmail() {
   if (typeof localStorage === 'undefined') {
@@ -100,6 +117,7 @@ function AppShell() {
   const [isSidebarMobile, setIsSidebarMobile] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [theme, setTheme] = useState<AppTheme>(getStoredTheme)
   const [personaStatus, setPersonaStatus] = useState<PersonaStatus>('idle')
   const [personaConfig, setPersonaConfig] = useState<PersonaConfigRecord | null>(null)
   const bootstrapRunIdRef = useRef(0)
@@ -184,6 +202,15 @@ function AppShell() {
   useEffect(() => {
     setStoredActivePage(activePage)
   }, [activePage])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return
+    }
+
+    document.documentElement.dataset.theme = theme
+    setStoredTheme(theme)
+  }, [theme])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -382,17 +409,19 @@ function AppShell() {
           />
         ) : null}
 
-        <Sidebar
-          activePage={activePage}
-          onNavigate={handleNavigate}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          isCollapsed={isSidebarCollapsed}
-          isMobile={isSidebarMobile}
-          isOpen={isSidebarMobile ? isSidebarOpen : true}
-          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
-          onClose={() => setIsSidebarOpen(false)}
-        />
+	        <Sidebar
+	          activePage={activePage}
+	          onNavigate={handleNavigate}
+	          currentUser={currentUser}
+	          onLogout={handleLogout}
+	          isCollapsed={isSidebarCollapsed}
+	          isMobile={isSidebarMobile}
+	          isOpen={isSidebarMobile ? isSidebarOpen : true}
+            theme={theme}
+            onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+	          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
+	          onClose={() => setIsSidebarOpen(false)}
+	        />
 
         <main className="content-area">
           <div key={activePage} className="page-transition">

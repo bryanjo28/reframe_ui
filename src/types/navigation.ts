@@ -11,6 +11,8 @@ export type NavKey =
   | 'subscription-plans'
   | 'connecting-apps'
 
+export type AppTheme = 'dark' | 'light'
+
 export type MenuItem = {
   key: NavKey
   label: string
