@@ -13,14 +13,17 @@ import { ContentEnginePage } from './pages/ContentEnginePage'
 import { GenerateTopicPage } from './pages/GenerateTopicPage'
 import { PersonalizePage } from './pages/PersonalizePage'
 import { CheckEmailPage } from './pages/CheckEmailPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { EmailConfirmedPage } from './pages/EmailConfirmedPage'
+import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
 import type { AppTheme, NavKey } from './types/navigation'
 import { ToastProvider } from './components/Toast'
 import {
   clearAuthSession,
-  getCurrentUser,
+  getCurrentAuthState,
   logout,
   type AuthUser,
-  type AuthSession,
 } from './services/authService'
 import {
   findPersonaConfigForUser,
@@ -104,6 +107,26 @@ function setStoredActivePage(page: NavKey) {
   localStorage.setItem(ACTIVE_PAGE_STORAGE_KEY, page)
 }
 
+function replaceAppPath(path: string) {
+  if (window.location.pathname !== path || window.location.search || window.location.hash) {
+    window.history.replaceState({}, document.title, path)
+  }
+}
+
+function isRootEmailConfirmationCallback() {
+  if (window.location.pathname !== '/') {
+    return false
+  }
+
+  const hashParams = new URLSearchParams(window.location.hash.slice(1))
+  const searchParams = new URLSearchParams(window.location.search)
+  const callbackType = hashParams.get('type') || searchParams.get('type')
+
+  return callbackType === 'signup' && Boolean(
+    hashParams.get('access_token') || searchParams.get('token_hash') || searchParams.get('code'),
+  )
+}
+
 function AppShell() {
   const isAuthCallbackRoute =
     typeof window !== 'undefined' && window.location.pathname === '/auth/callback'
@@ -135,6 +158,7 @@ function AppShell() {
 
       setPersonaConfig(config)
       setPersonaStatus('ready')
+      return config
     } catch {
       if (activeRunId !== bootstrapRunIdRef.current) {
         return
@@ -142,6 +166,7 @@ function AppShell() {
 
       setPersonaConfig(null)
       setPersonaStatus('ready')
+      return null
     }
   }, [])
 
@@ -158,13 +183,13 @@ function AppShell() {
     setAuthError('')
 
     try {
-      const user = await getCurrentUser()
+      const authState = await getCurrentAuthState()
 
       if (runId !== bootstrapRunIdRef.current) {
         return
       }
 
-      if (!user) {
+      if (!authState) {
         clearAuthSession()
         resetWorkspaceState()
         setUnauthenticatedView('login')
@@ -172,13 +197,25 @@ function AppShell() {
         return
       }
 
+      const { user, onboarding } = authState
       setCurrentUser(user)
       setStoredPendingVerificationEmail(undefined)
       setPendingVerificationEmail('')
       setAuthHelperMessage('')
       setAuthStatus('authenticated')
 
-      void loadPersonaConfig(user.id, runId)
+      if (onboarding?.hasPersona === false) {
+        setPersonaConfig(null)
+        setPersonaStatus('ready')
+        replaceAppPath('/first-setup')
+        return
+      }
+
+      const config = await loadPersonaConfig(user.id, runId)
+
+      if (runId === bootstrapRunIdRef.current) {
+        replaceAppPath(config ? '/dashboard' : '/first-setup')
+      }
     } catch (error) {
       if (runId !== bootstrapRunIdRef.current) {
         return
@@ -282,15 +319,44 @@ function AppShell() {
     window.history.replaceState({}, document.title, '/')
   }, [isAuthCallbackRoute])
 
-  const handleAuthenticated = useCallback(async (session: AuthSession) => {
-    setCurrentUser(session.user)
-    setAuthStatus('authenticated')
-    setUnauthenticatedView('login')
-    setStoredPendingVerificationEmail(undefined)
-    setPendingVerificationEmail('')
-    setAuthHelperMessage('')
-    setActivePage('dashboard')
-    await loadPersonaConfig(session.user.id)
+  const handleAuthenticated = useCallback(async () => {
+    const runId = ++bootstrapRunIdRef.current
+    setAuthStatus('loading')
+    setAuthError('')
+
+    try {
+      const authState = await getCurrentAuthState()
+
+      if (!authState || runId !== bootstrapRunIdRef.current) {
+        throw new Error('Session login tidak tersedia.')
+      }
+
+      setCurrentUser(authState.user)
+      setAuthStatus('authenticated')
+      setUnauthenticatedView('login')
+      setStoredPendingVerificationEmail(undefined)
+      setPendingVerificationEmail('')
+      setAuthHelperMessage('')
+      setActivePage('dashboard')
+
+      if (authState.onboarding?.hasPersona === false) {
+        setPersonaConfig(null)
+        setPersonaStatus('ready')
+        replaceAppPath('/first-setup')
+        return
+      }
+
+      const config = await loadPersonaConfig(authState.user.id, runId)
+
+      if (runId === bootstrapRunIdRef.current) {
+        replaceAppPath(config ? '/dashboard' : '/first-setup')
+      }
+    } catch (error) {
+      clearAuthSession()
+      resetWorkspaceState()
+      setAuthError(error instanceof Error ? error.message : 'Gagal memuat session login.')
+      setAuthStatus('error')
+    }
   }, [loadPersonaConfig])
 
   const handleLogout = useCallback(async () => {
@@ -303,12 +369,14 @@ function AppShell() {
       setUnauthenticatedView('login')
       setAuthHelperMessage('')
       setAuthStatus('unauthenticated')
+      replaceAppPath('/login')
     }
   }, [])
 
   function handlePersonalizePersonaSaved(nextConfig: PersonaConfigRecord) {
     setPersonaConfig(nextConfig)
-    setActivePage('personalize')
+    setActivePage('dashboard')
+    replaceAppPath('/dashboard')
   }
 
   const handleNavigate = useCallback((page: NavKey) => {
@@ -353,14 +421,22 @@ function AppShell() {
       />
     ) : (
       <AuthPage
-        onAuthenticated={(session) => void handleAuthenticated(session)}
+        onAuthenticated={() => void handleAuthenticated()}
         onRegisterRequiresEmail={(email) => {
           setStoredPendingVerificationEmail(email)
           setPendingVerificationEmail(email)
           setUnauthenticatedView('check-email')
           setAuthHelperMessage('')
+          replaceAppPath('/check-email')
         }}
-        initialMode="login"
+        onEmailNotVerified={(email) => {
+          setStoredPendingVerificationEmail(email)
+          setPendingVerificationEmail(email)
+          setUnauthenticatedView('check-email')
+          setAuthHelperMessage('')
+          replaceAppPath('/check-email')
+        }}
+        initialMode={window.location.pathname === '/register' ? 'register' : 'login'}
         allowRegister
         helperMessage={authHelperMessage}
       />
@@ -458,6 +534,39 @@ function AppShell() {
 }
 
 function App() {
+  if (isRootEmailConfirmationCallback()) {
+    return <EmailConfirmedPage />
+  }
+
+  if (window.location.pathname === '/') {
+    return (
+      <ToastProvider>
+        <CreateContentDemoPage
+          isAuthenticated={false}
+          onRequestAuth={(mode) => {
+            window.location.href = mode === 'login' ? '/login' : '/register'
+          }}
+        />
+      </ToastProvider>
+    )
+  }
+
+  if (window.location.pathname === '/check-email') {
+    return <CheckEmailPage email={getStoredPendingVerificationEmail()} />
+  }
+
+  if (window.location.pathname === '/email-confirmed') {
+    return <EmailConfirmedPage />
+  }
+
+  if (window.location.pathname === '/forgot-password') {
+    return <ForgotPasswordPage />
+  }
+
+  if (window.location.pathname === '/reset-password') {
+    return <ResetPasswordPage />
+  }
+
   if (window.location.pathname === '/threads/callback') {
     return <ThreadsCallbackPage />
   }

@@ -291,6 +291,66 @@
   grid-column: 1 / -1;
 }
 
+.auth-password-group {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 7px;
+}
+
+.auth-forgot-link,
+.auth-secondary-link {
+  width: fit-content;
+  color: #a5b4fc;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.auth-forgot-link {
+  justify-self: end;
+}
+
+.auth-forgot-link:hover,
+.auth-secondary-link:hover {
+  color: #c7d2fe;
+  text-decoration: underline;
+}
+
+.auth-recovery-card {
+  width: min(100%, 620px);
+}
+
+.auth-recovery-actions {
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.auth-message-success {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(20, 83, 45, 0.22);
+}
+
+.auth-message-success p {
+  color: #bbf7d0;
+}
+
+.check-email-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.auth-route-button {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .auth-field span {
   color: #94a3b8;
   font-size: 0.78rem;
@@ -2518,6 +2578,7 @@ th {
 }
 
 .persona-actions {
+  grid-column: 1 / -1;
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;

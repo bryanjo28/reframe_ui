@@ -51,6 +51,9 @@ export type ThreadsSocialAccountState = {
 
 export type AuthMeState = {
   user: AuthUser
+  onboarding: {
+    hasPersona: boolean
+  } | null
   socialAccounts: {
     threads?: ThreadsSocialAccountState
     [key: string]: unknown
@@ -70,6 +73,7 @@ let authStateRequest: Promise<AuthMeState | null> | null = null
 type ApiResponse = {
   success?: boolean
   message?: string
+  code?: unknown
   emailConfirmationRequired?: boolean
   data?: unknown
   user?: unknown
@@ -78,6 +82,16 @@ type ApiResponse = {
   accessToken?: unknown
   session?: unknown
   socialAccounts?: unknown
+}
+
+export class AuthRequestError extends Error {
+  code?: string
+
+  constructor(message: string, code?: string) {
+    super(message)
+    this.name = 'AuthRequestError'
+    this.code = code
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -272,7 +286,7 @@ function normalizeThreadsSocialAccount(candidate: unknown) {
     needsReconnect:
       needsReconnectOverride ??
       (hasConnectionRow && !isDisconnectedStatus
-        ? !Boolean(connectedOverride ?? inferredConnected)
+        ? !(connectedOverride ?? inferredConnected)
         : false),
     username,
     accountId,
@@ -326,8 +340,19 @@ function normalizeAuthMeState(payload: ApiResponse): AuthMeState | null {
     normalizeThreadsSocialAccount(directThreadsCandidate) ??
     normalizeThreadsSocialAccount(providerCandidate)
 
+  const onboardingRecord = isRecord(dataRecord?.onboarding)
+    ? dataRecord.onboarding
+    : isRecord((payload as Record<string, unknown>).onboarding)
+      ? ((payload as Record<string, unknown>).onboarding as Record<string, unknown>)
+      : null
+  const hasPersona = onboardingRecord?.hasPersona
+
   return {
     user,
+    onboarding:
+      typeof hasPersona === 'boolean'
+        ? { hasPersona }
+        : null,
     socialAccounts: socialAccountsRecord
       ? {
           ...socialAccountsRecord,
@@ -387,7 +412,10 @@ async function parseAuthResponse(response: Response) {
 async function parseRegisterResponse(response: Response) {
   const data = (await response.json()) as ApiResponse
   const session = normalizeSessionPayload(data)
-  const emailConfirmationRequired = Boolean(data.emailConfirmationRequired)
+  const nestedData = isRecord(data.data) ? data.data : null
+  const emailConfirmationRequired = Boolean(
+    data.emailConfirmationRequired ?? nestedData?.emailConfirmationRequired,
+  )
 
   if (emailConfirmationRequired) {
     setStoredAuthToken(undefined)
@@ -421,7 +449,16 @@ export async function login(payload: AuthCredentials) {
   })
 
   if (!response.ok) {
-    throw new Error('Login gagal. Periksa email/username dan password.')
+    const errorPayload = (await response.json().catch(() => null)) as unknown
+    const errorRecord = isRecord(errorPayload) ? errorPayload : null
+    const nestedError = isRecord(errorRecord?.data) ? errorRecord.data : null
+    const code = getString(errorRecord?.code) || getString(nestedError?.code)
+
+    if (code === 'EMAIL_NOT_VERIFIED') {
+      throw new AuthRequestError('Email belum diverifikasi.', code)
+    }
+
+    throw new AuthRequestError('Login gagal. Periksa email/username dan password.', code)
   }
 
   return parseAuthResponse(response)
@@ -439,6 +476,18 @@ export async function register(payload: RegisterCredentials) {
   }
 
   return parseRegisterResponse(response)
+}
+
+export async function resendVerification(email: string) {
+  const response = await fetch(buildApiUrl('/api/auth/resend-verification'), {
+    method: 'POST',
+    headers: buildRequestHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ email }),
+  })
+
+  if (!response.ok) {
+    throw new Error('Gagal mengirim ulang email verifikasi. Coba lagi.')
+  }
 }
 
 export async function getCurrentUser() {

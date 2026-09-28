@@ -419,9 +419,11 @@ export function CreatePersonaPage({
             ))}
 
             <div className="persona-actions">
-              <button className="ghost-button" type="button" onClick={handleCreateNew} disabled={isSaving}>
-                New Persona
-              </button>
+              {!isInitialSetup ? (
+                <button className="ghost-button" type="button" onClick={handleCreateNew} disabled={isSaving}>
+                  New Persona
+                </button>
+              ) : null}
               <button className="primary-button" type="submit" disabled={isSaving}>
               {isSaving
                   ? 'Menyimpan...'

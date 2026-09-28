@@ -427,27 +427,13 @@ export function CreateContentDemoPage({
       return
     }
 
-    if (isAuthenticated) {
-      void submitGenerate()
-      return
-    }
-
-    setPendingGenerateAfterAuth(true)
-    onDemoSessionStart?.()
-    onRequestAuth('register')
-    setStatusTone('idle')
-    setStatusMessage('Buat akun dulu untuk lanjut ke demo content.')
+    void submitGenerate()
   }
 
   async function submitGenerate() {
     if (generatedResult) {
       clearPersistedDemoState()
       onDemoSessionEnd?.()
-      return
-    }
-
-    if (!isAuthenticated) {
-      requestGenerate()
       return
     }
 
@@ -521,12 +507,12 @@ export function CreateContentDemoPage({
       <header className="persona-chat-hero content-demo-hero">
         <div className="persona-chat-kicker content-demo-kicker">
           <span className="persona-chat-badge content-demo-badge">Free demo</span>
-          <span>Trial singkat dulu, login baru untuk generate penuh</span>
+          <span>Coba gratis dulu, buat akun setelah melihat hasilnya</span>
         </div>
         <h1>Generate viral threads dalam 10 detik</h1>
         <p className="page-description">
-          User bisa chat dulu dengan AI lewat pertanyaan singkat. Saat klik generate, barulah
-          kami minta login atau sign up supaya hasil demo bisa diproses.
+          Jawab empat pertanyaan singkat dan lihat contoh hasilnya tanpa login. Buat akun hanya
+          jika kamu ingin lanjut memakai workspace lengkap.
         </p>
 
         <div className="content-demo-hero-actions">
@@ -581,8 +567,7 @@ export function CreateContentDemoPage({
                 <div className="persona-chat-bubble">
                   <span className="persona-chat-label">Assistant</span>
                   <p>
-                    Isi 4 jawaban singkat saja. Setelah itu, klik generate untuk lanjut ke login
-                    atau sign up.
+                    Isi 4 jawaban singkat saja. Setelah itu, klik generate untuk melihat hasil demo.
                   </p>
                 </div>
               </div>
@@ -629,6 +614,22 @@ export function CreateContentDemoPage({
                       <span className="pill subtle">Preview</span>
                     </div>
                     <pre>{formatDemoResult(generatedResult)}</pre>
+                    <div className="content-demo-login-actions">
+                      <a
+                        className="primary-button content-demo-inline-button"
+                        href="/login"
+                        onClick={clearPersistedDemoState}
+                      >
+                        Login untuk lanjut
+                      </a>
+                      <a
+                        className="ghost-button content-demo-inline-button"
+                        href="/register"
+                        onClick={clearPersistedDemoState}
+                      >
+                        Buat akun
+                      </a>
+                    </div>
                   </div>
                 </div>
               ) : null}
@@ -700,9 +701,9 @@ export function CreateContentDemoPage({
                     <button
                       className="primary-button chat-next-button"
                       type="submit"
-                      disabled={generatedResult ? false : !draftValue.trim() || isGenerating}
+                      disabled={Boolean(generatedResult) || !draftValue.trim() || isGenerating}
                     >
-                      {generatedResult ? 'Lanjut ke dashboard' : isGenerating ? 'Generating...' : 'Generate demo'}
+                      {generatedResult ? 'Hasil demo siap' : isGenerating ? 'Generating...' : 'Generate demo'}
                     </button>
                   ) : (
                     <button

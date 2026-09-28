@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { login, register, type AuthSession } from '../services/authService'
+import { AuthRequestError, login, register, type AuthSession } from '../services/authService'
 
 type AuthMode = 'login' | 'register'
 
 type AuthPageProps = {
   onAuthenticated: (session: AuthSession, mode: AuthMode) => void
   onRegisterRequiresEmail?: (email: string) => void
+  onEmailNotVerified?: (email: string) => void
   initialMode?: AuthMode
   allowRegister?: boolean
   onBack?: () => void
@@ -15,6 +16,7 @@ type AuthPageProps = {
 export function AuthPage({
   onAuthenticated,
   onRegisterRequiresEmail,
+  onEmailNotVerified,
   initialMode = 'login',
   allowRegister = true,
   onBack,
@@ -52,6 +54,11 @@ export function AuthPage({
 
       onAuthenticated(result.session, mode)
     } catch (error) {
+      if (error instanceof AuthRequestError && error.code === 'EMAIL_NOT_VERIFIED') {
+        onEmailNotVerified?.(email)
+        return
+      }
+
       setErrorMessage(error instanceof Error ? error.message : 'Auth gagal. Coba lagi.')
     } finally {
       setIsSubmitting(false)
@@ -165,17 +172,24 @@ export function AuthPage({
             </>
           )}
 
-          <label className="auth-field full-width">
-            <span>Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Masukkan password"
-              autoComplete={isLogin ? 'current-password' : 'new-password'}
-              required
-            />
-          </label>
+          <div className="auth-password-group">
+            <label className="auth-field">
+              <span>Password</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Masukkan password"
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+                required
+              />
+            </label>
+            {isLogin ? (
+              <a className="auth-forgot-link" href="/forgot-password">
+                Forgot password?
+              </a>
+            ) : null}
+          </div>
 
           <div className="auth-actions">
             <button className="primary-button" type="submit" disabled={isSubmitting}>
