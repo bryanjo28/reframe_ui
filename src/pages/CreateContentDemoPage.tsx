@@ -75,6 +75,8 @@ const emptyValues: GenerateContentOutputDemoPayload = {
 }
 
 const DEMO_STORAGE_KEY = 'reframe.demoContentDraft'
+// Public demo generation is paused. Keep the implementation below ready for reactivation.
+const ENABLE_PUBLIC_DEMO_API = false
 
 function isFilled(value: string) {
   return value.trim().length > 0
@@ -427,7 +429,15 @@ export function CreateContentDemoPage({
       return
     }
 
-    void submitGenerate()
+    if (ENABLE_PUBLIC_DEMO_API) {
+      void submitGenerate()
+      return
+    }
+
+    onDemoSessionStart?.()
+    onRequestAuth('login')
+    setStatusTone('idle')
+    setStatusMessage('Login dulu untuk melanjutkan proses generate.')
   }
 
   async function submitGenerate() {
@@ -507,12 +517,12 @@ export function CreateContentDemoPage({
       <header className="persona-chat-hero content-demo-hero">
         <div className="persona-chat-kicker content-demo-kicker">
           <span className="persona-chat-badge content-demo-badge">Free demo</span>
-          <span>Coba gratis dulu, buat akun setelah melihat hasilnya</span>
+          <span>Isi demo singkat, lalu login untuk melanjutkan generate</span>
         </div>
         <h1>Generate viral threads dalam 10 detik</h1>
         <p className="page-description">
-          Jawab empat pertanyaan singkat dan lihat contoh hasilnya tanpa login. Buat akun hanya
-          jika kamu ingin lanjut memakai workspace lengkap.
+          Jawab empat pertanyaan singkat untuk mencoba alurnya. Saat klik generate, kamu akan
+          diarahkan ke login sebelum melanjutkan ke workspace.
         </p>
 
         <div className="content-demo-hero-actions">
@@ -567,7 +577,7 @@ export function CreateContentDemoPage({
                 <div className="persona-chat-bubble">
                   <span className="persona-chat-label">Assistant</span>
                   <p>
-                    Isi 4 jawaban singkat saja. Setelah itu, klik generate untuk melihat hasil demo.
+                    Isi 4 jawaban singkat saja. Setelah itu, klik generate untuk lanjut ke login.
                   </p>
                 </div>
               </div>

@@ -11,15 +11,14 @@ beforeEach(() => {
   vi.restoreAllMocks()
 })
 
-it('lets a guest generate a demo result before showing login and register CTAs', async () => {
+it('sends a guest to login without calling the paused demo API', async () => {
   const user = userEvent.setup()
-  vi.spyOn(contentOutputs, 'generateContentOutputDemo').mockResolvedValue({
-    content: 'Contoh thread hasil demo',
-  })
+  const onRequestAuth = vi.fn()
+  const generateDemo = vi.spyOn(contentOutputs, 'generateContentOutputDemo')
 
   render(
     <ToastProvider>
-      <CreateContentDemoPage isAuthenticated={false} onRequestAuth={vi.fn()} />
+      <CreateContentDemoPage isAuthenticated={false} onRequestAuth={onRequestAuth} />
     </ToastProvider>,
   )
 
@@ -29,7 +28,6 @@ it('lets a guest generate a demo result before showing login and register CTAs',
   await user.click(screen.getByRole('button', { name: 'Singkat dan tajam' }))
   await user.click(screen.getByRole('button', { name: 'Generate demo' }))
 
-  expect(await screen.findByText('Contoh thread hasil demo')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Login untuk lanjut' })).toHaveAttribute('href', '/login')
-  expect(screen.getByRole('link', { name: 'Buat akun' })).toHaveAttribute('href', '/register')
+  expect(onRequestAuth).toHaveBeenCalledWith('login')
+  expect(generateDemo).not.toHaveBeenCalled()
 })
