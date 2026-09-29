@@ -19,6 +19,7 @@ import { EmailConfirmedPage } from './pages/EmailConfirmedPage'
 import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
 import type { AppTheme, NavKey } from './types/navigation'
 import { ToastProvider } from './components/Toast'
+import { ContentGenerationProgress } from './components/ContentGenerationProgress'
 import {
   clearAuthSession,
   getCurrentAuthState,
@@ -29,6 +30,11 @@ import {
   findPersonaConfigForUser,
   type PersonaConfigRecord,
 } from './services/personaConfigs'
+import {
+  getScheduledJobById,
+  isScheduledJobProgressTerminal,
+  type ScheduledJobProgress,
+} from './services/threadsAutoPost'
 
 type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'error'
 type PersonaStatus = 'idle' | 'loading' | 'ready'
@@ -143,7 +149,72 @@ function AppShell() {
   const [theme, setTheme] = useState<AppTheme>(getStoredTheme)
   const [personaStatus, setPersonaStatus] = useState<PersonaStatus>('idle')
   const [personaConfig, setPersonaConfig] = useState<PersonaConfigRecord | null>(null)
+  const [activeGenerationJobId, setActiveGenerationJobId] = useState('')
+  const [generationProgress, setGenerationProgress] = useState<ScheduledJobProgress | null>(null)
+  const [contentOutputsRefreshKey, setContentOutputsRefreshKey] = useState(0)
   const bootstrapRunIdRef = useRef(0)
+
+  useEffect(() => {
+    if (!activeGenerationJobId) {
+      return
+    }
+
+    let isCancelled = false
+    let pollTimeoutId: number | undefined
+    let dismissTimeoutId: number | undefined
+
+    async function pollJob() {
+      try {
+        const job = await getScheduledJobById(activeGenerationJobId)
+
+        if (isCancelled) {
+          return
+        }
+
+        if (job.progress) {
+          setGenerationProgress(job.progress)
+
+          if (isScheduledJobProgressTerminal(job.progress)) {
+            setContentOutputsRefreshKey((current) => current + 1)
+            dismissTimeoutId = window.setTimeout(() => {
+              setActiveGenerationJobId('')
+              setGenerationProgress(null)
+            }, 2400)
+            return
+          }
+        }
+      } catch {
+        // Keep the current progress visible and retry transient polling failures.
+      }
+
+      if (!isCancelled) {
+        pollTimeoutId = window.setTimeout(pollJob, 2000)
+      }
+    }
+
+    void pollJob()
+
+    return () => {
+      isCancelled = true
+      window.clearTimeout(pollTimeoutId)
+      window.clearTimeout(dismissTimeoutId)
+    }
+  }, [activeGenerationJobId])
+
+  const handleScheduledJobCreated = useCallback((jobId: string, targetCount: number) => {
+    setActiveGenerationJobId(jobId)
+    setGenerationProgress({
+      status: 'pending',
+      targetCount,
+      fetchedCount: 0,
+      processedCount: 0,
+      successCount: 0,
+      failedCount: 0,
+      percentage: 0,
+      startedAt: null,
+      finishedAt: null,
+    })
+  }, [])
 
   const loadPersonaConfig = useCallback(async (userId: string, runId?: number) => {
     const activeRunId = runId ?? ++bootstrapRunIdRef.current
@@ -175,6 +246,8 @@ function AppShell() {
     setPersonaConfig(null)
     setActivePage('dashboard')
     setPersonaStatus('idle')
+    setActiveGenerationJobId('')
+    setGenerationProgress(null)
   }
 
   const hydrateAuthState = useCallback(async () => {
@@ -509,7 +582,11 @@ function AppShell() {
             ) : activePage === 'generate-topic' ? (
               <GenerateTopicPage userId={currentUser?.id || ''} />
             ) : activePage === 'content-engine' ? (
-              <ContentEnginePage userId={currentUser?.id || ''} />
+              <ContentEnginePage
+                userId={currentUser?.id || ''}
+                outputsRefreshKey={contentOutputsRefreshKey}
+                onScheduledJobCreated={handleScheduledJobCreated}
+              />
             ) : activePage === 'manual-post' ? (
               <ManualPostPage
                 userId={currentUser?.id || ''}
@@ -526,6 +603,9 @@ function AppShell() {
               )}
           </div>
         </main>
+        {generationProgress ? (
+          <ContentGenerationProgress progress={generationProgress} />
+        ) : null}
       </div>
     )
   }

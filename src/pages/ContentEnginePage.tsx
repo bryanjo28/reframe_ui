@@ -4,6 +4,7 @@ import { useToast } from '../components/useToast'
 import {
   autoGenerateContentOutputs,
   deleteContentOutput,
+  getScheduledJobId,
   listContentOutputs,
   retryContentOutputPost,
   updateContentOutput,
@@ -14,6 +15,8 @@ import { listContentTopics, type ContentTopicRecord } from '../services/contentT
 
 type ContentEnginePageProps = {
   userId: string
+  outputsRefreshKey?: number
+  onScheduledJobCreated?: (jobId: string, targetCount: number) => void
 }
 
 type AutoScheduleMode = 'now' | 'later'
@@ -272,7 +275,11 @@ function isUnusedTopic(record: ContentTopicRecord) {
   return true
 }
 
-export function ContentEnginePage({ userId }: ContentEnginePageProps) {
+export function ContentEnginePage({
+  userId,
+  outputsRefreshKey: externalOutputsRefreshKey = 0,
+  onScheduledJobCreated,
+}: ContentEnginePageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const pillarsRailRef = useRef<HTMLDivElement | null>(null)
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
@@ -422,7 +429,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
     return () => {
       isMounted = false
     }
-  }, [userId, viewMode, outputsRefreshKey])
+  }, [userId, viewMode, outputsRefreshKey, externalOutputsRefreshKey])
 
   const selectedContentPillar = useMemo(
     () => contentPillars.find((pillar) => pillar.id === selectedContentPillarId) || null,
@@ -531,7 +538,14 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
       targetCount,
       scheduledAt: scheduledAtSource.toISOString(),
     })
-      .then(() => {
+      .then((response) => {
+        const jobId = getScheduledJobId(response)
+
+        if (!jobId) {
+          throw new Error('Schedule berhasil dibuat, tetapi job ID tidak ditemukan.')
+        }
+
+        onScheduledJobCreated?.(jobId, targetCount)
         setStatusTone('success')
         if (scheduleMode === 'now') {
           setStatusMessage('Generate content berhasil. Silakan cek di list generated content.')

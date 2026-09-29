@@ -20,7 +20,20 @@ export type ScheduledJobRecord = {
   scheduled_at?: string
   personaConfigId?: string
   persona_config_id?: string
+  progress?: ScheduledJobProgress
   [key: string]: unknown
+}
+
+export type ScheduledJobProgress = {
+  status: string
+  targetCount?: number
+  fetchedCount?: number
+  processedCount?: number
+  successCount?: number
+  failedCount?: number
+  percentage?: number
+  startedAt?: string | null
+  finishedAt?: string | null
 }
 
 type ScheduledJobItemResponse =
@@ -47,6 +60,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function readString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function readNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function normalizeProgress(value: unknown): ScheduledJobProgress | undefined {
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  return {
+    status: readString(value.status) || 'pending',
+    targetCount: readNumber(value.targetCount),
+    fetchedCount: readNumber(value.fetchedCount),
+    processedCount: readNumber(value.processedCount),
+    successCount: readNumber(value.successCount),
+    failedCount: readNumber(value.failedCount),
+    percentage: readNumber(value.percentage),
+    startedAt: readString(value.startedAt) || null,
+    finishedAt: readString(value.finishedAt) || null,
+  }
+}
+
+export function isScheduledJobProgressTerminal(progress?: Pick<ScheduledJobProgress, 'status'>) {
+  return Boolean(
+    progress && ['completed', 'completed_with_errors', 'failed'].includes(progress.status),
+  )
 }
 
 function unwrapScheduledJobResponse(response: ScheduledJobItemResponse): ScheduledJobRecord | null {
@@ -184,7 +225,10 @@ export async function getScheduledJobById(id: string) {
     throw new Error('Scheduled job tidak ditemukan.')
   }
 
-  return scheduledJob
+  return {
+    ...scheduledJob,
+    progress: normalizeProgress(scheduledJob.progress),
+  }
 }
 
 export async function listScheduledJobs() {

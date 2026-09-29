@@ -38,6 +38,19 @@ export type RetryContentOutputPayload = {
   scheduledAt: string
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function getScheduledJobId(response: unknown) {
+  if (!isRecord(response) || !isRecord(response.data)) {
+    return ''
+  }
+
+  const id = response.data.id
+  return typeof id === 'string' ? id.trim() : ''
+}
+
 export type ContentOutputRecord = {
   id?: string
   userId?: string

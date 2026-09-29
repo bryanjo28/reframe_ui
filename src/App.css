@@ -4293,6 +4293,89 @@ th {
   gap: 12px;
 }
 
+.generation-progress {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 70;
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(70, 225, 144, 0.46);
+  border-radius: 8px;
+  background: rgba(13, 42, 31, 0.96);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+  color: #eafff3;
+  backdrop-filter: blur(14px);
+  animation: toast-in 180ms ease-out;
+}
+
+.generation-progress-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(102, 239, 166, 0.25);
+  border-top-color: #66efa6;
+  border-radius: 50%;
+  animation: generation-progress-spin 800ms linear infinite;
+}
+
+.generation-progress-content {
+  min-width: 0;
+}
+
+.generation-progress-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.generation-progress-copy strong {
+  min-width: 0;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.generation-progress-copy span {
+  color: #8df3bd;
+  font-size: 0.8rem;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.generation-progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.generation-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #55e69b;
+  transition: width 240ms ease;
+}
+
+@keyframes generation-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 600px) {
+  .generation-progress {
+    right: 16px;
+    bottom: 16px;
+  }
+}
+
 .toast {
   pointer-events: auto;
   display: grid;
