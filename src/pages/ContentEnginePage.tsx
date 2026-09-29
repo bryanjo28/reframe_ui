@@ -835,7 +835,6 @@ export function ContentEnginePage({
                     <tr>
                       <th>Output</th>
                       <th>Platform</th>
-                      <th>Format</th>
                       <th>Status</th>
                       <th>Created At</th>
                       <th>Action</th>
@@ -845,9 +844,6 @@ export function ContentEnginePage({
 		                    {paginatedOutputs.map((record, index) => {
 	                      const title = getOutputTitle(record)
 	                      const platform = getOutputValue(record, ['platform']) || 'Unknown platform'
-                      const formatOutput =
-                        getOutputValue(record, ['formatOutput', 'format_output']) ||
-                        'Unknown format'
                       const status = getOutputStatus(record)
 	                      const createdAt = formatDate(
 	                        getOutputValue(record, ['createdAt', 'created_at']) ||
@@ -877,7 +873,6 @@ export function ContentEnginePage({
                           <td>
                             <span className="chip active">{platform}</span>
                           </td>
-                          <td>{formatOutput}</td>
                           <td>
                             <span className={`pill ${status === 'approved' ? '' : 'subtle'}`}>
                               {formatOutputStatus(status)}
@@ -1027,14 +1022,6 @@ export function ContentEnginePage({
                         Status `posted` dikontrol backend, jadi tidak bisa diubah dari sini.
                       </small>
                     ) : null} */}
-                  </label>
-                  <label className="persona-field">
-                    <span>Format</span>
-                    <input
-                      value={outputEditForm.formatOutput}
-                      placeholder="single post"
-                      disabled
-                    />
                   </label>
                 </div>
 
