@@ -28,7 +28,7 @@ type OutputEditForm = {
 const outputStatusOptions = [
   { value: 'draft', label: 'Draft' },
   { value: 'approved', label: 'Approved' },
-  { value: 'failed', label: 'Failed' },
+  // { value: 'failed', label: 'Failed' },
   { value: 'posted', label: 'Posted' },
 ]
 
