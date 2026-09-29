@@ -7,6 +7,7 @@ const CONTENT_PILLARS_ENHANCE_ENDPOINT = `${CONTENT_PILLARS_ENDPOINT}/enhance`
 export type ContentPillarPayload = {
   personaConfigId: string
   name: string
+  threadType: 'short' | 'long'
   templateContent: string
   targetObjective: string
   audienceSegment: string
@@ -177,11 +178,16 @@ function buildHeaders(withBody = false) {
   return headers
 }
 
-function normalizeListItem(record: ContentPillarRecord) {
+function normalizeListItem(record: ContentPillarRecord): ContentPillarRecord {
+  const threadType = readRecordValue(record, ['threadType', 'thread_type'])
+  const normalizedThreadType: ContentPillarPayload['threadType'] =
+    threadType === 'long' ? 'long' : 'short'
+
   return {
     ...record,
     personaConfigId: readRecordValue(record, ['personaConfigId', 'persona_config_id']),
     name: readRecordValue(record, ['name', 'title', 'pillarName', 'pillar_name']),
+    threadType: normalizedThreadType,
     templateContent: readRecordValue(record, ['templateContent', 'template_content']),
     targetObjective: readRecordValue(record, ['targetObjective', 'target_objective']),
     audienceSegment: readRecordValue(record, ['audienceSegment', 'audience_segment']),
@@ -197,6 +203,7 @@ function toRequestPayload(payload: ContentPillarPayload) {
   return {
     personaConfigId: payload.personaConfigId,
     pillarName: payload.name,
+    threadType: payload.threadType,
     templateContent: payload.templateContent,
     targetObjective: payload.targetObjective,
     audienceSegment: payload.audienceSegment,

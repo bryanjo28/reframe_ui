@@ -6,6 +6,29 @@ import { AuthPage } from '../src/pages/AuthPage'
 import * as authService from '../src/services/authService'
 
 describe('AuthPage', () => {
+  it('submits full name and account name as separate registration fields', async () => {
+    const user = userEvent.setup()
+    const registerSpy = vi.spyOn(authService, 'register').mockResolvedValue({
+      emailConfirmationRequired: true,
+      session: null,
+    })
+
+    render(<AuthPage onAuthenticated={vi.fn()} initialMode="register" />)
+
+    await user.type(screen.getByRole('textbox', { name: 'Full Name' }), 'Bryan Jonathan')
+    await user.type(screen.getByRole('textbox', { name: 'Username' }), 'bryanjon')
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'bryanjo2324@gmail.com')
+    await user.type(screen.getByLabelText('Password'), 'password123')
+    await user.click(screen.getAllByRole('button', { name: 'Register' }).at(-1)!)
+
+    expect(registerSpy).toHaveBeenCalledWith({
+      fullName: 'Bryan Jonathan',
+      accountName: 'bryanjon',
+      email: 'bryanjo2324@gmail.com',
+      password: 'password123',
+    })
+  })
+
   it('shows a small forgot-password link below the login password field', () => {
     render(<AuthPage onAuthenticated={vi.fn()} initialMode="login" />)
 

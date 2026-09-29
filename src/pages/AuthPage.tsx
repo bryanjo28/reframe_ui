@@ -24,6 +24,7 @@ export function AuthPage({
 }: AuthPageProps) {
   const [mode, setMode] = useState<AuthMode>(initialMode)
   const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
   const [accountName, setAccountName] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -41,7 +42,7 @@ export function AuthPage({
         return
       }
 
-      const result = await register({ email, accountName, password })
+      const result = await register({ email, fullName, accountName, password })
 
       if (result.emailConfirmationRequired) {
         onRegisterRequiresEmail?.(email)
@@ -160,12 +161,22 @@ export function AuthPage({
                 />
               </label>
               <label className="auth-field">
+                <span>Full Name</span>
+                <input
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  placeholder="nama lengkap kamu"
+                  autoComplete="name"
+                  required
+                />
+              </label>
+              <label className="auth-field">
                 <span>Username</span>
                 <input
                   value={accountName}
                   onChange={(event) => setAccountName(event.target.value)}
                   placeholder="username kamu"
-                  autoComplete="name"
+                  autoComplete="username"
                   required
                 />
               </label>

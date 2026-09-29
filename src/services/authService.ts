@@ -10,6 +10,7 @@ export type AuthCredentials = {
 
 export type RegisterCredentials = {
   email: string
+  fullName: string
   accountName: string
   password: string
 }

@@ -36,6 +36,7 @@ describe('authService verification flow', () => {
 
     const result = await register({
       email: 'user@example.com',
+      fullName: 'User Example',
       accountName: 'user',
       password: 'password-baru',
     })

@@ -19,6 +19,7 @@ type PillarField = {
   placeholder?: string
   multiline?: boolean
   optional?: boolean
+  options?: Array<{ value: string; label: string }>
 }
 
 const pillarFields: PillarField[] = [
@@ -26,6 +27,14 @@ const pillarFields: PillarField[] = [
     key: 'name',
     label: 'Nama Content Pillar',
     placeholder: 'Contoh: Educational Threads Funnel',
+  },
+  {
+    key: 'threadType',
+    label: 'Thread Type',
+    options: [
+      { value: 'short', label: 'Short' },
+      { value: 'long', label: 'Long' },
+    ],
   },
   {
     key: 'templateContent',
@@ -66,6 +75,7 @@ const pillarFields: PillarField[] = [
 const emptyPillarForm: ContentPillarPayload = {
   personaConfigId: '',
   name: '',
+  threadType: 'short',
   templateContent: '',
   targetObjective: '',
   audienceSegment: '',
@@ -94,6 +104,10 @@ function createFormValuesFromRecord(record: ContentPillarRecord | null): Content
   return {
     personaConfigId: getRecordValue(record, ['personaConfigId', 'persona_config_id']),
     name: getRecordValue(record, ['name', 'title', 'pillarName', 'pillar_name']),
+    threadType:
+      getRecordValue(record, ['threadType', 'thread_type']).toLowerCase() === 'long'
+        ? 'long'
+        : 'short',
     templateContent: getRecordValue(record, ['templateContent', 'template_content']),
     targetObjective: getRecordValue(record, ['targetObjective', 'target_objective']),
     audienceSegment: getRecordValue(record, ['audienceSegment', 'audience_segment']),
@@ -155,7 +169,19 @@ function PillarFieldRenderer({
         {field.label}
         {field.optional ? ' (Optional)' : ''}
       </span>
-      {field.multiline ? (
+      {field.options ? (
+        <select
+          value={value}
+          onChange={(event) => onChange(field.key, event.target.value)}
+          disabled={disabled}
+        >
+          {field.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      ) : field.multiline ? (
         <textarea
           value={value}
           onChange={(event) => onChange(field.key, event.target.value)}
