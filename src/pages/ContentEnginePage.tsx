@@ -1153,7 +1153,7 @@ export function ContentEnginePage({ userId }: ContentEnginePageProps) {
               className="generate-simple-choice"
               onClick={() => setViewMode('list')}
             >
-              <strong>Generated Content</strong>
+              <strong>List Generated Content</strong>
               <p>Lihat semua content hasil generate yang sudah dibuat user aktif.</p>
             </button>
           </div>
