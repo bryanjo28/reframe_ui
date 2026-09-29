@@ -32,7 +32,7 @@ const outputStatusOptions = [
   { value: 'draft', label: 'Draft' },
   { value: 'approved', label: 'Approved' },
   // { value: 'failed', label: 'Failed' },
-  { value: 'posted', label: 'Posted' },
+  // { value: 'posted', label: 'Posted' },
 ]
 
 const outputsPerPage = 5

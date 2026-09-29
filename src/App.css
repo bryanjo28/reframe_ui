@@ -4311,6 +4311,7 @@ th {
   color: #eafff3;
   backdrop-filter: blur(14px);
   animation: toast-in 180ms ease-out;
+  pointer-events: none;
 }
 
 .generation-progress-spinner {
@@ -4371,8 +4372,27 @@ th {
 
 @media (max-width: 600px) {
   .generation-progress {
-    right: 16px;
-    bottom: 16px;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .generation-progress-spinner {
+    width: 26px;
+    height: 26px;
+  }
+
+  .generation-progress-copy {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .generation-progress-copy strong {
+    font-size: 0.84rem;
   }
 }
 
