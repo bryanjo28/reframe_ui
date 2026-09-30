@@ -101,7 +101,8 @@ it('routes a registration requiring confirmation to check email without opening 
   await user.type(screen.getByRole('textbox', { name: 'Email' }), 'user@example.com')
   await user.type(screen.getByRole('textbox', { name: 'Full Name' }), 'New User')
   await user.type(screen.getByRole('textbox', { name: 'Username' }), 'new-user')
-  await user.type(screen.getByLabelText('Password'), 'password-baru')
+  await user.type(screen.getByLabelText('Password'), 'Password1')
+  await user.type(screen.getByLabelText('Konfirmasi Password'), 'Password1')
   await user.click(screen.getAllByRole('button', { name: 'Register' }).at(-1)!)
 
   expect(await screen.findByRole('heading', { name: 'Cek email kamu dulu' })).toBeInTheDocument()
