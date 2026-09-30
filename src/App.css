@@ -383,6 +383,16 @@
   background: #111827;
 }
 
+.auth-field input[aria-invalid='true'] {
+  border-color: #e87998;
+}
+
+.auth-field-error {
+  color: #f1a8bf;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .auth-actions {
   grid-column: 1 / -1;
   display: flex;
@@ -4362,6 +4372,21 @@ th {
   border-radius: inherit;
   background: #55e69b;
   transition: width 240ms ease;
+}
+
+.generation-progress-track-indeterminate > span {
+  width: 38%;
+  animation: generation-progress-indeterminate 1.1s ease-in-out infinite;
+}
+
+@keyframes generation-progress-indeterminate {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(290%);
+  }
 }
 
 @keyframes generation-progress-spin {

@@ -1,4 +1,5 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
+import { createApiResponseError } from '../utils/apiError'
 import { getCurrentAuthToken } from './authService'
 
 const CONTENT_TOPICS_ENDPOINT = '/api/content-topics'
@@ -218,10 +219,7 @@ export async function generateContentTopics(payload: GenerateContentTopicsPayloa
     : await response.text()
 
   if (!response.ok) {
-    const errorMessage =
-      typeof data === 'string' ? data : 'Gagal generate content topics.'
-
-    throw new Error(errorMessage || 'Gagal generate content topics.')
+    throw createApiResponseError(response.status, data)
   }
 
   return data

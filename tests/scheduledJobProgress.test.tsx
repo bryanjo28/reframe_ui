@@ -105,6 +105,13 @@ test('renders processed count and percentage in the floating progress alert', ()
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40')
 })
 
+test('renders an indeterminate loading bar when generation has no progress data', () => {
+  render(<ContentGenerationProgress label="Generating topics..." />)
+
+  expect(screen.getByRole('status')).toHaveTextContent('Generating topics...')
+  expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow')
+})
+
 test('recognizes every terminal progress status', () => {
   expect(isScheduledJobProgressTerminal({ status: 'completed' })).toBe(true)
   expect(isScheduledJobProgressTerminal({ status: 'completed_with_errors' })).toBe(true)

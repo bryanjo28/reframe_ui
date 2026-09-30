@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AppIcon } from '../components/AppIcon'
+import { ContentGenerationProgress } from '../components/ContentGenerationProgress'
 import { useToast } from '../components/useToast'
 import { createContentTopic, generateContentTopics } from '../services/contentTopics'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
@@ -343,7 +344,6 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
     setIsSubmitting(true)
     resetResponseState()
-    setStatusMessage('Mengirim payload ke backend...')
 
     void generateContentTopics({
       contentPillarId: selectedContentPillarId,
@@ -356,9 +356,6 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
         setResponseTopics(topics)
         setTokenUsage(usage)
-        setStatusTone('success')
-        setStatusMessage('Payload berhasil dikirim ke backend.')
-        toastSuccess('Generate request sent', 'Payload topic sudah dikirim ke backend.')
       })
       .catch((error) => {
         setStatusTone('error')
@@ -481,6 +478,8 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
           <p>{statusMessage}</p>
         </div>
       ) : null}
+
+      {isSubmitting ? <ContentGenerationProgress label="Generating topics..." /> : null}
 
       <section className="generate-layout">
         <div className="generate-main-column">
@@ -733,7 +732,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
                 type="submit"
                 disabled={!canSubmitManual}
               >
-                {isSubmitting ? 'Mengirim...' : 'Create Topics'}
+                {isSubmitting ? 'Generating...' : 'Create Topics'}
               </button>
             </div>
 

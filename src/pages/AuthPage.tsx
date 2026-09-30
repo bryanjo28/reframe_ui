@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { AuthRequestError, login, register, type AuthSession } from '../services/authService'
+import { login, register, type AuthSession } from '../services/authService'
+import { getApiError } from '../utils/apiError'
 
 type AuthMode = 'login' | 'register'
+type AuthFieldErrors = Partial<Record<'email' | 'accountName', string>>
 
 type AuthPageProps = {
   onAuthenticated: (session: AuthSession, mode: AuthMode) => void
@@ -29,11 +31,13 @@ export function AuthPage({
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({})
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsSubmitting(true)
     setErrorMessage('')
+    setFieldErrors({})
 
     try {
       if (mode === 'login') {
@@ -55,12 +59,24 @@ export function AuthPage({
 
       onAuthenticated(result.session, mode)
     } catch (error) {
-      if (error instanceof AuthRequestError && error.code === 'EMAIL_NOT_VERIFIED') {
-        onEmailNotVerified?.(email)
-        return
-      }
+      const apiError = getApiError(error)
 
-      setErrorMessage(error instanceof Error ? error.message : 'Auth gagal. Coba lagi.')
+      switch (apiError.code) {
+        case 'EMAIL_NOT_VERIFIED':
+          onEmailNotVerified?.(email)
+          return
+        case 'EMAIL_ALREADY_EXISTS':
+          setFieldErrors({ email: apiError.message })
+          return
+        case 'ACCOUNT_NAME_ALREADY_EXISTS':
+          setFieldErrors({ accountName: apiError.message })
+          return
+        case 'INVALID_CREDENTIALS':
+          setErrorMessage(apiError.message)
+          return
+        default:
+          setErrorMessage(apiError.message)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -71,12 +87,14 @@ export function AuthPage({
   useEffect(() => {
     setMode(initialMode)
     setErrorMessage('')
+    setFieldErrors({})
   }, [initialMode])
 
   useEffect(() => {
     if (!allowRegister && mode !== 'login') {
       setMode('login')
       setErrorMessage('')
+      setFieldErrors({})
     }
   }, [allowRegister, mode])
 
@@ -114,6 +132,7 @@ export function AuthPage({
             onClick={() => {
               setMode('login')
               setErrorMessage('')
+              setFieldErrors({})
             }}
           >
             Login
@@ -125,6 +144,7 @@ export function AuthPage({
               onClick={() => {
                 setMode('register')
                 setErrorMessage('')
+                setFieldErrors({})
               }}
             >
               Register
@@ -154,11 +174,21 @@ export function AuthPage({
                 <input
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => {
+                    setEmail(event.target.value)
+                    setFieldErrors((current) => ({ ...current, email: undefined }))
+                  }}
                   placeholder="nama@email.com"
                   autoComplete="email"
+                  aria-invalid={Boolean(fieldErrors.email)}
+                  aria-describedby={fieldErrors.email ? 'register-email-error' : undefined}
                   required
                 />
+                {fieldErrors.email ? (
+                  <small id="register-email-error" className="auth-field-error">
+                    {fieldErrors.email}
+                  </small>
+                ) : null}
               </label>
               <label className="auth-field">
                 <span>Full Name</span>
@@ -174,11 +204,21 @@ export function AuthPage({
                 <span>Username</span>
                 <input
                   value={accountName}
-                  onChange={(event) => setAccountName(event.target.value)}
+                  onChange={(event) => {
+                    setAccountName(event.target.value)
+                    setFieldErrors((current) => ({ ...current, accountName: undefined }))
+                  }}
                   placeholder="username kamu"
                   autoComplete="username"
+                  aria-invalid={Boolean(fieldErrors.accountName)}
+                  aria-describedby={fieldErrors.accountName ? 'register-account-name-error' : undefined}
                   required
                 />
+                {fieldErrors.accountName ? (
+                  <small id="register-account-name-error" className="auth-field-error">
+                    {fieldErrors.accountName}
+                  </small>
+                ) : null}
               </label>
             </>
           )}

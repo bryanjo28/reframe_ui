@@ -1,4 +1,5 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
+import { createApiResponseError } from '../utils/apiError'
 import { getCurrentAuthToken } from './authService'
 
 const CONTENT_OUTPUTS_ENDPOINT = '/api/content-outputs/generate'
@@ -204,10 +205,7 @@ export async function autoGenerateContentOutputs(payload: AutoGenerateContentOut
   const data = await readResponseBodyWithTimeout(response)
 
   if (!response.ok) {
-    const errorMessage =
-      typeof data === 'string' ? data : 'Gagal auto-generate content outputs.'
-
-    throw new Error(errorMessage || 'Gagal auto-generate content outputs.')
+    throw createApiResponseError(response.status, data)
   }
 
   return data

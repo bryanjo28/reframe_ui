@@ -1,4 +1,5 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
+import { getApiError } from '../utils/apiError'
 
 const AUTH_TOKEN_STORAGE_KEY = 'reframe.authToken'
 const AUTH_STATE_CACHE_TTL_MS = 10_000
@@ -74,7 +75,6 @@ let authStateRequest: Promise<AuthMeState | null> | null = null
 type ApiResponse = {
   success?: boolean
   message?: string
-  code?: unknown
   emailConfirmationRequired?: boolean
   data?: unknown
   user?: unknown
@@ -86,12 +86,14 @@ type ApiResponse = {
 }
 
 export class AuthRequestError extends Error {
-  code?: string
+  code: string
+  status: number
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code = 'UNKNOWN_ERROR', status = 500) {
     super(message)
     this.name = 'AuthRequestError'
     this.code = code
+    this.status = status
   }
 }
 
@@ -437,6 +439,18 @@ async function parseRegisterResponse(response: Response) {
   } satisfies RegisterResult
 }
 
+async function createAuthRequestError(response: Response) {
+  const data = await response.json().catch(() => null)
+  const apiError = getApiError({
+    response: {
+      status: response.status,
+      data,
+    },
+  })
+
+  return new AuthRequestError(apiError.message, apiError.code, apiError.status)
+}
+
 export function clearAuthSession() {
   setStoredAuthToken(undefined)
   authStateCache = null
@@ -450,16 +464,7 @@ export async function login(payload: AuthCredentials) {
   })
 
   if (!response.ok) {
-    const errorPayload = (await response.json().catch(() => null)) as unknown
-    const errorRecord = isRecord(errorPayload) ? errorPayload : null
-    const nestedError = isRecord(errorRecord?.data) ? errorRecord.data : null
-    const code = getString(errorRecord?.code) || getString(nestedError?.code)
-
-    if (code === 'EMAIL_NOT_VERIFIED') {
-      throw new AuthRequestError('Email belum diverifikasi.', code)
-    }
-
-    throw new AuthRequestError('Login gagal. Periksa email/username dan password.', code)
+    throw await createAuthRequestError(response)
   }
 
   return parseAuthResponse(response)
@@ -473,7 +478,7 @@ export async function register(payload: RegisterCredentials) {
   })
 
   if (!response.ok) {
-    throw new Error('Register gagal. Periksa input yang dimasukkan.')
+    throw await createAuthRequestError(response)
   }
 
   return parseRegisterResponse(response)

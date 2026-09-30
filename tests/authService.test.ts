@@ -49,10 +49,16 @@ describe('authService verification flow', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ code: 'EMAIL_NOT_VERIFIED' }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' },
-        }),
+        new Response(
+          JSON.stringify({
+            error_code: 'EMAIL_NOT_VERIFIED',
+            message: 'Verifikasi email kamu sebelum login.',
+          }),
+          {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
       ),
     )
 
