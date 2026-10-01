@@ -9,6 +9,7 @@ import { AutoPostPage } from './pages/AutoPostPage'
 import { SubscriptionPlansPage } from './pages/SubscriptionPlansPage'
 import { ConnectingAppsPage } from './pages/ConnectingAppsPage'
 import { ThreadsCallbackPage } from './pages/ThreadsCallbackPage'
+import { isThreadsCallbackSearch } from './utils/threadsCallback'
 import { ContentEnginePage } from './pages/ContentEnginePage'
 import { GenerateTopicPage } from './pages/GenerateTopicPage'
 import { PersonalizePage } from './pages/PersonalizePage'
@@ -292,7 +293,11 @@ function AppShell() {
       const config = await loadPersonaConfig(user.id, runId)
 
       if (runId === bootstrapRunIdRef.current) {
-        replaceAppPath(config ? '/dashboard' : '/first-setup')
+        if (!config) {
+          replaceAppPath('/first-setup')
+        } else if (window.location.pathname !== '/connecting-apps') {
+          replaceAppPath('/dashboard')
+        }
       }
     } catch (error) {
       if (runId !== bootstrapRunIdRef.current) {
@@ -628,6 +633,13 @@ function AppShell() {
 function App() {
   if (isRootEmailConfirmationCallback()) {
     return <EmailConfirmedPage />
+  }
+
+  if (
+    window.location.pathname === '/' &&
+    isThreadsCallbackSearch(window.location.search)
+  ) {
+    return <ThreadsCallbackPage />
   }
 
   if (window.location.pathname === '/') {

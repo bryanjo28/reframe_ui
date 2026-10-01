@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildThreadsCallbackRedirect } from '../src/utils/threadsCallback'
+import {
+  buildThreadsCallbackRedirect,
+  isThreadsCallbackSearch,
+} from '../src/utils/threadsCallback'
 
 describe('ThreadsCallbackPage', () => {
   it('redirects callback search params to the connecting apps page', () => {
@@ -21,5 +24,11 @@ describe('ThreadsCallbackPage', () => {
 
   it('does not accept non-success connected values', () => {
     expect(buildThreadsCallbackRedirect('?connected=false')).toBe('/connecting-apps')
+  })
+
+  it('recognizes callbacks that return to the frontend root', () => {
+    expect(isThreadsCallbackSearch('?connected=true')).toBe(true)
+    expect(isThreadsCallbackSearch('?connected=false&error=access_denied')).toBe(true)
+    expect(isThreadsCallbackSearch('?campaign=threads')).toBe(false)
   })
 })

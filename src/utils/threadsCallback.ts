@@ -1,5 +1,11 @@
 const THREADS_CALLBACK_TARGET_PATH = '/connecting-apps'
 
+export function isThreadsCallbackSearch(search: string) {
+  const callbackParams = new URLSearchParams(search)
+
+  return callbackParams.has('connected') || callbackParams.has('error')
+}
+
 export function buildThreadsCallbackRedirect(search: string) {
   const callbackParams = new URLSearchParams(search)
   const safeParams = new URLSearchParams()
