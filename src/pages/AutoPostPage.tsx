@@ -12,6 +12,7 @@ import {
 
 type AutoPostPageProps = {
   userId: string
+  isThreadsConnected: boolean
 }
 
 type AutoPostScheduleForm = {
@@ -238,7 +239,7 @@ function getOutputPreviewText(record: ContentOutputRecord): string {
   )
 }
 
-export function AutoPostPage({ userId }: AutoPostPageProps) {
+export function AutoPostPage({ userId, isThreadsConnected }: AutoPostPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfigRecord[]>([])
   const [contentOutputs, setContentOutputs] = useState<ContentOutputRecord[]>([])
@@ -441,6 +442,7 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
   )
 
   const canSubmit =
+    isThreadsConnected &&
     Boolean(form.personaConfigId.trim()) &&
     form.targetCount >= 1 &&
     form.targetCount <= 100 &&
@@ -459,6 +461,12 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+
+    if (!isThreadsConnected) {
+      setStatusTone('error')
+      setStatusMessage('Hubungkan akun Threads terlebih dahulu sebelum membuat schedule.')
+      return
+    }
 
     const scheduledAtIso = normalizeDatetimeLocal(form.scheduledAt)
 
@@ -618,6 +626,13 @@ export function AutoPostPage({ userId }: AutoPostPageProps) {
               {canSubmit ? 'Ready' : 'Needs input'}
             </span>
           </div>
+
+          {!isThreadsConnected ? (
+            <div className="integration-note integration-note-error">
+              <AppIcon name="info" />
+              <p>Hubungkan akun Threads di Reframe Connections untuk mengaktifkan Schedule.</p>
+            </div>
+          ) : null}
 
           <label className="persona-field full-width">
             <span>Persona Config</span>

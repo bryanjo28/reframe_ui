@@ -139,6 +139,7 @@ function AppShell() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
   const [authError, setAuthError] = useState('')
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
+  const [isThreadsConnected, setIsThreadsConnected] = useState(false)
   const [unauthenticatedView, setUnauthenticatedView] = useState<UnauthenticatedView>('login')
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState(getStoredPendingVerificationEmail)
   const [authHelperMessage, setAuthHelperMessage] = useState('')
@@ -243,6 +244,7 @@ function AppShell() {
 
   function resetWorkspaceState() {
     setCurrentUser(null)
+    setIsThreadsConnected(false)
     setPersonaConfig(null)
     setActivePage('dashboard')
     setPersonaStatus('idle')
@@ -270,8 +272,11 @@ function AppShell() {
         return
       }
 
-      const { user, onboarding } = authState
+      const { user, onboarding, socialAccounts } = authState
       setCurrentUser(user)
+      setIsThreadsConnected(Boolean(
+        socialAccounts?.threads?.connected && !socialAccounts.threads.needsReconnect,
+      ))
       setStoredPendingVerificationEmail(undefined)
       setPendingVerificationEmail('')
       setAuthHelperMessage('')
@@ -405,6 +410,10 @@ function AppShell() {
       }
 
       setCurrentUser(authState.user)
+      setIsThreadsConnected(Boolean(
+        authState.socialAccounts?.threads?.connected &&
+          !authState.socialAccounts.threads.needsReconnect,
+      ))
       setAuthStatus('authenticated')
       setUnauthenticatedView('login')
       setStoredPendingVerificationEmail(undefined)
@@ -593,7 +602,10 @@ function AppShell() {
                 onBackToContentEngine={() => setActivePage('content-engine')}
               />
             ) : activePage === 'auto-post' ? (
-              <AutoPostPage userId={currentUser?.id || ''} />
+              <AutoPostPage
+                userId={currentUser?.id || ''}
+                isThreadsConnected={isThreadsConnected}
+              />
             ) : activePage === 'subscription-plans' ? (
               <SubscriptionPlansPage userId={currentUser?.id || ''} />
             ) : activePage === 'connecting-apps' ? (
