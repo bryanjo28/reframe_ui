@@ -1,43 +1,49 @@
 :root {
-  --bg-page: #0b111c;
-  --bg-page-accent: rgba(79, 70, 229, 0.08);
-  --bg-sidebar: #0f172a;
+  --bg-page: #0f172a;
+  --bg-page-accent: rgba(129, 140, 248, 0.08);
+  --bg-sidebar: #0b1120;
   --bg-surface: #111827;
-  --bg-surface-soft: #151e2e;
-  --bg-input: #10161f;
-  --bg-input-focus: #121925;
-  --bg-track: #0b1220;
-  --border-color: #263246;
-  --border-subtle: #263141;
+  --bg-surface-soft: #1e293b;
+  --bg-input: #0f172a;
+  --bg-input-focus: #111827;
+  --bg-track: #1e293b;
+  --border-color: #263244;
+  --border-subtle: #243044;
   --text-color: #f8fafc;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
-  --text-faint: #6b7280;
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  --primary-shadow: 0 10px 24px rgba(79, 70, 229, 0.18);
+  --text-faint: #64748b;
+  --primary: #818cf8;
+  --primary-hover: #a5b4fc;
+  --primary-soft: #1e1b4b;
+  --primary-contrast: #e0e7ff;
+  --primary-gradient: #6366f1;
+  --logo-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --primary-shadow: 0 8px 20px rgba(49, 46, 129, 0.24);
 }
 
 :root[data-theme='light'] {
   --bg-page: #f8fafc;
-  --bg-page-accent: rgba(99, 102, 241, 0.06);
-  --bg-sidebar: #ffffff;
+  --bg-page-accent: rgba(79, 70, 229, 0.045);
+  --bg-sidebar: #f1f5f9;
   --bg-surface: #ffffff;
-  --bg-surface-soft: #f8fafc;
+  --bg-surface-soft: #f1f5f9;
   --bg-input: #ffffff;
   --bg-input-focus: #ffffff;
   --bg-track: #eef2ff;
-  --border-color: #e5e7eb;
-  --border-subtle: #e5e7eb;
-  --text-color: #050505;
-  --text-secondary: #171717;
-  --text-muted: #262626;
-  --text-faint: #404040;
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  --primary-shadow: 0 10px 24px rgba(99, 102, 241, 0.12);
+  --border-color: #e2e8f0;
+  --border-subtle: #e2e8f0;
+  --text-color: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #475569;
+  --text-faint: #64748b;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-soft: #eef2ff;
+  --primary-contrast: #4338ca;
+  --primary-gradient: #4f46e5;
+  --logo-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  --primary-shadow: 0 6px 16px rgba(79, 70, 229, 0.14);
 }
 
 /* Keep dashboard content genuinely light. Some feature sections predate the
@@ -127,18 +133,57 @@
   .manual-flow-button,
   .auth-tab.active,
   .chip.active,
-  .batch-button.selected,
-  .sidebar-theme-toggle.active-theme
+  .batch-button.selected
 ),
 :root[data-theme='light'] :where(
   .primary-button,
   .manual-flow-button,
   .auth-tab.active,
   .chip.active,
-  .batch-button.selected,
-  .sidebar-theme-toggle.active-theme
+  .batch-button.selected
 ) * {
   color: #ffffff;
+}
+
+:root[data-theme='light'] .pill,
+:root[data-theme='light'] .chip {
+  color: var(--text-secondary);
+  background: var(--bg-surface-soft);
+  border: 1px solid var(--border-color);
+}
+
+:root[data-theme='light'] .chip.active {
+  color: var(--primary-contrast);
+  background: var(--primary-soft);
+  border-color: #c7d2fe;
+}
+
+:root[data-theme='light'] .status-badge.ready,
+:root[data-theme='light'] .status-badge.active {
+  color: #166534;
+  background: #dcfce7;
+}
+
+:root[data-theme='light'] .status-badge.review,
+:root[data-theme='light'] .status-badge.queued {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+:root[data-theme='light'] .status-badge.draft,
+:root[data-theme='light'] .status-badge.needs-review {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+:root[data-theme='light'] .status-badge.scheduled {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+:root[data-theme='light'] .connected-button {
+  color: #166534;
+  background: #dcfce7;
 }
 
 .dashboard-shell {
@@ -606,7 +651,7 @@
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: var(--primary-gradient);
+  background: var(--logo-gradient);
   color: #ffffff;
   font-size: 0.95rem;
   font-weight: 800;
@@ -741,19 +786,19 @@
 }
 
 .menu-item.active {
-  background: var(--primary-gradient);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 24%, transparent);
+  color: var(--primary-contrast);
   font-weight: 700;
-  box-shadow: var(--primary-shadow), inset 3px 0 0 rgba(255, 255, 255, 0.82);
+  box-shadow: inset 3px 0 0 var(--primary);
 }
 
 .menu-item.active svg {
-  color: #ffffff;
+  color: var(--primary);
 }
 
 .menu-item.active .menu-item-icon {
-  background: rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .menu-item.disabled {
