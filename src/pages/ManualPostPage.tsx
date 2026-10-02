@@ -99,7 +99,6 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
   const [contentOutputPreview, setContentOutputPreview] = useState('')
   const [platform, setPlatform] = useState('threads')
-  const [formatOutput, setFormatOutput] = useState('single post')
   const [additionalPrompt, setAdditionalPrompt] = useState('')
 
   const accessToken = getCurrentAuthToken() || ''
@@ -176,13 +175,11 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
   useEffect(() => {
     if (!selectedTopic) {
       setPlatform('threads')
-      setFormatOutput('single post')
       setAdditionalPrompt('')
       return
     }
 
     setPlatform(getTopicValue(selectedTopic, ['platform']) || 'threads')
-    setFormatOutput(getTopicValue(selectedTopic, ['formatOutput', 'format_output']) || 'single post')
     setAdditionalPrompt(getTopicValue(selectedTopic, ['additionalPrompt', 'additional_prompt']))
   }, [selectedTopic])
 
@@ -258,7 +255,6 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
       const rawResponse = await createContentOutput({
         topicId: selectedTopic.id,
         platform: platform.trim() || 'threads',
-        formatOutput: formatOutput.trim() || 'single post',
         additionalPrompt: additionalPrompt.trim(),
       })
 
@@ -517,15 +513,6 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
                     value={platform}
                     onChange={(event) => setPlatform(event.target.value)}
                     placeholder="threads"
-                  />
-                </label>
-
-                <label className="persona-field full-width">
-                  <span>Format Output</span>
-                  <input
-                    value={formatOutput}
-                    onChange={(event) => setFormatOutput(event.target.value)}
-                    placeholder="single post"
                   />
                 </label>
 

@@ -36,6 +36,7 @@ import {
   isScheduledJobProgressTerminal,
   type ScheduledJobProgress,
 } from './services/threadsAutoPost'
+import { notifyUsageChanged } from './services/usage'
 
 type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'error'
 type PersonaStatus = 'idle' | 'loading' | 'ready'
@@ -178,6 +179,7 @@ function AppShell() {
 
           if (isScheduledJobProgressTerminal(job.progress)) {
             setContentOutputsRefreshKey((current) => current + 1)
+            notifyUsageChanged()
             dismissTimeoutId = window.setTimeout(() => {
               setActiveGenerationJobId('')
               setGenerationProgress(null)
@@ -584,6 +586,7 @@ function AppShell() {
             onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
 	          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
 	          onClose={() => setIsSidebarOpen(false)}
+	          isThreadsConnected={isThreadsConnected}
 	        />
 
         <main className="content-area">
@@ -592,6 +595,7 @@ function AppShell() {
               <PersonalizePage
                 personaConfig={personaConfig}
                 onPersonaSaved={handlePersonalizePersonaSaved}
+                initialTab={activePage === 'content-pillar' ? 'content-pillar' : 'persona'}
               />
             ) : activePage === 'generate-topic' ? (
               <GenerateTopicPage userId={currentUser?.id || ''} />

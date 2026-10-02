@@ -21,7 +21,6 @@ test('hides format from the generated content table and editor', async () => {
                 userId: 'user-1',
                 title: 'A generated thread',
                 platform: 'threads',
-                formatOutput: 'single post',
                 content: 'Generated content preview',
                 status: 'draft',
                 createdAt: '2026-09-29T10:00:00.000Z',

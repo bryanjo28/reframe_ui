@@ -1,6 +1,7 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { createApiResponseError } from '../utils/apiError'
 import { getCurrentAuthToken } from './authService'
+import { notifyUsageChanged } from './usage'
 
 const CONTENT_TOPICS_ENDPOINT = '/api/content-topics'
 const CONTENT_TOPICS_GENERATE_ENDPOINT = '/api/content-topics/generate'
@@ -222,5 +223,6 @@ export async function generateContentTopics(payload: GenerateContentTopicsPayloa
     throw createApiResponseError(response.status, data)
   }
 
+  notifyUsageChanged()
   return data
 }

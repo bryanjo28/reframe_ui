@@ -25,7 +25,6 @@ type OutputEditForm = {
   platform: string
   status: string
   content: string
-  formatOutput: string
 }
 
 const outputStatusOptions = [
@@ -142,7 +141,7 @@ function getOutputStatus(record: ContentOutputRecord | null) {
   )
 }
 
-function formatOutputStatus(status: string) {
+function formatStatusLabel(status: string) {
   const normalized = status.trim().toLowerCase()
 
   if (!normalized) {
@@ -202,7 +201,6 @@ function getOutputEditForm(record: ContentOutputRecord | null): OutputEditForm {
     platform: getOutputValue(record, ['platform']) || 'threads',
     status: getOutputStatus(record),
     content: getOutputContent(record),
-    formatOutput: getOutputValue(record, ['formatOutput', 'format_output']) || 'single post',
   }
 }
 
@@ -875,7 +873,7 @@ export function ContentEnginePage({
                           </td>
                           <td>
                             <span className={`pill ${status === 'approved' ? '' : 'subtle'}`}>
-                              {formatOutputStatus(status)}
+                              {formatStatusLabel(status)}
                             </span>
                           </td>
                           <td>{createdAt}</td>

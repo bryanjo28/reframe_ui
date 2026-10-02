@@ -30,14 +30,115 @@
   --bg-track: #eef2ff;
   --border-color: #e5e7eb;
   --border-subtle: #e5e7eb;
-  --text-color: #111827;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
-  --text-faint: #9ca3af;
+  --text-color: #050505;
+  --text-secondary: #171717;
+  --text-muted: #262626;
+  --text-faint: #404040;
   --primary: #6366f1;
   --primary-hover: #4f46e5;
   --primary-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   --primary-shadow: 0 10px 24px rgba(99, 102, 241, 0.12);
+}
+
+/* Keep dashboard content genuinely light. Some feature sections predate the
+   theme tokens and still carry dark-mode colors directly on their elements. */
+:root[data-theme='light'] body,
+:root[data-theme='light'] .dashboard-shell,
+:root[data-theme='light'] .main-content {
+  color: var(--text-color);
+}
+
+:root[data-theme='light'] .dashboard-shell main :where(
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  label,
+  legend,
+  li,
+  th,
+  td,
+  small
+) {
+  color: var(--text-color);
+}
+
+:root[data-theme='light'] .dashboard-shell main :where(span, strong) {
+  color: inherit;
+}
+
+:root[data-theme='light'] .dashboard-shell main :where(input, textarea, select) {
+  color: var(--text-color);
+  background: var(--bg-input);
+  border-color: var(--border-color);
+}
+
+:root[data-theme='light'] .dashboard-shell main :where(input, textarea)::placeholder {
+  color: var(--text-faint);
+  opacity: 1;
+}
+
+:root[data-theme='light'] .dashboard-shell main :where(input, textarea, select):focus {
+  background: var(--bg-input-focus);
+  border-color: var(--primary-hover);
+}
+
+:root[data-theme='light'] :where(
+  .panel,
+  .stat-card,
+  .metric-card,
+  .dashboard-ops-card,
+  .auto-post-detail-card,
+  .persona-preview-block,
+  .pillar-version-card,
+  .persona-version-card,
+  .generate-simple-choice,
+  .generate-entry-card,
+  .generate-card,
+  .generate-topic-card,
+  .generate-summary-item,
+  .content-output-card,
+  .threads-disconnect-modal
+) {
+  color: var(--text-color);
+  background: var(--bg-surface);
+  border-color: var(--border-color);
+}
+
+:root[data-theme='light'] :where(
+  .table-subtext,
+  .field-hint,
+  .persona-db-time,
+  .persona-tip-list,
+  .generate-card-id,
+  .generate-empty-state,
+  .generate-token-footnote,
+  .generate-note,
+  .content-output-meta-item,
+  .content-output-preview,
+  .integration-note
+) {
+  color: var(--text-secondary);
+}
+
+:root[data-theme='light'] :where(
+  .primary-button,
+  .manual-flow-button,
+  .auth-tab.active,
+  .chip.active,
+  .batch-button.selected,
+  .sidebar-theme-toggle.active-theme
+),
+:root[data-theme='light'] :where(
+  .primary-button,
+  .manual-flow-button,
+  .auth-tab.active,
+  .chip.active,
+  .batch-button.selected,
+  .sidebar-theme-toggle.active-theme
+) * {
+  color: #ffffff;
 }
 
 .dashboard-shell {
@@ -565,6 +666,11 @@
   gap: 4px;
 }
 
+.menu-entry {
+  display: grid;
+  gap: 4px;
+}
+
 .sidebar.collapsed .menu-group nav {
   justify-items: center;
 }
@@ -583,7 +689,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 14px;
   background: transparent;
   color: var(--text-secondary);
@@ -594,6 +700,23 @@
     color 160ms ease,
     transform 160ms ease,
     box-shadow 160ms ease;
+}
+
+.menu-item-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--bg-surface-soft);
+  flex: 0 0 auto;
+}
+
+.menu-item-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar.collapsed .menu-item {
@@ -619,13 +742,40 @@
 
 .menu-item.active {
   background: var(--primary-gradient);
+  border-color: rgba(255, 255, 255, 0.18);
   color: #ffffff;
   font-weight: 700;
-  box-shadow: var(--primary-shadow);
+  box-shadow: var(--primary-shadow), inset 3px 0 0 rgba(255, 255, 255, 0.82);
 }
 
 .menu-item.active svg {
   color: #ffffff;
+}
+
+.menu-item.active .menu-item-icon {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.menu-item.disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.menu-item.disabled:hover {
+  background: transparent;
+  color: var(--text-secondary);
+  transform: none;
+}
+
+.menu-disabled-reason {
+  padding: 0 10px 5px 53px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.sidebar.collapsed .menu-entry {
+  justify-items: center;
 }
 
 .sidebar-theme-toggle.active-theme {

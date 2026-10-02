@@ -3,6 +3,7 @@ import { getCurrentAuthToken } from './authService'
 
 type UsageApiRecord = Record<string, unknown>
 const USAGE_CACHE_TTL_MS = 30_000
+export const USAGE_UPDATED_EVENT = 'reframe:usage-updated'
 
 export type UsageSummary = {
   used: number
@@ -20,6 +21,14 @@ let usageCache:
   | null = null
 
 let usageRequest: Promise<UsageSummary | null> | null = null
+
+export function notifyUsageChanged() {
+  usageCache = null
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(USAGE_UPDATED_EVENT))
+  }
+}
 
 function isRecord(value: unknown): value is UsageApiRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -194,8 +203,12 @@ function buildAuthorizedHeaders() {
   return headers
 }
 
-export async function getMyUsage() {
+export async function getMyUsage(options: { force?: boolean } = {}) {
   const token = getCurrentAuthToken() || ''
+
+  if (options.force) {
+    usageCache = null
+  }
 
   if (usageCache && usageCache.token === token && usageCache.expiresAt > Date.now()) {
     return usageCache.value

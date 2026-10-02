@@ -3,7 +3,7 @@ import { AppIcon } from './AppIcon'
 import type { MenuItem, NavKey } from '../types/navigation'
 import type { AuthUser } from '../services/authService'
 import { getCurrentSubscription, listSubscriptionPlans } from '../services/subscriptionPlans'
-import { getMyUsage } from '../services/usage'
+import { getMyUsage, USAGE_UPDATED_EVENT } from '../services/usage'
 import type { AppTheme } from '../types/navigation'
 
 type SidebarProps = {
@@ -18,20 +18,36 @@ type SidebarProps = {
   onToggleTheme: () => void
   onToggleCollapse: () => void
   onClose: () => void
+  isThreadsConnected: boolean
 }
 
-const workspaceMenu: MenuItem[] = [
+type SidebarMenuItem = MenuItem & {
+  disabledReason?: string
+}
+
+const overviewMenu: SidebarMenuItem[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
-  { key: 'personalize', label: 'Personalize', icon: 'sparkles' },
-  { key: 'generate-topic', label: 'Generate Topic', icon: 'sparkles' },
-  { key: 'content-engine', label: 'Content Engine', icon: 'calendar' },
-  { key: 'auto-post', label: 'Auto Post', icon: 'clock' },
 ]
 
-const accountMenu: MenuItem[] = [
-  { key: 'subscription-plans', label: 'Subscription Plans', icon: 'calendar' },
-  { key: 'connecting-apps', label: 'Connecting Apps', icon: 'link' },
+const createMenu: SidebarMenuItem[] = [
+  { key: 'personalize', label: 'Persona', icon: 'user' },
+  { key: 'content-pillar', label: 'Content Pillar', icon: 'layers' },
+  { key: 'generate-topic', label: 'Topics', icon: 'sparkles' },
+  { key: 'content-engine', label: 'Generate Content', icon: 'plus' },
 ]
+
+const settingsMenu: SidebarMenuItem[] = [
+  { key: 'connecting-apps', label: 'Integration', icon: 'link' },
+  { key: 'subscription-plans', label: 'Subscription', icon: 'calendar' },
+]
+
+function isMenuItemActive(activePage: NavKey, itemKey: NavKey) {
+  if (itemKey === 'personalize') {
+    return activePage === 'personalize' || activePage === 'create-persona' || activePage === 'create-persona-chat'
+  }
+
+  return activePage === itemKey
+}
 
 function SidebarSection({
   title,
@@ -41,7 +57,7 @@ function SidebarSection({
   isCollapsed,
 }: {
   title: string
-  items: MenuItem[]
+  items: SidebarMenuItem[]
   activePage: NavKey
   onNavigate: (page: NavKey) => void
   isCollapsed: boolean
@@ -50,19 +66,31 @@ function SidebarSection({
     <div className="menu-group">
       {!isCollapsed ? <p className="menu-title">{title}</p> : null}
       <nav>
-        {items.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            className={`menu-item${activePage === item.key ? ' active' : ''}`}
-            onClick={() => onNavigate(item.key)}
-            title={isCollapsed ? item.label : undefined}
-            aria-label={item.label}
-          >
-            <AppIcon name={item.icon} />
-            {!isCollapsed ? <span>{item.label}</span> : null}
-          </button>
-        ))}
+        {items.map((item) => {
+          const isDisabled = Boolean(item.disabledReason)
+          const isActive = isMenuItemActive(activePage, item.key)
+          const tooltip = isDisabled ? `${item.label} — ${item.disabledReason}` : item.label
+
+          return (
+            <div className="menu-entry" key={item.key}>
+              <button
+                type="button"
+                className={`menu-item${isActive ? ' active' : ''}${isDisabled ? ' disabled' : ''}`}
+                onClick={() => onNavigate(item.key)}
+                title={isCollapsed ? tooltip : undefined}
+                aria-label={tooltip}
+                aria-disabled={isDisabled}
+                disabled={isDisabled}
+              >
+                <span className="menu-item-icon"><AppIcon name={item.icon} /></span>
+                {!isCollapsed ? <span className="menu-item-label">{item.label}</span> : null}
+              </button>
+              {!isCollapsed && item.disabledReason ? (
+                <span className="menu-disabled-reason">{item.disabledReason}</span>
+              ) : null}
+            </div>
+          )
+        })}
       </nav>
     </div>
   )
@@ -80,6 +108,7 @@ export function Sidebar({
   onToggleTheme,
   onToggleCollapse,
   onClose,
+  isThreadsConnected,
 }: SidebarProps) {
   const [usedTokens, setUsedTokens] = useState(0)
   const [tokenLimit, setTokenLimit] = useState<number | null>(null)
@@ -94,11 +123,22 @@ export function Sidebar({
 
   useEffect(() => {
     let isMounted = true
+    const refreshTimeouts: number[] = []
 
-    async function loadUsage() {
+    async function loadUsage(includePlan = true) {
       try {
-        const [summary, currentSubscription, subscriptionPlans] = await Promise.all([
-          getMyUsage(),
+        const summary = await getMyUsage({ force: !includePlan })
+
+        if (!includePlan) {
+          if (isMounted) {
+            setUsedTokens(summary?.used ?? 0)
+            setTokenLimit((current) => summary?.limit ?? current)
+            setPlanName((current) => summary?.planName || current)
+          }
+          return
+        }
+
+        const [currentSubscription, subscriptionPlans] = await Promise.all([
           getCurrentSubscription(),
           listSubscriptionPlans(),
         ])
@@ -133,8 +173,21 @@ export function Sidebar({
 
     void loadUsage()
 
+    function handleUsageUpdated() {
+      void loadUsage(false)
+
+      // Backend usage persistence may complete just after the generate response.
+      for (const delay of [1200, 3500]) {
+        refreshTimeouts.push(window.setTimeout(() => void loadUsage(false), delay))
+      }
+    }
+
+    window.addEventListener(USAGE_UPDATED_EVENT, handleUsageUpdated)
+
     return () => {
       isMounted = false
+      window.removeEventListener(USAGE_UPDATED_EVENT, handleUsageUpdated)
+      refreshTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId))
     }
   }, [])
 
@@ -178,16 +231,40 @@ export function Sidebar({
         </div>
 
         <SidebarSection
-          title="Workspace"
-          items={workspaceMenu}
+          title="Overview"
+          items={overviewMenu}
           activePage={activePage}
           onNavigate={onNavigate}
           isCollapsed={isCollapsed}
         />
 
         <SidebarSection
-          title="Account"
-          items={accountMenu}
+          title="Create"
+          items={createMenu}
+          activePage={activePage}
+          onNavigate={onNavigate}
+          isCollapsed={isCollapsed}
+        />
+
+        <SidebarSection
+          title="Publish"
+          items={[
+            { key: 'manual-post', label: 'Content Output', icon: 'layers' },
+            {
+              key: 'auto-post',
+              label: 'Auto Post',
+              icon: 'clock',
+              disabledReason: isThreadsConnected ? undefined : 'Hubungkan Threads dulu',
+            },
+          ]}
+          activePage={activePage}
+          onNavigate={onNavigate}
+          isCollapsed={isCollapsed}
+        />
+
+        <SidebarSection
+          title="Settings"
+          items={settingsMenu}
           activePage={activePage}
           onNavigate={onNavigate}
           isCollapsed={isCollapsed}

@@ -8,10 +8,11 @@ type PersonalizeTab = 'persona' | 'content-pillar'
 type PersonalizePageProps = {
   personaConfig: PersonaConfigRecord | null
   onPersonaSaved?: (personaConfig: PersonaConfigRecord) => void
+  initialTab?: PersonalizeTab
 }
 
-export function PersonalizePage({ personaConfig, onPersonaSaved }: PersonalizePageProps) {
-  const [activeTab, setActiveTab] = useState<PersonalizeTab | null>(null)
+export function PersonalizePage({ personaConfig, onPersonaSaved, initialTab }: PersonalizePageProps) {
+  const [activeTab, setActiveTab] = useState<PersonalizeTab | null>(initialTab ?? null)
   const isInitialSetup = !personaConfig
 
   if (isInitialSetup) {

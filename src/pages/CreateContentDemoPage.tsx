@@ -5,7 +5,7 @@ import {
   type GenerateContentOutputDemoPayload,
 } from '../services/contentOutputs'
 
-type DemoFieldKey = Exclude<keyof GenerateContentOutputDemoPayload, 'formatOutput'>
+type DemoFieldKey = keyof GenerateContentOutputDemoPayload
 
 type ChatStep = {
   key: DemoFieldKey
@@ -71,7 +71,6 @@ const emptyValues: GenerateContentOutputDemoPayload = {
   targetAudience: '',
   nicheTopicFocus: '',
   contentStyle: '',
-  formatOutput: 'threads pendek',
 }
 
 const DEMO_STORAGE_KEY = 'reframe.demoContentDraft'
@@ -114,7 +113,6 @@ function readPersistedDemoState(): PersistedDemoState | undefined {
         nicheTopicFocus:
           typeof formValues.nicheTopicFocus === 'string' ? formValues.nicheTopicFocus : '',
         contentStyle: typeof formValues.contentStyle === 'string' ? formValues.contentStyle : '',
-        formatOutput: 'threads pendek',
       },
       generatedResult: parsed.generatedResult ?? null,
     }
@@ -145,7 +143,6 @@ function normalizeDraft(values: GenerateContentOutputDemoPayload) {
     targetAudience: values.targetAudience?.trim() || '',
     nicheTopicFocus: values.nicheTopicFocus?.trim() || '',
     contentStyle: values.contentStyle?.trim() || '',
-    formatOutput: 'threads pendek',
   }
 }
 

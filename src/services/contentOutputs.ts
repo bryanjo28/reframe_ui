@@ -1,6 +1,7 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { createApiResponseError } from '../utils/apiError'
 import { getCurrentAuthToken } from './authService'
+import { notifyUsageChanged } from './usage'
 
 const CONTENT_OUTPUTS_ENDPOINT = '/api/content-outputs/generate'
 const CONTENT_OUTPUTS_LIST_ENDPOINT = '/api/content-outputs'
@@ -10,7 +11,6 @@ const REQUEST_TIMEOUT_MS = 25000
 export type CreateContentOutputPayload = {
   topicId: string
   platform: string
-  formatOutput: string
   additionalPrompt: string
 }
 
@@ -19,7 +19,6 @@ export type GenerateContentOutputDemoPayload = {
   targetAudience?: string
   nicheTopicFocus?: string
   contentStyle?: string
-  formatOutput?: string
 }
 
 export type AutoGenerateContentOutputsPayload = {
@@ -61,8 +60,6 @@ export type ContentOutputRecord = {
   topic?: string
   title?: string
   platform?: string
-  formatOutput?: string
-  format_output?: string
   additionalPrompt?: string
   additional_prompt?: string
   content?: string
@@ -108,7 +105,6 @@ function normalizeGenerateContentOutputDemoPayload(payload: GenerateContentOutpu
     nicheTopicFocus:
       typeof payload.nicheTopicFocus === 'string' ? payload.nicheTopicFocus.trim() : '',
     contentStyle: typeof payload.contentStyle === 'string' ? payload.contentStyle.trim() : '',
-    formatOutput: 'threads pendek',
   }
 }
 
@@ -149,7 +145,6 @@ export async function createContentOutput(payload: CreateContentOutputPayload) {
   const requestBody: Record<string, unknown> = {
     topicId: payload.topicId,
     platform: payload.platform,
-    formatOutput: payload.formatOutput,
     additionalPrompt: payload.additionalPrompt,
   }
 
@@ -167,6 +162,7 @@ export async function createContentOutput(payload: CreateContentOutputPayload) {
     throw new Error(errorMessage || 'Gagal generate content output.')
   }
 
+  notifyUsageChanged()
   return data
 }
 
@@ -185,6 +181,7 @@ export async function generateContentOutputDemo(payload: GenerateContentOutputDe
     throw new Error(errorMessage || 'Gagal generate demo content output.')
   }
 
+  notifyUsageChanged()
   return data
 }
 
@@ -331,7 +328,6 @@ function normalizeContentOutputRecord(record: ContentOutputRecord) {
     topicId: asString(record.topicId) || asString(record.topic_id) || '',
     topic: asString(record.topic) || asString(record.title) || '',
     platform: asString(record.platform) || '',
-    formatOutput: asString(record.formatOutput) || asString(record.format_output) || '',
     additionalPrompt:
       asString(record.additionalPrompt) || asString(record.additional_prompt) || '',
     content:
