@@ -12,6 +12,7 @@ import {
 } from '../services/contentOutputs'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
 import { listContentTopics, type ContentTopicRecord } from '../services/contentTopics'
+import { ManualPostPage } from './ManualPostPage'
 
 type ContentEnginePageProps = {
   userId: string
@@ -19,22 +20,27 @@ type ContentEnginePageProps = {
   onScheduledJobCreated?: (jobId: string, targetCount: number) => void
 }
 
-type AutoScheduleMode = 'now' | 'later'
-type ContentEngineView = 'chooser' | 'auto' | 'list'
+type ContentEngineView = 'auto' | 'list'
+type ContentCreationMode = 'batch' | 'topic-variants'
+type ThreadTypeFilter = 'all' | 'short' | 'long'
 type OutputEditForm = {
   platform: string
   status: string
   content: string
 }
 
-const outputStatusOptions = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'approved', label: 'Approved' },
-  // { value: 'failed', label: 'Failed' },
-  // { value: 'posted', label: 'Posted' },
-]
-
 const outputsPerPage = 5
+const THREAD_SPLIT_DELIMITER = '---THREAD_SPLIT---'
+const MAX_THREAD_PARTS = 8
+const MAX_THREAD_CHARACTERS = 500
+
+function parseThreadParts(content: string) {
+  return content.split(THREAD_SPLIT_DELIMITER).map((part) => part.trim())
+}
+
+function serializeThreadParts(parts: string[]) {
+  return parts.map((part) => part.trim()).join(`\n\n${THREAD_SPLIT_DELIMITER}\n\n`)
+}
 
 function getRecordValue(record: ContentPillarRecord | null, keys: string[]) {
   if (!record) {
@@ -245,7 +251,6 @@ function getTopicPillarId(record: ContentTopicRecord) {
 function getTopicLabel(record: ContentTopicRecord) {
   return (
     (typeof record.topic === 'string' && record.topic.trim()) ||
-    (typeof record.subcategory === 'string' && record.subcategory.trim()) ||
     (typeof record.category === 'string' && record.category.trim()) ||
     'Untitled topic'
   )
@@ -283,9 +288,8 @@ export function ContentEnginePage({
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
   const [targetCount, setTargetCount] = useState(10)
-  const [scheduleMode, setScheduleMode] = useState<AutoScheduleMode>('now')
-  const [viewMode, setViewMode] = useState<ContentEngineView>('chooser')
-  const [scheduledAt, setScheduledAt] = useState('')
+  const [viewMode, setViewMode] = useState<ContentEngineView>('auto')
+  const [creationMode, setCreationMode] = useState<ContentCreationMode>('batch')
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
   const [isLoadingPillars, setIsLoadingPillars] = useState(true)
@@ -300,10 +304,13 @@ export function ContentEnginePage({
   const [isSavingOutput, setIsSavingOutput] = useState(false)
   const [isDeletingOutputId, setIsDeletingOutputId] = useState('')
   const [currentOutputsPage, setCurrentOutputsPage] = useState(1)
+  const [threadTypeFilter, setThreadTypeFilter] = useState<ThreadTypeFilter>('all')
   const [retryingOutputId, setRetryingOutputId] = useState('')
   const [retryModalOutputId, setRetryModalOutputId] = useState('')
   const [retryScheduledAt, setRetryScheduledAt] = useState('')
   const [outputEditForm, setOutputEditForm] = useState<OutputEditForm>(getOutputEditForm(null))
+  const [threadParts, setThreadParts] = useState<string[]>([''])
+  const [isThreadSplitEditor, setIsThreadSplitEditor] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -447,17 +454,63 @@ export function ContentEnginePage({
     () => contentOutputs.find((output) => output.id === selectedOutputId) || null,
     [contentOutputs, selectedOutputId],
   )
+  const selectedOutputTitle = useMemo(() => {
+    if (!selectedContentOutput) {
+      return 'Untitled output'
+    }
+
+    const directTitle = getOutputValue(selectedContentOutput, ['title', 'topic'])
+
+    if (directTitle) {
+      return directTitle
+    }
+
+    const topicId = getOutputValue(selectedContentOutput, ['topicId', 'topic_id'])
+    const topic = contentTopics.find((record) => record.id === topicId)
+
+    return topic ? getTopicLabel(topic) : 'Untitled output'
+  }, [contentTopics, selectedContentOutput])
   const retryModalOutput = useMemo(
     () => contentOutputs.find((output) => output.id === retryModalOutputId) || null,
     [contentOutputs, retryModalOutputId],
   )
   const selectedOutputStatus = getOutputStatus(selectedContentOutput)
   const canChangeSelectedOutputStatus = canEditOutputStatus(selectedOutputStatus)
-  const totalOutputPages = Math.max(1, Math.ceil(contentOutputs.length / outputsPerPage))
+
+  function getOutputThreadType(record: ContentOutputRecord): Exclude<ThreadTypeFilter, 'all'> {
+    const content = getOutputContent(record)
+
+    if (content.includes(THREAD_SPLIT_DELIMITER)) {
+      return 'long'
+    }
+
+    const directType = getOutputValue(record, ['threadType', 'thread_type']).toLowerCase()
+
+    if (directType === 'long' || directType === 'short') {
+      return directType
+    }
+
+    const topicId = getOutputValue(record, ['topicId', 'topic_id'])
+    const topic = contentTopics.find((item) => item.id === topicId)
+    const pillarId = topic ? getTopicPillarId(topic) : ''
+    const pillar = contentPillars.find((item) => item.id === pillarId)
+
+    return pillar?.threadType === 'long' ? 'long' : 'short'
+  }
+
+  const filteredContentOutputs = useMemo(
+    () => threadTypeFilter === 'all'
+      ? contentOutputs
+      : contentOutputs.filter((record) => getOutputThreadType(record) === threadTypeFilter),
+    // The lookup intentionally follows output -> topic -> pillar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contentOutputs, contentPillars, contentTopics, threadTypeFilter],
+  )
+  const totalOutputPages = Math.max(1, Math.ceil(filteredContentOutputs.length / outputsPerPage))
   const paginatedOutputs = useMemo(() => {
     const startIndex = (currentOutputsPage - 1) * outputsPerPage
-    return contentOutputs.slice(startIndex, startIndex + outputsPerPage)
-  }, [contentOutputs, currentOutputsPage])
+    return filteredContentOutputs.slice(startIndex, startIndex + outputsPerPage)
+  }, [filteredContentOutputs, currentOutputsPage])
 
   useEffect(() => {
     if (!isOutputEditorOpen) {
@@ -488,11 +541,21 @@ export function ContentEnginePage({
       ...nextForm,
       status: nextForm.status.trim().toLowerCase(),
     })
-  }, [isOutputEditorOpen, selectedContentOutput])
+    setThreadParts(parseThreadParts(nextForm.content))
+    setIsThreadSplitEditor(
+      nextForm.platform.trim().toLowerCase() === 'threads' &&
+      getOutputThreadType(selectedContentOutput) === 'long',
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOutputEditorOpen, selectedContentOutput, contentPillars, contentTopics])
 
   useEffect(() => {
     setCurrentOutputsPage((current) => Math.min(current, totalOutputPages))
   }, [totalOutputPages])
+
+  useEffect(() => {
+    setCurrentOutputsPage(1)
+  }, [threadTypeFilter])
 
   const canSubmit =
     Boolean(selectedContentPillarId) &&
@@ -500,7 +563,6 @@ export function ContentEnginePage({
     selectedPillarTopics.length >= targetCount &&
     targetCount >= 1 &&
     targetCount <= 10 &&
-    (scheduleMode === 'now' || Boolean(scheduledAt.trim())) &&
     !isSubmitting &&
     !isLoadingPillars
 
@@ -514,47 +576,30 @@ export function ContentEnginePage({
           ? 'Topic available untuk pillar ini masih 0.'
           : selectedContentPillarId && selectedPillarTopics.length < targetCount
             ? `Topic available untuk pillar ini cuma ${selectedPillarTopics.length}, lebih kecil dari target ${targetCount}.`
-          : 'Lengkapi pillar, target count, dan scheduled at dulu.',
+          : 'Pilih pillar dan tentukan jumlah content yang ingin dibuat.',
       )
-      return
-    }
-
-    const scheduledAtSource =
-      scheduleMode === 'now' ? new Date() : new Date(scheduledAt.trim())
-
-    if (Number.isNaN(scheduledAtSource.getTime())) {
-      setStatusTone('error')
-      setStatusMessage('Scheduled time tidak valid.')
       return
     }
 
     setIsSubmitting(true)
     setStatusTone('idle')
-    setStatusMessage('Mengirim auto-generate payload...')
+    setStatusMessage('Memulai proses generate content...')
     void autoGenerateContentOutputs({
       contentPillarId: selectedContentPillarId,
       targetCount,
-      scheduledAt: scheduledAtSource.toISOString(),
+      scheduledAt: new Date().toISOString(),
     })
       .then((response) => {
         const jobId = getScheduledJobId(response)
 
         if (!jobId) {
-          throw new Error('Schedule berhasil dibuat, tetapi job ID tidak ditemukan.')
+          throw new Error('Proses berhasil dimulai, tetapi job ID tidak ditemukan.')
         }
 
         onScheduledJobCreated?.(jobId, targetCount)
         setStatusTone('success')
-        if (scheduleMode === 'now') {
-          setStatusMessage('Generate content berhasil. Silakan cek di list generated content.')
-          toastSuccess(
-            'Generate content berhasil',
-            'Silakan cek hasilnya di list generated content.',
-          )
-        } else {
-          setStatusMessage('Schedule auto-generate berhasil dikirim ke backend.')
-          toastSuccess('Schedule sent', 'Payload content engine sudah dijadwalkan.')
-        }
+        setStatusMessage('Generate content sedang diproses. Hasil akan masuk ke Content Library.')
+        toastSuccess('Generate content dimulai', 'Hasil akan masuk ke Content Library.')
       })
       .catch((error) => {
         setStatusTone('error')
@@ -621,6 +666,32 @@ export function ContentEnginePage({
     }))
   }
 
+  function handleThreadPartChange(index: number, value: string) {
+    setThreadParts((current) => current.map((part, partIndex) => partIndex === index ? value : part))
+  }
+
+  function addThreadPart() {
+    setThreadParts((current) => current.length >= MAX_THREAD_PARTS ? current : [...current, ''])
+  }
+
+  function removeThreadPart(index: number) {
+    setThreadParts((current) => current.length <= 1 ? current : current.filter((_, partIndex) => partIndex !== index))
+  }
+
+  function moveThreadPart(index: number, direction: -1 | 1) {
+    setThreadParts((current) => {
+      const targetIndex = index + direction
+
+      if (targetIndex < 0 || targetIndex >= current.length) {
+        return current
+      }
+
+      const next = [...current]
+      ;[next[index], next[targetIndex]] = [next[targetIndex], next[index]]
+      return next
+    })
+  }
+
   function openRetryModal(record: ContentOutputRecord) {
     const outputId = getOutputId(record)
 
@@ -641,14 +712,15 @@ export function ContentEnginePage({
     setRetryScheduledAt('')
   }
 
-  async function handleSaveOutput(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
+  async function saveOutput(nextStatus = outputEditForm.status) {
     const selectedOutputIdValue = normalizeOutputId(selectedOutputId)
+    const nextContent = isThreadSplitEditor
+      ? serializeThreadParts(threadParts)
+      : outputEditForm.content.trim()
     const payload = {
       id: selectedOutputIdValue,
-      status: outputEditForm.status.trim(),
-      content: outputEditForm.content.trim(),
+      status: nextStatus.trim(),
+      content: nextContent,
     }
 
     console.log('[ContentEngine] handleSaveOutput', {
@@ -664,6 +736,12 @@ export function ContentEnginePage({
       return
     }
 
+    if (isThreadSplitEditor && threadParts.some((part) => !part.trim())) {
+      setStatusTone('error')
+      setStatusMessage('Setiap bagian thread harus memiliki isi sebelum disimpan.')
+      return
+    }
+
     setIsSavingOutput(true)
     setStatusTone('idle')
     setStatusMessage('Menyimpan perubahan output...')
@@ -671,7 +749,15 @@ export function ContentEnginePage({
     try {
       await updateContentOutput(selectedOutputIdValue, payload)
 
-      toastSuccess('Output updated', 'Perubahan output sudah tersimpan.')
+      const statusChanged = nextStatus !== outputEditForm.status
+      toastSuccess(
+        statusChanged ? 'Status updated' : 'Output updated',
+        nextStatus === 'approved'
+          ? 'Thread sudah disetujui dan siap digunakan di Auto Post.'
+          : nextStatus === 'draft'
+            ? 'Thread dikembalikan ke draft.'
+            : 'Perubahan output sudah tersimpan.',
+      )
       setStatusTone('success')
       setStatusMessage('Output berhasil diupdate.')
       setIsOutputEditorOpen(false)
@@ -684,6 +770,11 @@ export function ContentEnginePage({
     } finally {
       setIsSavingOutput(false)
     }
+  }
+
+  function handleSaveOutput(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void saveOutput()
   }
 
   async function handleDeleteOutput(record: ContentOutputRecord) {
@@ -766,38 +857,100 @@ export function ContentEnginePage({
     }
   }
 
+  function renderViewTabs(showRefresh = false) {
+    return (
+      <div className="content-engine-view-nav">
+        <div className="content-engine-tabs" role="tablist" aria-label="Content engine view">
+          <button
+            className={`content-engine-tab${viewMode === 'auto' ? ' active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'auto'}
+            onClick={() => setViewMode('auto')}
+          >
+            Create Content
+          </button>
+          <button
+            className={`content-engine-tab${viewMode === 'list' ? ' active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+          >
+            Content Library
+          </button>
+        </div>
+
+        {showRefresh ? (
+          <button
+            className="ghost-button content-library-refresh"
+            type="button"
+            onClick={handleReloadOutputs}
+            disabled={isLoadingOutputs}
+          >
+            <AppIcon name="refresh" />
+            <span>{isLoadingOutputs ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+        ) : null}
+      </div>
+    )
+  }
+
+  function renderCreationModeSelector() {
+    return (
+      <section className="content-creation-method" aria-labelledby="creation-method-title">
+        <div className="content-creation-method-head">
+          <div>
+            <p className="eyebrow">Creation method</p>
+            <h2 id="creation-method-title">Pilih cara membuat konten</h2>
+          </div>
+        </div>
+        <div className="content-creation-options" role="radiogroup" aria-label="Cara membuat konten">
+          <button
+            className={`content-creation-option${creationMode === 'batch' ? ' active' : ''}`}
+            type="button"
+            role="radio"
+            aria-checked={creationMode === 'batch'}
+            onClick={() => setCreationMode('batch')}
+          >
+            <span className="content-creation-option-mark" aria-hidden="true" />
+            <span>
+              <strong>Batch by Pillar</strong>
+              <small>Satu konten untuk setiap topic yang tersedia.</small>
+            </span>
+          </button>
+          <button
+            className={`content-creation-option${creationMode === 'topic-variants' ? ' active' : ''}`}
+            type="button"
+            role="radio"
+            aria-checked={creationMode === 'topic-variants'}
+            onClick={() => setCreationMode('topic-variants')}
+          >
+            <span className="content-creation-option-mark" aria-hidden="true" />
+            <span>
+              <strong>Variants from Topic</strong>
+              <small>Hingga lima angle berbeda dari satu topic.</small>
+            </span>
+          </button>
+        </div>
+      </section>
+    )
+  }
+
   function renderListOutputsView() {
     return (
       <section className="generate-page">
         <header className="page-header generate-hero">
           <div>
             <p className="eyebrow">Reframe Content Engine</p>
-            <h1>Generated Content</h1>
+            <h1>Content Library</h1>
             <p className="page-description">
-              Lihat semua content yang sudah digenerate untuk user aktif. Data diambil dari tabel
-              output, bukan dari topic.
+              Lihat, review, dan kelola semua konten yang sudah berhasil dibuat.
             </p>
           </div>
         </header>
 
-        <div className="generate-mode-switcher">
-          <span className="pill subtle">List mode</span>
-          <button
-            className="ghost-button generate-mode-button"
-            type="button"
-            onClick={() => setViewMode('chooser')}
-          >
-            Change flow
-          </button>
-          <button
-            className="ghost-button generate-mode-button"
-            type="button"
-            onClick={handleReloadOutputs}
-            disabled={isLoadingOutputs}
-          >
-            Refresh
-          </button>
-        </div>
+        {renderViewTabs(true)}
 
         {statusMessage ? (
           <div
@@ -814,7 +967,25 @@ export function ContentEnginePage({
               <p className="eyebrow">Content Outputs</p>
               <h2>Konten hasil generate</h2>
             </div>
-            <span className="pill subtle">{contentOutputs.length} item</span>
+            <span className="pill subtle">
+              {threadTypeFilter === 'all'
+                ? `${contentOutputs.length} item`
+                : `${filteredContentOutputs.length} of ${contentOutputs.length}`}
+            </span>
+          </div>
+
+          <div className="content-library-filter" role="group" aria-label="Filter thread type">
+            {(['all', 'short', 'long'] as ThreadTypeFilter[]).map((type) => (
+              <button
+                className={`content-library-filter-button${threadTypeFilter === type ? ' active' : ''}`}
+                type="button"
+                key={type}
+                onClick={() => setThreadTypeFilter(type)}
+                aria-pressed={threadTypeFilter === type}
+              >
+                {type === 'all' ? 'All types' : type === 'short' ? 'Short Thread' : 'Long Thread'}
+              </button>
+            ))}
           </div>
 
           {isLoadingOutputs ? (
@@ -825,7 +996,7 @@ export function ContentEnginePage({
                 <p>Sedang ambil daftar output yang dibuat user aktif.</p>
               </div>
             </div>
-          ) : contentOutputs.length ? (
+          ) : filteredContentOutputs.length ? (
             <div className="content-output-list">
               <div className="table-wrap content-output-table-wrap">
                 <table className="content-output-table">
@@ -833,6 +1004,7 @@ export function ContentEnginePage({
                     <tr>
                       <th>Output</th>
                       <th>Platform</th>
+                      <th>Type</th>
                       <th>Status</th>
                       <th>Created At</th>
                       <th>Action</th>
@@ -843,6 +1015,7 @@ export function ContentEnginePage({
 	                      const title = getOutputTitle(record)
 	                      const platform = getOutputValue(record, ['platform']) || 'Unknown platform'
                       const status = getOutputStatus(record)
+                      const threadType = getOutputThreadType(record)
 	                      const createdAt = formatDate(
 	                        getOutputValue(record, ['createdAt', 'created_at']) ||
 	                          getOutputValue(record, ['generatedAt', 'generated_at']) ||
@@ -870,6 +1043,11 @@ export function ContentEnginePage({
                           </td>
                           <td>
                             <span className="chip active">{platform}</span>
+                          </td>
+                          <td>
+                            <span className={`thread-type-badge ${threadType}`}>
+                              {threadType === 'long' ? 'Long Thread' : 'Short Thread'}
+                            </span>
                           </td>
                           <td>
                             <span className={`pill ${status === 'approved' ? '' : 'subtle'}`}>
@@ -964,8 +1142,12 @@ export function ContentEnginePage({
             <div className="generate-empty-state">
               <AppIcon name="check" />
               <div>
-                <strong>Belum ada output</strong>
-                <p>Kalau user belum pernah generate, daftar ini masih kosong.</p>
+                <strong>{contentOutputs.length ? 'Tidak ada thread yang cocok' : 'Belum ada output'}</strong>
+                <p>
+                  {contentOutputs.length
+                    ? 'Coba pilih filter thread type yang lain.'
+                    : 'Kalau user belum pernah generate, daftar ini masih kosong.'}
+                </p>
               </div>
             </div>
           )}
@@ -974,7 +1156,7 @@ export function ContentEnginePage({
 	        {isOutputEditorOpen && selectedContentOutput ? (
           <div className="auth-overlay content-output-modal-overlay" onClick={closeOutputEditor}>
             <div
-              className="content-output-modal"
+              className={`content-output-modal${isThreadSplitEditor ? ' long-thread-modal' : ''}`}
               role="dialog"
               aria-modal="true"
               aria-labelledby="content-output-modal-title"
@@ -984,54 +1166,107 @@ export function ContentEnginePage({
                 <div className="content-output-modal-head">
                   <div>
                     <p className="eyebrow">Edit Output</p>
-                    <h3 id="content-output-modal-title">{getOutputTitle(selectedContentOutput)}</h3>
+                    <h3 id="content-output-modal-title">{selectedOutputTitle}</h3>
+                    <div className="content-output-modal-summary">
+                      <span>{outputEditForm.platform}</span>
+                      <span className={`status-badge ${outputEditForm.status}`}>
+                        {formatStatusLabel(outputEditForm.status)}
+                      </span>
+                    </div>
                   </div>
                   <button className="ghost-button" type="button" onClick={closeOutputEditor}>
                     Close
                   </button>
                 </div>
 
-                <div className="content-output-modal-meta content-output-modal-meta-edit">
-                  <label className="persona-field">
-                    <span>Platform</span>
-                    <input
-                      value={outputEditForm.platform}
-                      placeholder="threads"
-                      disabled
+                {isThreadSplitEditor ? (
+                  <section className="thread-split-editor" aria-labelledby="thread-editor-title">
+                    <div className="thread-split-editor-head">
+                      <div>
+                        <span className="content-output-modal-label">Long Thread</span>
+                        <h4 id="thread-editor-title">Thread Editor</h4>
+                      </div>
+                      <div className="thread-parts-progress">
+                        <span>{threadParts.length} / {MAX_THREAD_PARTS} parts</span>
+                        <span className="thread-parts-progress-track" aria-hidden="true">
+                          <span style={{ width: `${(threadParts.length / MAX_THREAD_PARTS) * 100}%` }} />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="thread-split-list">
+                      {threadParts.map((part, index) => (
+                        <article className="thread-split-card" key={index}>
+                          <div className="thread-split-card-head">
+                            <div className="thread-split-title">
+                              <span>{String(index + 1).padStart(2, '0')}</span>
+                              <strong>Thread {index + 1}</strong>
+                            </div>
+                            <span className={part.length >= MAX_THREAD_CHARACTERS ? 'limit-reached' : ''}>
+                              {part.length} / {MAX_THREAD_CHARACTERS}
+                            </span>
+                          </div>
+                          <textarea
+                            value={part}
+                            onChange={(event) => handleThreadPartChange(index, event.target.value)}
+                            maxLength={MAX_THREAD_CHARACTERS}
+                            rows={3}
+                            placeholder={`Tulis bagian thread ${index + 1}...`}
+                            disabled={!canChangeSelectedOutputStatus}
+                          />
+                          {canChangeSelectedOutputStatus ? (
+                            <div className="thread-split-card-actions">
+                              <button
+                                type="button"
+                                onClick={() => moveThreadPart(index, -1)}
+                                disabled={index === 0}
+                                aria-label={`Move thread ${index + 1} up`}
+                                title="Move up"
+                              >
+                                <AppIcon name="chevron-left" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveThreadPart(index, 1)}
+                                disabled={index === threadParts.length - 1}
+                                aria-label={`Move thread ${index + 1} down`}
+                                title="Move down"
+                              >
+                                <AppIcon name="chevron-right" />
+                              </button>
+                              <button className="danger" type="button" onClick={() => removeThreadPart(index)} disabled={threadParts.length === 1}>
+                                <AppIcon name="trash" /> Remove
+                              </button>
+                            </div>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+
+                    {canChangeSelectedOutputStatus ? (
+                      <button
+                        className="ghost-button thread-add-button"
+                        type="button"
+                        onClick={addThreadPart}
+                        disabled={threadParts.length >= MAX_THREAD_PARTS}
+                      >
+                        <AppIcon name="plus" />
+                        {threadParts.length >= MAX_THREAD_PARTS ? 'Maximum 8 threads' : 'Add thread'}
+                      </button>
+                    ) : null}
+                  </section>
+                ) : (
+                  <label className="content-output-modal-body">
+                    <span className="content-output-modal-label">Content Output</span>
+                    <textarea
+                      value={outputEditForm.content}
+                      onChange={(event) => handleOutputFieldChange('content', event.target.value)}
+                      rows={8}
+                      placeholder="Edit isi output di sini..."
+                      disabled={!canChangeSelectedOutputStatus}
                     />
                   </label>
-                  <label className="persona-field">
-                    <span>Status</span>
-                    <div className="select-wrap">
-	                      <select
-	                        value={outputEditForm.status}
-	                        onChange={(event) => handleOutputFieldChange('status', event.target.value)}
-	                        disabled={!canChangeSelectedOutputStatus}
-	                      >
-                        {outputStatusOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {/* {!canChangeSelectedOutputStatus ? (
-                      <small className="field-hint">
-                        Status `posted` dikontrol backend, jadi tidak bisa diubah dari sini.
-                      </small>
-                    ) : null} */}
-                  </label>
-                </div>
-
-                <label className="content-output-modal-body">
-                  <span className="content-output-modal-label">Content Output</span>
-                  <textarea
-                    value={outputEditForm.content}
-                    onChange={(event) => handleOutputFieldChange('content', event.target.value)}
-                    rows={8}
-                    placeholder="Edit isi output di sini..."
-                  />
-                </label>
+                )}
 
                 <div className="content-output-modal-actions">
                     <button
@@ -1043,9 +1278,30 @@ export function ContentEnginePage({
                       {canChangeSelectedOutputStatus ? 'Cancel' : 'Close'}
                     </button>
                     {canChangeSelectedOutputStatus ? (
-                      <button className="primary-button" type="submit" disabled={isSavingOutput}>
-                        {isSavingOutput ? 'Saving...' : 'Save changes'}
-                      </button>
+                      <>
+                        <button className="ghost-button" type="submit" disabled={isSavingOutput}>
+                          {isSavingOutput ? 'Saving...' : 'Save changes'}
+                        </button>
+                        {outputEditForm.status === 'approved' ? (
+                          <button
+                            className="approval-secondary-button"
+                            type="button"
+                            onClick={() => void saveOutput('draft')}
+                            disabled={isSavingOutput}
+                          >
+                            Back to draft
+                          </button>
+                        ) : (
+                          <button
+                            className="primary-button approval-button"
+                            type="button"
+                            onClick={() => void saveOutput('approved')}
+                            disabled={isSavingOutput}
+                          >
+                            Approve thread
+                          </button>
+                        )}
+                      </>
                     ) : null}
 	                </div>
               </form>
@@ -1109,60 +1365,31 @@ export function ContentEnginePage({
 	    )
   }
 
-  if (viewMode === 'chooser') {
+  if (viewMode === 'list') {
+    return renderListOutputsView()
+  }
+
+  if (creationMode === 'topic-variants') {
     return (
       <section className="generate-page">
         <header className="page-header generate-hero">
           <div>
             <p className="eyebrow">Reframe Content Engine</p>
-            <h1>Pilih dulu flow yang mau kamu edit.</h1>
+            <h1>Generate Content</h1>
             <p className="page-description">
-              Kita mulai dari card supaya tampilan awal lebih tenang. Setelah dipilih, baru
-              form yang sesuai muncul di bawah.
+              Buat beberapa angle konten dari satu topic yang sudah tersedia.
             </p>
           </div>
         </header>
-
-        <article className="panel generate-panel generate-chooser-panel content-engine-picker">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Choose a flow</p>
-              <h2>Pilih dulu yang mau kamu edit</h2>
-            </div>
-            <span className="pill subtle">2 option</span>
-          </div>
-
-          <p className="page-description generate-chooser-copy">
-            Satu menu untuk pilih cara kerja content engine. Auto langsung jalan dari pillar, dan
-            list buat lihat hasil yang sudah jadi.
-          </p>
-
-          <div className="generate-simple-chooser-grid">
-            <button
-              type="button"
-              className="generate-simple-choice"
-              onClick={() => setViewMode('auto')}
-            >
-              <strong>Auto Create</strong>
-              <p>Generate langsung dari content pillar dengan schedule.</p>
-            </button>
-
-            <button
-              type="button"
-              className="generate-simple-choice"
-              onClick={() => setViewMode('list')}
-            >
-              <strong>List Generated Content</strong>
-              <p>Lihat semua content hasil generate yang sudah dibuat user aktif.</p>
-            </button>
-          </div>
-        </article>
+        {renderViewTabs()}
+        {renderCreationModeSelector()}
+        <ManualPostPage
+          userId={userId}
+          embedded
+          onViewLibrary={() => setViewMode('list')}
+        />
       </section>
     )
-  }
-
-  if (viewMode === 'list') {
-    return renderListOutputsView()
   }
 
   return (
@@ -1170,10 +1397,9 @@ export function ContentEnginePage({
       <header className="page-header generate-hero">
         <div>
           <p className="eyebrow">Reframe Content Engine</p>
-          <h1>Content Engine untuk auto-generate output.</h1>
+          <h1>Generate Content</h1>
           <p className="page-description">
-            Pilih content pillar, tentukan target count, lalu kirim payload ke endpoint
-            auto-generate. Generate Topic tetap ada di menu terpisah.
+            Pilih content pillar dan jumlah topic yang ingin diubah menjadi konten.
           </p>
         </div>
 
@@ -1193,16 +1419,8 @@ export function ContentEnginePage({
         </div> */}
       </header>
 
-      <div className="generate-mode-switcher">
-        <span className="pill subtle">Auto mode</span>
-        <button
-          className="ghost-button generate-mode-button"
-          type="button"
-          onClick={() => setViewMode('chooser')}
-        >
-          Change flow
-        </button>
-      </div>
+      {renderViewTabs()}
+      {renderCreationModeSelector()}
 
       {statusMessage ? (
         <div className={`integration-note ${statusTone === 'error' ? 'integration-note-error' : ''}`}>
@@ -1341,32 +1559,12 @@ export function ContentEnginePage({
           <form className="panel generate-panel generate-form-panel" onSubmit={handleSubmit}>
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Auto Generate</p>
-                <h2>Auto generate content</h2>
+                <p className="eyebrow">Batch Generate</p>
+                <h2>Buat konten sekarang</h2>
               </div>
               <span className={`pill${canSubmit ? ' subtle' : ''}`}>
                 {canSubmit ? 'Ready' : 'Needs setup'}
               </span>
-            </div>
-
-            <div className="generate-mode-chooser content-engine-mode-chooser">
-              <button
-                type="button"
-                className={`panel generate-entry-card${scheduleMode === 'now' ? ' selected' : ''}`}
-                onClick={() => setScheduleMode('now')}
-              >
-                <span className="generate-entry-pill">Now</span>
-                <strong>Produce now</strong>
-              </button>
-
-              <button
-                type="button"
-                className={`panel generate-entry-card${scheduleMode === 'later' ? ' selected' : ''}`}
-                onClick={() => setScheduleMode('later')}
-              >
-                <span className="generate-entry-pill accent">Schedule</span>
-                <strong>Schedule</strong>
-              </button>
             </div>
 
             <label className="persona-field full-width">
@@ -1408,21 +1606,9 @@ export function ContentEnginePage({
               <small className="field-hint">Masukkan angka 1 sampai 10.</small>
             </label>
 
-            {scheduleMode === 'later' ? (
-              <label className="persona-field full-width">
-                <span>Scheduled At</span>
-                <input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(event) => setScheduledAt(event.target.value)}
-                />
-                <small className="field-hint">Pilih waktu kirim untuk payload auto-generate.</small>
-              </label>
-            ) : null}
-
             <div className="persona-actions persona-actions-preview generate-actions">
               <button className="primary-button" type="submit" disabled={!canSubmit}>
-                {isSubmitting ? 'Mengirim...' : 'Auto Generate'}
+                {isSubmitting ? 'Memproses...' : `Generate ${targetCount} Content`}
               </button>
             </div>
 

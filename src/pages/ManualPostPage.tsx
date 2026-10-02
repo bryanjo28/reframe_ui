@@ -11,7 +11,9 @@ import {
 
 type ManualPostPageProps = {
   userId: string
-  onBackToContentEngine: () => void
+  onBackToContentEngine?: () => void
+  onViewLibrary?: () => void
+  embedded?: boolean
 }
 
 function getTopicValue(record: ContentTopicRecord | null, keys: string[]) {
@@ -38,11 +40,10 @@ function getTopicCategory(record: ContentTopicRecord) {
   return getTopicValue(record, ['category', 'categoryType', 'category_type']) || 'Uncategorized'
 }
 
-function getTopicSubtitle(record: ContentTopicRecord) {
+function getTopicPillarReference(record: ContentTopicRecord) {
   return (
-    getTopicValue(record, ['subcategory']) ||
     getTopicValue(record, ['contentPillarId', 'content_pillar_id']) ||
-    'Belum ada subkategori'
+    'Belum terhubung ke pillar'
   )
 }
 
@@ -84,7 +85,12 @@ function isTopicOfUser(record: ContentTopicRecord, userId: string) {
   return !ownerId || ownerId === userId
 }
 
-export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPageProps) {
+export function ManualPostPage({
+  userId,
+  onBackToContentEngine,
+  onViewLibrary,
+  embedded = false,
+}: ManualPostPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [topics, setTopics] = useState<ContentTopicRecord[]>([])
   const [selectedTopicId, setSelectedTopicId] = useState('')
@@ -97,8 +103,8 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
   const [isGeneratingOutput, setIsGeneratingOutput] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
-  const [contentOutputPreview, setContentOutputPreview] = useState('')
-  const [platform, setPlatform] = useState('threads')
+  const [contentOutputPreviews, setContentOutputPreviews] = useState<string[]>([])
+  const [variantCount, setVariantCount] = useState(1)
   const [additionalPrompt, setAdditionalPrompt] = useState('')
 
   const accessToken = getCurrentAuthToken() || ''
@@ -158,7 +164,7 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
       const matchesCategory = categoryFilter === 'all' || category === categoryFilter
       const matchesQuery =
         !query ||
-        [getTopicTitle(topic), category, getTopicSubtitle(topic)]
+        [getTopicTitle(topic), category, getTopicPillarReference(topic)]
           .join(' ')
           .toLowerCase()
           .includes(query)
@@ -174,12 +180,10 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
 
   useEffect(() => {
     if (!selectedTopic) {
-      setPlatform('threads')
       setAdditionalPrompt('')
       return
     }
 
-    setPlatform(getTopicValue(selectedTopic, ['platform']) || 'threads')
     setAdditionalPrompt(getTopicValue(selectedTopic, ['additionalPrompt', 'additional_prompt']))
   }, [selectedTopic])
 
@@ -202,15 +206,38 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
     }
   }
 
-  function unwrapPreviewResponse(response: unknown) {
+  function unwrapPreviewResponse(response: unknown): string[] {
     if (typeof response === 'string') {
-      return response
+      return response.trim() ? [response] : []
     }
 
     if (response && typeof response === 'object' && !Array.isArray(response)) {
       const record = response as Record<string, unknown>
+      if (Array.isArray(record.contents)) {
+        return record.contents.filter((content): content is string => typeof content === 'string' && Boolean(content.trim()))
+      }
+
+      if (Array.isArray(record.data)) {
+        const contents = record.data.flatMap((item) => {
+          if (typeof item === 'string' && item.trim()) {
+            return [item]
+          }
+
+          if (item && typeof item === 'object') {
+            const itemRecord = item as Record<string, unknown>
+            const content = itemRecord.content ?? itemRecord.contentOutput ?? itemRecord.content_output
+            return typeof content === 'string' && content.trim() ? [content] : []
+          }
+
+          return []
+        })
+
+        if (contents.length) {
+          return contents
+        }
+      }
+
       const candidates = [
-        record.data,
         record.contentOutput,
         record.content_output,
         record.output,
@@ -219,18 +246,18 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
 
       for (const candidate of candidates) {
         if (typeof candidate === 'string') {
-          return candidate
+          return candidate.trim() ? [candidate] : []
         }
 
         if (candidate && typeof candidate === 'object') {
-          return JSON.stringify(candidate, null, 2)
+          return [JSON.stringify(candidate, null, 2)]
         }
       }
 
-      return JSON.stringify(record, null, 2)
+      return [JSON.stringify(record, null, 2)]
     }
 
-    return ''
+    return []
   }
 
   async function handleGenerateContentOutput() {
@@ -249,21 +276,21 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
     setIsGeneratingOutput(true)
     setStatusTone('idle')
     setStatusMessage(`Generate content manual untuk "${getTopicTitle(selectedTopic)}"...`)
-    setContentOutputPreview('')
+    setContentOutputPreviews([])
 
     try {
       const rawResponse = await createContentOutput({
         topicId: selectedTopic.id,
-        platform: platform.trim() || 'threads',
+        variantCount,
         additionalPrompt: additionalPrompt.trim(),
       })
 
-      const preview = unwrapPreviewResponse(rawResponse) || JSON.stringify(rawResponse, null, 2)
+      const previews = unwrapPreviewResponse(rawResponse)
 
-      setContentOutputPreview(preview)
+      setContentOutputPreviews(previews)
       setStatusTone('success')
-      setStatusMessage(`Content output untuk "${getTopicTitle(selectedTopic)}" berhasil digenerate.`)
-      toastSuccess('Content generated', 'Response backend sudah tampil di bawah tabel.')
+      setStatusMessage(`${variantCount} content variant untuk "${getTopicTitle(selectedTopic)}" berhasil dibuat.`)
+      toastSuccess('Content generated', `${variantCount} variant berhasil dibuat.`)
     } catch (error) {
       setStatusTone('error')
       const errorMessage = error instanceof Error ? error.message : 'Gagal generate content.'
@@ -292,8 +319,8 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
   }
 
   return (
-    <section className="generate-page">
-      <header className="page-header generate-hero">
+    <section className={embedded ? 'topic-variants-workspace' : 'generate-page'}>
+      {!embedded ? <header className="page-header generate-hero">
         <div>
           <p className="eyebrow">Reframe Scheduler</p>
           <h1>Auto post dulu lihat topic yang tersedia, lalu pilih mana yang mau diproses.</h1>
@@ -302,9 +329,9 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
             cari berdasarkan judul, dan buka detail topic sebelum masuk ke flow schedule.
           </p>
         </div>
-      </header>
+      </header> : null}
 
-      <div className="generate-mode-switcher">
+      {!embedded ? <div className="generate-mode-switcher">
         <span className="pill subtle">Manual mode</span>
         <button
           className="ghost-button generate-mode-button manual-flow-button"
@@ -313,7 +340,7 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
         >
           Change flow
         </button>
-      </div>
+      </div> : null}
 
       {statusMessage ? (
         <div className={`integration-note ${statusTone === 'error' ? 'integration-note-error' : ''}`}>
@@ -370,15 +397,13 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
                 <tr>
                   <th>Topic</th>
                   <th>Category</th>
-                  <th>Content Pillar</th>
-                  <th>Used At</th>
-                  {/* <th>Action</th> */}
+                  <th>Created At</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="table-empty-cell">
+                    <td colSpan={3} className="table-empty-cell">
                       <div className="generate-empty-state">
                         <AppIcon name="info" />
                         <div>
@@ -402,29 +427,17 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
                           >
                             {getTopicTitle(topic)}
                           </button>
-                          <span className="table-subtext">{getTopicSubtitle(topic)}</span>
                         </td>
                         <td>
                           <span className="status-badge draft">{getTopicCategory(topic)}</span>
                         </td>
-                        <td>{getTopicValue(topic, ['contentPillarId', 'content_pillar_id']) || 'Belum ada'}</td>
-                        <td>{formatDate(getTopicValue(topic, ['usedAt', 'used_at']))}</td>
-                        {/* <td>
-                          <button
-                            className="ghost-button table-action-button"
-                            type="button"
-                            onClick={() => topic.id && handleOpenDetail(topic.id)}
-                            disabled={!topic.id || isLoadingDetail}
-                          >
-                            Detail
-                          </button>
-                        </td> */}
+                        <td>{formatDate(getTopicValue(topic, ['createdAt', 'created_at']))}</td>
                       </tr>
                     )
                   })
                 ) : (
                   <tr>
-                    <td colSpan={6} className="table-empty-cell">
+                    <td colSpan={3} className="table-empty-cell">
                       <div className="generate-empty-state">
                         <AppIcon name="layers" />
                         <div>
@@ -446,21 +459,32 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
                 <p className="eyebrow">Manual Generate</p>
                 <h2>Response backend</h2>
               </div>
-              <span className={`pill${contentOutputPreview ? ' subtle' : ''}`}>
-                {contentOutputPreview ? 'Has response' : 'Waiting'}
+              <span className={`pill${contentOutputPreviews.length ? ' subtle' : ''}`}>
+                {contentOutputPreviews.length ? `${contentOutputPreviews.length} variants` : 'Waiting'}
               </span>
             </div>
 
-            {contentOutputPreview ? (
-              <pre className="generate-response-preview">{contentOutputPreview}</pre>
+            {contentOutputPreviews.length ? (
+              <div className="content-variant-results">
+                {contentOutputPreviews.map((content, index) => (
+                  <article className="content-variant-result" key={`${index}-${content.slice(0, 24)}`}>
+                    <span>Variant {index + 1}</span>
+                    <p>{content}</p>
+                  </article>
+                ))}
+                {onViewLibrary ? (
+                  <button className="ghost-button" type="button" onClick={onViewLibrary}>
+                    View in Content Library
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <div className="generate-empty-state">
                 <AppIcon name="info" />
                 <div>
-                  <strong>Belum ada response manual</strong>
+                  <strong>Belum ada variant</strong>
                   <p>
-                    Klik tombol generate di panel detail topic untuk melihat hasil dari backend
-                    di sini.
+                    Pilih topic, tentukan jumlah variant, lalu generate untuk melihat hasilnya.
                   </p>
                 </div>
               </div>
@@ -495,10 +519,6 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
                   <p>{getTopicTitle(selectedTopic)}</p>
                 </div>
                 <div className="auto-post-detail-card">
-                  <span>Subcategory</span>
-                  <p>{getTopicValue(selectedTopic, ['subcategory']) || 'Hidden / belum diisi'}</p>
-                </div>
-                <div className="auto-post-detail-card">
                   <span>Used At</span>
                   <p>{formatDate(getTopicValue(selectedTopic, ['usedAt', 'used_at']))}</p>
                 </div>
@@ -508,16 +528,33 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
                 </div>
 
                 <label className="persona-field full-width">
-                  <span>Platform</span>
-                  <input
-                    value={platform}
-                    onChange={(event) => setPlatform(event.target.value)}
-                    placeholder="threads"
-                  />
+                  <span>Jumlah Variant</span>
+                  <div className="topic-stepper">
+                    <button
+                      className="stepper-button"
+                      type="button"
+                      onClick={() => setVariantCount((current) => Math.max(1, current - 1))}
+                      disabled={variantCount <= 1}
+                      aria-label="Kurangi jumlah variant"
+                    >
+                      <AppIcon name="minus" />
+                    </button>
+                    <input type="number" min={1} max={5} value={variantCount} readOnly />
+                    <button
+                      className="stepper-button"
+                      type="button"
+                      onClick={() => setVariantCount((current) => Math.min(5, current + 1))}
+                      disabled={variantCount >= 5}
+                      aria-label="Tambah jumlah variant"
+                    >
+                      <AppIcon name="plus" />
+                    </button>
+                  </div>
+                  <small className="field-hint">Maksimal 5 angle berbeda untuk satu topic.</small>
                 </label>
 
                 <label className="persona-field full-width">
-                  <span>Additional Prompt</span>
+                  <span>Instruksi Tambahan <small>(opsional)</small></span>
                   <textarea
                     value={additionalPrompt}
                     onChange={(event) => setAdditionalPrompt(event.target.value)}
@@ -529,8 +566,7 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
                 <div className="auto-post-note">
                   <AppIcon name="info" />
                   <p>
-                    Panel ini baru menampilkan data topic dulu supaya flow auto post lebih gampang
-                    dipahami user awam. Setelah ini kita bisa sambung ke schedule step.
+                    Setiap variant akan memakai angle yang berbeda agar hasilnya tidak repetitif.
                   </p>
                 </div>
 
@@ -540,7 +576,7 @@ export function ManualPostPage({ userId, onBackToContentEngine }: ManualPostPage
                   onClick={() => void handleGenerateContentOutput()}
                   disabled={!selectedTopic?.id || isGeneratingOutput || !accessToken}
                 >
-                  {isGeneratingOutput ? 'Generating...' : 'Generate Content'}
+                  {isGeneratingOutput ? 'Generating...' : `Generate ${variantCount} Variant${variantCount > 1 ? 's' : ''}`}
                 </button>
               </div>
             ) : (

@@ -249,7 +249,6 @@ export function Sidebar({
         <SidebarSection
           title="Publish"
           items={[
-            { key: 'manual-post', label: 'Content Output', icon: 'layers' },
             {
               key: 'auto-post',
               label: 'Auto Post',

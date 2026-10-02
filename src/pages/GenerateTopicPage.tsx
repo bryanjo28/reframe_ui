@@ -397,7 +397,6 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
         personaConfigId,
         contentPillarId,
         category: draft.categoryType,
-        subcategory: '',
         topic: draft.title,
       })
 

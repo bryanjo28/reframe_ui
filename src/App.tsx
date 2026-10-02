@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import './App.css'
+import './ThreadEditorTheme.css'
 import { AuthPage } from './pages/AuthPage'
 import { Sidebar } from './components/Sidebar'
 import { AppIcon } from './components/AppIcon'

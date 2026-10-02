@@ -10,7 +10,7 @@ const REQUEST_TIMEOUT_MS = 25000
 
 export type CreateContentOutputPayload = {
   topicId: string
-  platform: string
+  variantCount?: number
   additionalPrompt: string
 }
 
@@ -144,7 +144,7 @@ async function readResponseBodyWithTimeout(response: Response, timeoutMs = REQUE
 export async function createContentOutput(payload: CreateContentOutputPayload) {
   const requestBody: Record<string, unknown> = {
     topicId: payload.topicId,
-    platform: payload.platform,
+    variantCount: payload.variantCount ?? 1,
     additionalPrompt: payload.additionalPrompt,
   }
 

@@ -11,7 +11,6 @@ export type ContentTopicPayload = {
   personaConfigId: string
   contentPillarId: string
   category: string
-  subcategory: string
   topic: string
   usedAt?: string
 }
@@ -32,7 +31,6 @@ export type ContentTopicRecord = Partial<ContentTopicPayload> & {
   contentPillarId?: string
   content_pillar_id?: string
   category?: string
-  subcategory?: string
   topic?: string
   usedAt?: string
   used_at?: string
@@ -116,7 +114,6 @@ function toRequestPayload(payload: ContentTopicPayload) {
     personaConfigId: payload.personaConfigId,
     contentPillarId: payload.contentPillarId,
     category: payload.category,
-    subcategory: payload.subcategory,
     topic: payload.topic,
     usedAt: payload.usedAt,
   }
@@ -129,7 +126,6 @@ function normalizeRecord(record: ContentTopicRecord) {
     personaConfigId: asString(record.personaConfigId) || asString(record.persona_config_id) || '',
     contentPillarId: asString(record.contentPillarId) || asString(record.content_pillar_id) || '',
     category: asString(record.category) || '',
-    subcategory: asString(record.subcategory) || '',
     topic: asString(record.topic) || '',
     usedAt: asString(record.usedAt) || asString(record.used_at) || '',
     createdAt: asString(record.createdAt) || asString(record.created_at) || '',

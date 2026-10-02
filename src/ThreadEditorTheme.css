@@ -1,0 +1,412 @@
+.content-output-modal-overlay:has(.long-thread-modal) {
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.long-thread-modal {
+  border-color: var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-color);
+  box-shadow: 0 20px 52px rgba(2, 6, 23, 0.42);
+}
+
+.long-thread-modal .content-output-modal-head,
+.long-thread-modal .content-output-modal-actions {
+  border-color: var(--border-color);
+  background: var(--bg-surface);
+}
+
+.long-thread-modal .content-output-modal-head .eyebrow,
+.long-thread-modal .content-output-modal-label,
+.long-thread-modal .thread-split-card-head > span,
+.long-thread-modal .thread-split-title > span {
+  color: var(--text-muted);
+}
+
+.long-thread-modal .content-output-modal-head h3,
+.long-thread-modal .thread-split-editor-head h4,
+.long-thread-modal .thread-split-title strong {
+  color: var(--text-color);
+}
+
+.long-thread-modal .content-output-modal-summary > span:first-child,
+.long-thread-modal .content-output-modal-summary .status-badge,
+.long-thread-modal .content-output-modal-head > .ghost-button,
+.long-thread-modal .content-output-modal-actions .ghost-button,
+.long-thread-modal .approval-secondary-button {
+  border-color: var(--border-color);
+  background: var(--bg-surface-soft);
+  color: var(--text-secondary);
+}
+
+.long-thread-modal .thread-split-editor,
+.long-thread-modal .thread-split-editor-head {
+  border-color: var(--border-color);
+  background: var(--bg-surface-soft);
+}
+
+.long-thread-modal .thread-split-card {
+  border-color: var(--border-color);
+}
+
+.long-thread-modal .thread-split-card textarea {
+  border-color: var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-color);
+  caret-color: var(--primary);
+}
+
+.long-thread-modal .thread-split-card textarea::placeholder {
+  color: var(--text-faint);
+}
+
+.long-thread-modal .thread-split-card textarea:focus {
+  border-color: var(--primary);
+  background: var(--bg-input-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.thread-parts-progress {
+  width: 128px;
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.thread-parts-progress-track {
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border-color);
+}
+
+.thread-parts-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+.thread-split-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thread-split-title > span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.long-thread-modal .thread-split-card-actions button {
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.long-thread-modal .thread-split-card-actions button:hover:not(:disabled),
+.long-thread-modal .thread-add-button:hover:not(:disabled),
+.long-thread-modal .content-output-modal-head > .ghost-button:hover {
+  border-color: color-mix(in srgb, var(--primary) 38%, var(--border-color));
+  background: var(--bg-surface-soft);
+  color: var(--text-color);
+}
+
+.long-thread-modal .thread-add-button {
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border-color));
+  color: var(--text-secondary);
+}
+
+.long-thread-modal .content-output-modal-actions .primary-button {
+  border-color: var(--primary);
+  background: var(--primary-gradient);
+  color: #ffffff;
+}
+
+.long-thread-modal .content-output-modal-actions .primary-button:hover:not(:disabled) {
+  border-color: var(--primary-hover);
+  background: var(--primary-hover);
+  color: #ffffff;
+}
+
+:root[data-theme='light'] .content-output-modal-overlay:has(.long-thread-modal) {
+  background: rgba(15, 23, 42, 0.42);
+}
+
+/* Premium thread workspace layout; colors continue to come from app tokens. */
+.long-thread-modal {
+  width: min(960px, 100%);
+  max-height: min(88vh, 900px);
+  overflow: hidden;
+  padding: 0;
+  border-radius: 14px;
+}
+
+.long-thread-modal .content-output-modal-form {
+  max-height: min(88vh, 900px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0;
+}
+
+.long-thread-modal .content-output-modal-head {
+  position: relative;
+  z-index: 2;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.long-thread-modal .content-output-modal-head h3 {
+  margin-top: 5px;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.long-thread-modal .content-output-modal-head > .ghost-button {
+  width: auto;
+  min-height: 34px;
+  padding: 7px 11px;
+}
+
+.long-thread-modal .thread-split-editor {
+  min-height: 0;
+  overflow-y: auto;
+  display: block;
+  padding: 0 24px 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg-surface-soft);
+}
+
+.long-thread-modal .thread-split-editor-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 18px 0 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.long-thread-modal .thread-split-list {
+  display: grid;
+  gap: 0;
+}
+
+.long-thread-modal .thread-split-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0;
+  background: transparent;
+}
+
+.long-thread-modal .thread-split-card::after {
+  display: none;
+}
+
+.long-thread-modal .thread-split-card textarea {
+  field-sizing: content;
+  width: 100%;
+  min-height: 104px;
+  max-height: none;
+  overflow: hidden;
+  resize: none;
+  padding: 13px 14px;
+  border-radius: 9px;
+  line-height: 1.65;
+}
+
+.long-thread-modal .thread-split-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.long-thread-modal .thread-split-card-actions button {
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 7px;
+}
+
+.long-thread-modal .thread-split-card-actions button.danger {
+  width: auto;
+  margin-left: 8px;
+  padding-inline: 9px;
+}
+
+.long-thread-modal .thread-add-button {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 16px;
+  border-radius: 9px;
+}
+
+.long-thread-modal .content-output-modal-actions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.long-thread-modal .content-output-modal-actions button {
+  width: auto;
+  min-height: 36px;
+  padding: 8px 13px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+@media (max-width: 720px) {
+  .content-output-modal-overlay:has(.long-thread-modal) {
+    padding: 0;
+  }
+
+  .long-thread-modal {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .long-thread-modal .content-output-modal-form {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+
+  .long-thread-modal .content-output-modal-head {
+    padding: 13px 14px;
+  }
+
+  .long-thread-modal .content-output-modal-head h3 {
+    max-width: 70vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .long-thread-modal .thread-split-editor {
+    padding: 0 14px 16px;
+  }
+
+  .long-thread-modal .thread-split-editor-head {
+    padding-block: 14px 12px;
+  }
+
+  .thread-parts-progress {
+    width: 104px;
+  }
+
+  .long-thread-modal .thread-split-card {
+    padding-block: 15px;
+  }
+
+  .long-thread-modal .thread-split-card textarea {
+    min-height: 112px;
+  }
+
+  .long-thread-modal .content-output-modal-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  }
+
+  .long-thread-modal .content-output-modal-actions button {
+    width: 100%;
+  }
+
+  .long-thread-modal .content-output-modal-actions > :last-child:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Semantic action colors */
+.long-thread-modal .content-output-modal-head > .ghost-button {
+  border-color: rgba(129, 140, 248, 0.3);
+  background: rgba(99, 102, 241, 0.12);
+  color: #c7d2fe;
+}
+
+.long-thread-modal .thread-split-card-actions button:first-child {
+  border-color: rgba(96, 165, 250, 0.3);
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+}
+
+.long-thread-modal .thread-split-card-actions button:nth-child(2) {
+  border-color: rgba(167, 139, 250, 0.3);
+  background: rgba(139, 92, 246, 0.12);
+  color: #c4b5fd;
+}
+
+.long-thread-modal .thread-split-card-actions button.danger {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.11);
+  color: #f87171;
+}
+
+.long-thread-modal .thread-split-card-actions button.danger:hover:not(:disabled) {
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.long-thread-modal .thread-add-button {
+  border-color: rgba(129, 140, 248, 0.38);
+  background: rgba(99, 102, 241, 0.1);
+  color: #c7d2fe;
+}
+
+.long-thread-modal .content-output-modal-actions button[type='submit'] {
+  border-color: rgba(129, 140, 248, 0.38);
+  background: rgba(99, 102, 241, 0.16);
+  color: #c7d2fe;
+}
+
+.long-thread-modal .content-output-modal-actions .approval-button {
+  border-color: #22c55e;
+  background: #22c55e;
+  color: #052e16;
+}
+
+.long-thread-modal .content-output-modal-actions .approval-button:hover:not(:disabled) {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.long-thread-modal .content-output-modal-actions .approval-secondary-button {
+  border-color: rgba(245, 158, 11, 0.38);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+:root[data-theme='light'] .long-thread-modal .content-output-modal-head > .ghost-button,
+:root[data-theme='light'] .long-thread-modal .thread-add-button,
+:root[data-theme='light'] .long-thread-modal .content-output-modal-actions button[type='submit'] {
+  color: #4338ca;
+}
+
+:root[data-theme='light'] .long-thread-modal .thread-split-card-actions button:first-child {
+  color: #1d4ed8;
+}
+
+:root[data-theme='light'] .long-thread-modal .thread-split-card-actions button:nth-child(2) {
+  color: #6d28d9;
+}
+
+:root[data-theme='light'] .long-thread-modal .thread-split-card-actions button.danger {
+  color: #dc2626;
+}
+
+:root[data-theme='light'] .long-thread-modal .content-output-modal-actions .approval-secondary-button {
+  color: #b45309;
+}
+
