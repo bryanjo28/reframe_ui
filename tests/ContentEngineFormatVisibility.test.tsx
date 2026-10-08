@@ -46,7 +46,7 @@ test('hides format from the generated content table and editor', async () => {
     </ToastProvider>,
   )
 
-  await user.click(screen.getByRole('button', { name: /List Generated Content/i }))
+  await user.click(screen.getByRole('button', { name: /Lihat Konten Saya/i }))
 
   expect(await screen.findByText('Generated content preview')).toBeInTheDocument()
   expect(screen.queryByRole('columnheader', { name: 'Format' })).not.toBeInTheDocument()

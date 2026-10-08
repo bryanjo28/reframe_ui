@@ -359,10 +359,9 @@ export function CreatePersonaPage({
       onSaved?.(nextRecord)
     } catch (error) {
       setStatusTone('error')
-      const errorMessage =
-        error instanceof Error ? error.message : 'Gagal menyimpan persona config.'
+      const errorMessage = `Persona belum berhasil disimpan. ${error instanceof Error ? error.message : 'Periksa data lalu coba lagi.'}`
       setStatusMessage(errorMessage)
-      toastError('Persona save failed', errorMessage)
+      toastError('Persona belum berhasil disimpan', errorMessage)
     } finally {
       setIsSaving(false)
     }
@@ -381,12 +380,12 @@ export function CreatePersonaPage({
   return (
     <section className={`persona-page${isInitialSetup ? ' persona-page-initial' : ''}`}>
       <header className={`page-header${isInitialSetup ? ' persona-page-header-initial' : ''}`}>
-        <p className="eyebrow">Workspace</p>
-        <h1>{isInitialSetup ? 'Lengkapi Persona Pertama' : 'Reframe Persona Studio'}</h1>
+        <p className="eyebrow">{isInitialSetup ? 'Content Brain · 1 of 2' : 'Content Brain'}</p>
+        <h1>{isInitialSetup ? 'Biar Reframe kenal kamu dulu 👋' : 'Persona'}</h1>
         <p className="page-description">
           {isInitialSetup
-            ? 'Persona config belum ditemukan. Lengkapi form ini dulu supaya dashboard dan fitur generasi konten bisa dipakai.'
-            : 'Edit persona config yang tersimpan di database. Semua field di bawah langsung dipakai untuk update ke backend.'}
+            ? 'Ceritakan sedikit tentang kamu, audiensmu, dan bagaimana kamu ingin terdengar.'
+            : 'Atur cara Reframe memahami suara, audiens, dan tujuan kontenmu.'}
         </p>
       </header>
 
@@ -408,7 +407,7 @@ export function CreatePersonaPage({
             </span>
           </div>
 
-          <form className="persona-form" onSubmit={handleSubmit}>
+          <form className="persona-form" data-tour-step={isInitialSetup ? 2 : undefined} onSubmit={handleSubmit}>
             {personaFields.map((field) => (
               <FieldRenderer
                 key={field.key}
@@ -427,7 +426,9 @@ export function CreatePersonaPage({
               <button className="primary-button" type="submit" disabled={isSaving}>
               {isSaving
                   ? 'Menyimpan...'
-                  : hasExistingConfig
+                  : isInitialSetup
+                    ? 'Simpan & Lanjut'
+                    : hasExistingConfig
                     ? 'Update Persona'
                     : 'Create Persona'}
               </button>

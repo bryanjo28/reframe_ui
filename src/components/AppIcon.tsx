@@ -10,6 +10,8 @@ export function AppIcon({ name }: AppIconProps) {
           <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
         </svg>
       )
+    case 'search':
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 1 0 4.72 13.33L20 21.1l1.1-1.1-4.77-4.78A7.5 7.5 0 0 0 10.5 3Zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11Z" /></svg>
     case 'user':
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -130,6 +132,12 @@ export function AppIcon({ name }: AppIconProps) {
           <path d="M12 7a5 5 0 1 0 5 5 5 5 0 0 0-5-5Zm0-5h2v3h-2V2Zm0 17h2v3h-2v-3ZM2 11h3v2H2v-2Zm17 0h3v2h-3v-2ZM4.93 6.34l1.41-1.41 2.12 2.12-1.41 1.41-2.12-2.12Zm10.54 10.54 1.41-1.41 2.12 2.12-1.41 1.41-2.12-2.12ZM15.47 7.05l2.12-2.12 1.41 1.41-2.12 2.12-1.41-1.41ZM4.93 17.66l2.12-2.12 1.41 1.41-2.12 2.12-1.41-1.41Z" />
         </svg>
       )
+    case 'eye':
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c5.5 0 9.7 5.1 10 5.5l.8 1.5-.8 1.5C21.7 13.9 17.5 19 12 19S2.3 13.9 2 13.5L1.2 12l.8-1.5C2.3 10.1 6.5 5 12 5Zm0 2c-4.3 0-7.8 4-8.2 5 .4 1 3.9 5 8.2 5s7.8-4 8.2-5c-.4-1-3.9-5-8.2-5Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z" /></svg>
+    case 'eye-off':
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.3 2 18.7 18.7-1.3 1.3-3.1-3.1A11.7 11.7 0 0 1 12 20C6.5 20 2.3 14.9 2 14.5L1.2 13l.8-1.5a19 19 0 0 1 3.2-3.4L2 4.9 3.3 2Zm3.4 7.6A15 15 0 0 0 3.8 13c.4 1 3.9 5 8.2 5 1.5 0 2.9-.5 4.1-1.1l-1.6-1.6A3.9 3.9 0 0 1 9.7 11L6.7 9.6ZM12 6c5.5 0 9.7 5.1 10 5.5l.8 1.5-.8 1.5c-.4.5-1.2 1.4-2.2 2.3l-1.4-1.4c1-.8 1.6-1.7 1.8-2.4-.4-1-3.9-5-8.2-5-.6 0-1.2.1-1.8.2L8.5 6.5A12 12 0 0 1 12 6Z" /></svg>
+    case 'lock':
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2h2v11H5V10h2Zm2 0h6V8a3 3 0 0 0-6 0v2Zm8 2H7v7h10v-7Z" /></svg>
     default:
       return null
   }

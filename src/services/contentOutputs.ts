@@ -162,7 +162,7 @@ export async function createContentOutput(payload: CreateContentOutputPayload) {
     throw new Error(errorMessage || 'Gagal generate content output.')
   }
 
-  notifyUsageChanged()
+  notifyUsageChanged(data)
   return data
 }
 
@@ -181,7 +181,7 @@ export async function generateContentOutputDemo(payload: GenerateContentOutputDe
     throw new Error(errorMessage || 'Gagal generate demo content output.')
   }
 
-  notifyUsageChanged()
+  notifyUsageChanged(data)
   return data
 }
 

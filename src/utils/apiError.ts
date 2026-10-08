@@ -19,7 +19,23 @@ export class ApiResponseError extends Error {
 const DEFAULT_API_ERROR: ApiError = {
   status: 500,
   code: 'UNKNOWN_ERROR',
-  message: 'Terjadi kesalahan. Silakan coba lagi.',
+  message: 'Reframe sedang mengalami kendala. Coba lagi beberapa saat.',
+}
+
+export const SESSION_EXPIRED_EVENT = 'reframe:session-expired'
+
+export function getUserFacingError(error: unknown, fallback = DEFAULT_API_ERROR.message) {
+  if (error instanceof TypeError) return 'Koneksi internet bermasalah. Periksa koneksi kamu lalu coba lagi.'
+  const apiError = getApiError(error)
+  const value = `${apiError.code} ${apiError.message}`.toLowerCase()
+  if (value.includes('quota') || value.includes('usage limit') || value.includes('token limit') || value.includes('insufficient credit')) return 'Token penggunaan kamu sudah habis. Lihat paket untuk melanjutkan.'
+  if (value.includes('credit') && (value.includes('exceeded') || value.includes('habis'))) return 'Token penggunaan kamu sudah habis. Lihat paket untuk melanjutkan.'
+  if (apiError.status === 429 || value.includes('rate limit')) return 'Terlalu banyak permintaan dalam waktu singkat. Tunggu sebentar lalu coba lagi.'
+  if (value.includes('timeout') || value.includes('timed out')) return 'Prosesnya memakan waktu lebih lama dari biasanya. Coba lagi dalam beberapa saat.'
+  if (apiError.code === 'INVALID_CREDENTIALS' || value.includes('invalid credentials')) return 'Email atau password yang kamu masukkan belum benar.'
+  if (apiError.status >= 500) return 'Reframe sedang mengalami kendala. Coba lagi beberapa saat.'
+  const vague = /^(error|failed|request failed|internal error|terjadi kesalahan)[.!]?$/i.test(apiError.message.trim())
+  return vague ? fallback : apiError.message || fallback
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -47,6 +63,7 @@ export function getApiError(error: unknown): ApiError {
     status: readStatus(response?.status) ?? readStatus(error.status) ?? DEFAULT_API_ERROR.status,
     code:
       readString(responseData?.error_code) ??
+      readString(responseData?.code) ??
       readString(error.code) ??
       DEFAULT_API_ERROR.code,
     message:
@@ -58,12 +75,16 @@ export function getApiError(error: unknown): ApiError {
 }
 
 export function createApiResponseError(status: number, data: unknown) {
-  return new ApiResponseError(
-    getApiError({
+  const apiError = getApiError({
       response: {
         status,
         data,
       },
-    }),
-  )
+    })
+  // Every authenticated 401 means the current client session can no longer be
+  // used. Do not depend on inconsistent backend error wording to sign out.
+  if (typeof window !== 'undefined' && apiError.status === 401) {
+    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
+  }
+  return new ApiResponseError(apiError)
 }

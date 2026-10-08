@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import './App.css'
 import { AuthPage } from './pages/AuthPage'
 import { Sidebar } from './components/Sidebar'
-import { AppIcon } from './components/AppIcon'
 import { ManualPostPage } from './pages/ManualPostPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { AutoPostPage } from './pages/AutoPostPage'
@@ -11,6 +10,7 @@ import { ConnectingAppsPage } from './pages/ConnectingAppsPage'
 import { ThreadsCallbackPage } from './pages/ThreadsCallbackPage'
 import { isThreadsCallbackSearch } from './utils/threadsCallback'
 import { ContentEnginePage } from './pages/ContentEnginePage'
+import { ContentBankPage } from './pages/ContentBankPage'
 import { GenerateTopicPage } from './pages/GenerateTopicPage'
 import { PersonalizePage } from './pages/PersonalizePage'
 import { CheckEmailPage } from './pages/CheckEmailPage'
@@ -21,8 +21,17 @@ import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
 import type { AppTheme, NavKey } from './types/navigation'
 import { ToastProvider } from './components/Toast'
 import { ContentGenerationProgress } from './components/ContentGenerationProgress'
+import { MobileNavigation } from './components/MobileNavigation'
+import { CreateHubPage } from './pages/CreateHubPage'
+import { TokenBalance } from './components/TokenBalance'
+import { PaymentsPage } from './pages/PaymentsPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { OnboardingTutorial } from './components/OnboardingTutorial'
+import { watchLanguage, type UiLanguage } from './utils/uiLanguage'
+import { SESSION_EXPIRED_EVENT } from './utils/apiError'
 import {
   clearAuthSession,
+  getCurrentAuthToken,
   getCurrentAuthState,
   logout,
   type AuthUser,
@@ -39,11 +48,38 @@ import {
 import { notifyUsageChanged } from './services/usage'
 
 type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'error'
+
+function getJwtExpiryTime(token?: string) {
+  if (!token) return null
+
+  try {
+    const payloadPart = token.split('.')[1]
+    if (!payloadPart) return null
+    const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    const payload = JSON.parse(window.atob(padded)) as { exp?: unknown }
+    return typeof payload.exp === 'number' && Number.isFinite(payload.exp)
+      ? payload.exp * 1000
+      : null
+  } catch {
+    return null
+  }
+}
 type PersonaStatus = 'idle' | 'loading' | 'ready'
 type UnauthenticatedView = 'login' | 'check-email'
 const ACTIVE_PAGE_STORAGE_KEY = 'reframe.activePage'
 const PENDING_VERIFICATION_EMAIL_STORAGE_KEY = 'reframe.pendingVerificationEmail'
 const APP_THEME_STORAGE_KEY = 'reframe.appTheme'
+const TUTORIAL_STORAGE_KEY = 'reframe:onboarding:tutorialCompleted'
+const LANGUAGE_STORAGE_KEY = 'reframe.uiLanguage'
+const AUTH_HELPER_STORAGE_KEY = 'reframe.authHelperMessage'
+
+function takeStoredAuthHelperMessage() {
+  if (typeof sessionStorage === 'undefined') return ''
+  const message = sessionStorage.getItem(AUTH_HELPER_STORAGE_KEY) || ''
+  sessionStorage.removeItem(AUTH_HELPER_STORAGE_KEY)
+  return message
+}
 
 function getStoredTheme(): AppTheme {
   if (typeof localStorage === 'undefined') {
@@ -90,6 +126,7 @@ function getStoredActivePage(): NavKey {
 
   if (
     value === 'dashboard' ||
+    value === 'create' ||
     value === 'personalize' ||
     value === 'create-persona-chat' ||
     value === 'create-persona' ||
@@ -99,6 +136,7 @@ function getStoredActivePage(): NavKey {
     value === 'manual-post' ||
     value === 'auto-post' ||
     value === 'subscription-plans' ||
+    value === 'payments' ||
     value === 'connecting-apps'
   ) {
     return value
@@ -144,10 +182,11 @@ function AppShell() {
   const [isThreadsConnected, setIsThreadsConnected] = useState(false)
   const [unauthenticatedView, setUnauthenticatedView] = useState<UnauthenticatedView>('login')
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState(getStoredPendingVerificationEmail)
-  const [authHelperMessage, setAuthHelperMessage] = useState('')
+  const [authHelperMessage, setAuthHelperMessage] = useState(takeStoredAuthHelperMessage)
   const [activePage, setActivePage] = useState<NavKey>(getStoredActivePage)
   const [isSidebarMobile, setIsSidebarMobile] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isMoreOpen, setIsMoreOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [theme, setTheme] = useState<AppTheme>(getStoredTheme)
   const [personaStatus, setPersonaStatus] = useState<PersonaStatus>('idle')
@@ -155,7 +194,64 @@ function AppShell() {
   const [activeGenerationJobId, setActiveGenerationJobId] = useState('')
   const [generationProgress, setGenerationProgress] = useState<ScheduledJobProgress | null>(null)
   const [contentOutputsRefreshKey, setContentOutputsRefreshKey] = useState(0)
+  const [showTutorial, setShowTutorial] = useState(() => localStorage.getItem(TUTORIAL_STORAGE_KEY) !== 'true')
+  const [language, setLanguage] = useState<UiLanguage>(() => localStorage.getItem(LANGUAGE_STORAGE_KEY) === 'en' ? 'en' : 'id')
   const bootstrapRunIdRef = useRef(0)
+
+  const completeTutorial = useCallback(() => { localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true'); setShowTutorial(false) }, [])
+
+  useEffect(() => { localStorage.setItem(LANGUAGE_STORAGE_KEY, language); return watchLanguage(language) }, [language])
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      const message = 'Session kamu sudah berakhir. Silakan login kembali untuk melanjutkan.'
+      clearAuthSession()
+      resetWorkspaceState()
+      setUnauthenticatedView('login')
+      sessionStorage.setItem(AUTH_HELPER_STORAGE_KEY, message)
+      setAuthHelperMessage(message)
+      setAuthStatus('unauthenticated')
+      replaceAppPath('/login')
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
+  }, [])
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated') return
+
+    const expiryTime = getJwtExpiryTime(getCurrentAuthToken())
+    if (!expiryTime) return
+
+    let timeoutId: number | undefined
+    const expireIfNeeded = () => {
+      if (Date.now() >= expiryTime) {
+        window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
+        return true
+      }
+      return false
+    }
+    const scheduleExpiry = () => {
+      if (expireIfNeeded()) return
+      const delay = Math.min(Math.max(expiryTime - Date.now(), 0), 2_147_000_000)
+      timeoutId = window.setTimeout(() => {
+        if (!expireIfNeeded()) scheduleExpiry()
+      }, delay)
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') expireIfNeeded()
+    }
+
+    scheduleExpiry()
+    window.addEventListener('focus', expireIfNeeded)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      window.removeEventListener('focus', expireIfNeeded)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [authStatus])
 
   useEffect(() => {
     if (!activeGenerationJobId) {
@@ -464,7 +560,7 @@ function AppShell() {
 
   function handlePersonalizePersonaSaved(nextConfig: PersonaConfigRecord) {
     setPersonaConfig(nextConfig)
-    setActivePage('dashboard')
+    setActivePage('content-pillar')
     replaceAppPath('/dashboard')
   }
 
@@ -473,6 +569,7 @@ function AppShell() {
 
     if (isSidebarMobile) {
       setIsSidebarOpen(false)
+      setIsMoreOpen(false)
     }
   }, [isSidebarMobile])
 
@@ -552,29 +649,7 @@ function AppShell() {
   } else {
     content = (
       <div className={`dashboard-shell${isSidebarCollapsed && !isSidebarMobile ? ' sidebar-collapsed' : ''}`}>
-        {isSidebarMobile ? (
-          <button
-            className="mobile-sidebar-trigger"
-            type="button"
-            onClick={() => setIsSidebarOpen(true)}
-            aria-label="Buka sidebar"
-            aria-expanded={isSidebarOpen}
-          >
-            <AppIcon name="menu" />
-            <span>Menu</span>
-          </button>
-        ) : null}
-
-        {isSidebarMobile && isSidebarOpen ? (
-          <button
-            className="sidebar-backdrop"
-            type="button"
-            aria-label="Tutup sidebar"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        ) : null}
-
-	        <Sidebar
+	        {!isSidebarMobile ? <Sidebar
 	          activePage={activePage}
 	          onNavigate={handleNavigate}
 	          currentUser={currentUser}
@@ -586,25 +661,37 @@ function AppShell() {
             onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
 	          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
 	          onClose={() => setIsSidebarOpen(false)}
-	          isThreadsConnected={isThreadsConnected}
-	        />
+            onReplayTutorial={() => setShowTutorial(true)}
+            language={language}
+            onLanguageChange={setLanguage}
+	        /> : null}
 
         <main className="content-area">
+          <TokenBalance onTopUp={() => handleNavigate('payments')} />
           <div key={activePage} className="page-transition">
-            {activePage === 'personalize' || activePage === 'create-persona' || activePage === 'content-pillar' ? (
+            {activePage === 'create' ? (
+              <CreateHubPage onNavigate={handleNavigate} />
+            ) : activePage === 'personalize' || activePage === 'create-persona' || activePage === 'content-pillar' ? (
               <PersonalizePage
                 personaConfig={personaConfig}
                 onPersonaSaved={handlePersonalizePersonaSaved}
-                initialTab={activePage === 'content-pillar' ? 'content-pillar' : 'persona'}
+                initialTab={activePage === 'content-pillar' ? 'content-pillar' : activePage === 'personalize' ? undefined : 'persona'}
+                onNavigate={handleNavigate}
               />
             ) : activePage === 'generate-topic' ? (
-              <GenerateTopicPage userId={currentUser?.id || ''} />
+              <GenerateTopicPage
+                userId={currentUser?.id || ''}
+                onContinueToContent={() => handleNavigate('content-engine')}
+              />
             ) : activePage === 'content-engine' ? (
               <ContentEnginePage
                 userId={currentUser?.id || ''}
                 outputsRefreshKey={contentOutputsRefreshKey}
                 onScheduledJobCreated={handleScheduledJobCreated}
+                onOpenSchedule={() => handleNavigate('auto-post')}
               />
+            ) : activePage === 'content-bank' ? (
+              <ContentBankPage userId={currentUser?.id || ''} onNavigate={handleNavigate} />
             ) : activePage === 'manual-post' ? (
               <ManualPostPage
                 userId={currentUser?.id || ''}
@@ -614,24 +701,40 @@ function AppShell() {
               <AutoPostPage
                 userId={currentUser?.id || ''}
                 isThreadsConnected={isThreadsConnected}
+                onConnectThreads={() => handleNavigate('connecting-apps')}
+                onReviewContent={() => handleNavigate('content-bank')}
               />
             ) : activePage === 'subscription-plans' ? (
               <SubscriptionPlansPage userId={currentUser?.id || ''} />
+            ) : activePage === 'payments' ? (
+              <PaymentsPage />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage />
+            ) : activePage === 'settings' ? (
+              <SettingsPage user={currentUser} language={language} onLanguageChange={setLanguage} theme={theme} onThemeChange={setTheme} onReplayTutorial={() => setShowTutorial(true)} onLogout={handleLogout} />
               ) : (
-                <DashboardPage activePage={activePage} userId={currentUser?.id || ''} />
+                <DashboardPage activePage={activePage} userId={currentUser?.id || ''} onNavigate={handleNavigate} isThreadsConnected={isThreadsConnected} />
               )}
           </div>
         </main>
         {generationProgress ? (
           <ContentGenerationProgress progress={generationProgress} />
         ) : null}
+        {isSidebarMobile ? (
+          <MobileNavigation
+            activePage={activePage}
+            isMoreOpen={isMoreOpen}
+            onNavigate={handleNavigate}
+            onToggleMore={() => setIsMoreOpen((current) => !current)}
+            onCloseMore={() => setIsMoreOpen(false)}
+            currentUser={currentUser}
+          />
+        ) : null}
       </div>
     )
   }
 
-  return <ToastProvider>{content}</ToastProvider>
+  return <ToastProvider>{content}{showTutorial && authStatus === 'authenticated' && personaStatus === 'ready' ? <OnboardingTutorial onComplete={completeTutorial} /> : null}</ToastProvider>
 }
 
 function App() {

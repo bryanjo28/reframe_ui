@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { login, register, type AuthSession } from '../services/authService'
 import { getApiError } from '../utils/apiError'
+import { AppIcon } from '../components/AppIcon'
 
 type AuthMode = 'login' | 'register'
 type AuthField = 'email' | 'fullName' | 'accountName' | 'password' | 'confirmPassword'
@@ -35,6 +36,8 @@ export function AuthPage({
   const [accountName, setAccountName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({})
@@ -45,6 +48,8 @@ export function AuthPage({
     setAccountName('')
     setPassword('')
     setConfirmPassword('')
+    setShowPassword(false)
+    setShowConfirmPassword(false)
     setErrorMessage('')
     setFieldErrors({})
   }, [])
@@ -138,16 +143,37 @@ export function AuthPage({
       onAuthenticated(result.session, mode)
     } catch (error) {
       const apiError = getApiError(error)
+      const errorSignature = `${apiError.code} ${apiError.message}`.toLowerCase()
+      const emailAlreadyUsed =
+        ['EMAIL_ALREADY_EXISTS', 'EMAIL_EXISTS', 'USER_ALREADY_EXISTS'].includes(apiError.code) ||
+        (errorSignature.includes('email') && ['already', 'exists', 'registered', 'digunakan', 'terdaftar'].some((term) => errorSignature.includes(term)))
+      const usernameAlreadyUsed =
+        ['ACCOUNT_NAME_ALREADY_EXISTS', 'USERNAME_ALREADY_EXISTS', 'USERNAME_EXISTS'].includes(apiError.code) ||
+        (['username', 'account name'].some((term) => errorSignature.includes(term)) && ['already', 'exists', 'taken', 'digunakan'].some((term) => errorSignature.includes(term)))
+
+      if (mode === 'register' && emailAlreadyUsed) {
+        const message = 'Email ini sudah terdaftar. Gunakan email lain atau login jika ini akun kamu.'
+        setFieldErrors({ email: message })
+        setErrorMessage(message)
+        return
+      }
+
+      if (mode === 'register' && usernameAlreadyUsed) {
+        const message = 'Username ini sudah dipakai. Coba gunakan username lain.'
+        setFieldErrors({ accountName: message })
+        setErrorMessage(message)
+        return
+      }
 
       switch (apiError.code) {
         case 'EMAIL_NOT_VERIFIED':
           onEmailNotVerified?.(normalizedEmail)
           return
         case 'EMAIL_ALREADY_EXISTS':
-          setFieldErrors({ email: apiError.message })
+          setFieldErrors({ email: 'Email ini sudah terdaftar. Gunakan email lain atau login jika ini akun kamu.' })
           return
         case 'ACCOUNT_NAME_ALREADY_EXISTS':
-          setFieldErrors({ accountName: apiError.message })
+          setFieldErrors({ accountName: 'Username ini sudah dipakai. Coba gunakan username lain.' })
           return
         case 'INVALID_CREDENTIALS':
           setErrorMessage(apiError.message)
@@ -161,6 +187,7 @@ export function AuthPage({
   }
 
   const isLogin = mode === 'login'
+  const isExpiredSessionMessage = helperMessage.startsWith('Session kamu sudah berakhir.')
 
   useEffect(() => {
     setMode(initialMode)
@@ -176,7 +203,7 @@ export function AuthPage({
 
   return (
     <div className="auth-shell">
-      <section className="auth-card panel">
+      <section className={`auth-card panel ${isLogin ? 'auth-card-login' : 'auth-card-register'}`}>
         {onBack ? (
           <div className="auth-topbar">
             <button type="button" className="ghost-button auth-back-link" onClick={onBack}>
@@ -187,44 +214,24 @@ export function AuthPage({
 
         <div className="auth-hero">
           <p className="eyebrow">Reframe Access</p>
-          <h1>{isLogin ? 'Login ke workspace kamu' : 'Buat akun baru dulu'}</h1>
+          <h1>{isLogin ? 'Login ke workspace kamu' : 'Buat akun Reframe'}</h1>
           <p className="page-description">
             {isLogin
-              ? 'Masuk dengan email, lalu sistem akan cek persona config sebelum kamu masuk dashboard.'
-              : 'Daftar dulu supaya backend bisa simpan user profile dan persona config yang pertama.'}
+              ? 'Masuk dengan email kamu untuk melanjutkan.'
+              : 'Mulai perjalanan konten kamu.'}
           </p>
         </div>
 
         {helperMessage ? (
-          <div className="integration-note">
-            <p>{helperMessage}</p>
+          <div className="auth-helper-note" role="status">
+            <AppIcon name="info" />
+            {isExpiredSessionMessage ? (
+              <p><strong>Session kamu sudah berakhir.</strong><span>Silakan login kembali untuk melanjutkan.</span></p>
+            ) : <p>{helperMessage}</p>}
           </div>
         ) : null}
 
-        <div className="auth-tabs" role="tablist" aria-label="Auth mode">
-          <button
-            type="button"
-            className={`auth-tab${isLogin ? ' active' : ''}`}
-            onClick={() => {
-              switchMode('login')
-            }}
-          >
-            Login
-          </button>
-          {allowRegister ? (
-            <button
-              type="button"
-              className={`auth-tab${!isLogin ? ' active' : ''}`}
-              onClick={() => {
-                switchMode('register')
-              }}
-            >
-              Register
-            </button>
-          ) : null}
-        </div>
-
-        {errorMessage ? <div className="integration-note integration-note-error"><p>{errorMessage}</p></div> : null}
+        {errorMessage ? <div className="integration-note integration-note-error" role="alert"><p>{errorMessage}</p></div> : null}
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           {isLogin || !allowRegister ? (
@@ -322,8 +329,9 @@ export function AuthPage({
           <div className={`auth-password-group${isLogin ? '' : ' auth-password-pair'}`}>
             <label className="auth-field">
               <span>Password</span>
+              <div className="password-input-wrap">
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(event) => {
                   setPassword(event.target.value)
@@ -340,6 +348,8 @@ export function AuthPage({
                 aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                 required
               />
+              <button type="button" className="password-visibility" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'}><AppIcon name={showPassword ? 'eye-off' : 'eye'} /></button>
+              </div>
               {fieldErrors.password ? (
                 <small id="password-error" className="auth-field-error">
                   {fieldErrors.password}
@@ -353,8 +363,9 @@ export function AuthPage({
             ) : password ? (
               <label className="auth-field">
                 <span>Konfirmasi Password</span>
+                <div className="password-input-wrap">
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(event) => {
                     setConfirmPassword(event.target.value)
@@ -366,6 +377,8 @@ export function AuthPage({
                   aria-describedby={fieldErrors.confirmPassword ? 'confirm-password-error' : undefined}
                   required
                 />
+                <button type="button" className="password-visibility" onClick={() => setShowConfirmPassword((current) => !current)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}><AppIcon name={showConfirmPassword ? 'eye-off' : 'eye'} /></button>
+                </div>
                 {fieldErrors.confirmPassword ? (
                   <small id="confirm-password-error" className="auth-field-error">
                     {fieldErrors.confirmPassword}
@@ -377,10 +390,18 @@ export function AuthPage({
 
           <div className="auth-actions">
             <button className="primary-button" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Memproses...' : isLogin ? 'Login' : 'Register'}
+              {isSubmitting ? 'Memproses...' : isLogin ? 'Login' : 'Daftar'}
             </button>
           </div>
         </form>
+        {allowRegister ? (
+          <p className="auth-mode-switch">
+            {isLogin ? 'Belum punya akun? ' : 'Sudah punya akun? '}
+            <button type="button" onClick={() => switchMode(isLogin ? 'register' : 'login')}>
+              {isLogin ? 'Daftar' : 'Login'}
+            </button>
+          </p>
+        ) : null}
       </section>
     </div>
   )

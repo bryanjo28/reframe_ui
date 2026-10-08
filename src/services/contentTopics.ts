@@ -223,6 +223,6 @@ export async function generateContentTopics(payload: GenerateContentTopicsPayloa
     throw createApiResponseError(response.status, data)
   }
 
-  notifyUsageChanged()
+  notifyUsageChanged(data)
   return data
 }

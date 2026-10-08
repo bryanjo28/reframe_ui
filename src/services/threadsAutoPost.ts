@@ -5,7 +5,8 @@ const THREADS_AUTO_POST_ENDPOINT = '/api/threads/auto-post'
 const SCHEDULED_JOBS_ENDPOINT = '/api/scheduled-jobs'
 
 export type ScheduleThreadsAutoPostPayload = {
-  personaConfigId: string
+  personaConfigId?: string
+  contentOutputId?: string
   scheduledAt: string
   limit: number
 }
@@ -190,7 +191,8 @@ export async function scheduleThreadsAutoPost(payload: ScheduleThreadsAutoPostPa
     method: 'POST',
     headers: buildHeaders(true),
     body: JSON.stringify({
-      personaConfigId: payload.personaConfigId,
+      ...(payload.personaConfigId ? { personaConfigId: payload.personaConfigId } : {}),
+      ...(payload.contentOutputId ? { contentOutputId: payload.contentOutputId } : {}),
       scheduledAt: payload.scheduledAt,
       limit: payload.limit,
     }),
@@ -201,10 +203,46 @@ export async function scheduleThreadsAutoPost(payload: ScheduleThreadsAutoPostPa
     .catch(async () => await response.text())
 
   if (!response.ok) {
-    const errorMessage = typeof data === 'string' ? data : 'Gagal menjadwalkan auto post.'
+    const errorMessage = typeof data === 'string'
+      ? data
+      : isRecord(data) && typeof data.message === 'string'
+        ? data.message
+        : 'Gagal menjadwalkan auto post.'
     throw new Error(errorMessage || 'Gagal menjadwalkan auto post.')
   }
 
+  return data
+}
+
+export async function rescheduleThreadsContent(contentOutputId: string, scheduledAt: string) {
+  const response = await fetch(buildApiUrl(`${THREADS_AUTO_POST_ENDPOINT}/${contentOutputId}`), {
+    method: 'PATCH', headers: buildHeaders(true), body: JSON.stringify({ scheduledAt }),
+  })
+  const data = await response.json().catch(async () => await response.text())
+  if (!response.ok) {
+    const message = typeof data === 'string'
+      ? data
+      : isRecord(data) && typeof data.message === 'string'
+        ? data.message
+        : 'Gagal mengubah jadwal konten.'
+    throw new Error(message)
+  }
+  return data
+}
+
+export async function cancelThreadsContentSchedule(contentOutputId: string) {
+  const response = await fetch(buildApiUrl(`${THREADS_AUTO_POST_ENDPOINT}/${contentOutputId}`), {
+    method: 'DELETE', headers: buildHeaders(),
+  })
+  const data = await response.json().catch(async () => await response.text())
+  if (!response.ok) {
+    const message = typeof data === 'string'
+      ? data
+      : isRecord(data) && typeof data.message === 'string'
+        ? data.message
+        : 'Gagal membatalkan jadwal konten.'
+    throw new Error(message)
+  }
   return data
 }
 

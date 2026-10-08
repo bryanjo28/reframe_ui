@@ -348,7 +348,7 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
       <header className="page-header subscription-hero">
         <div>
           <p className="eyebrow">Account</p>
-          <h1>Subscription Plans</h1>
+          <h1>Subscription</h1>
           {/* <p className="page-description">
             Lihat paket aktif yang tersedia, lalu cek paket yang sedang dimiliki akun ini
             lewat `GET /api/subscriptions/me`.

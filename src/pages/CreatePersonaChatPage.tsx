@@ -263,10 +263,9 @@ export function CreatePersonaChatPage({
       onSaved?.(nextRecord)
     } catch (error) {
       setStatusTone('error')
-      const errorMessage =
-        error instanceof Error ? error.message : 'Gagal menyimpan persona config.'
+      const errorMessage = `Persona belum berhasil disimpan. ${error instanceof Error ? error.message : 'Periksa jawaban lalu coba lagi.'}`
       setStatusMessage(errorMessage)
-      toastError('Persona save failed', errorMessage)
+      toastError('Persona belum berhasil disimpan', errorMessage)
     } finally {
       setIsSaving(false)
     }

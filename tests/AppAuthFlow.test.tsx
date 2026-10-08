@@ -4,6 +4,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 
 import App from '../src/App'
 import { clearAuthSession } from '../src/services/authService'
+import { SESSION_EXPIRED_EVENT } from '../src/utils/apiError'
 
 beforeEach(() => {
   clearAuthSession()
@@ -64,10 +65,16 @@ it('uses auth me onboarding state to route a new user to first setup after login
   expect(await screen.findByRole('heading', { name: 'Login ke workspace kamu' })).toBeInTheDocument()
 
   await user.type(screen.getByRole('textbox', { name: 'Email' }), 'user@example.com')
-  await user.type(screen.getByLabelText('Password'), 'password-baru')
+  const loginPassword = screen.getByLabelText('Password')
+  expect(loginPassword).toHaveAttribute('type', 'password')
+  await user.type(loginPassword, 'password-baru')
+  await user.click(screen.getByRole('button', { name: 'Show password' }))
+  expect(loginPassword).toHaveAttribute('type', 'text')
+  await user.click(screen.getByRole('button', { name: 'Hide password' }))
+  expect(loginPassword).toHaveAttribute('type', 'password')
   await user.click(screen.getAllByRole('button', { name: 'Login' }).at(-1)!)
 
-  expect(await screen.findByRole('heading', { name: 'Lengkapi Persona Pertama' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Biar Reframe kenal kamu dulu 👋' })).toBeInTheDocument()
   await waitFor(() => expect(window.location.pathname).toBe('/first-setup'))
   expect(authMeRequests).toBe(2)
 })
@@ -96,14 +103,16 @@ it('routes a registration requiring confirmation to check email without opening 
   )
 
   render(<App />)
-  expect(await screen.findByRole('heading', { name: 'Buat akun baru dulu' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Buat akun Reframe' })).toBeInTheDocument()
 
   await user.type(screen.getByRole('textbox', { name: 'Email' }), 'user@example.com')
   await user.type(screen.getByRole('textbox', { name: 'Full Name' }), 'New User')
   await user.type(screen.getByRole('textbox', { name: 'Username' }), 'new-user')
   await user.type(screen.getByLabelText('Password'), 'Password1')
   await user.type(screen.getByLabelText('Konfirmasi Password'), 'Password1')
-  await user.click(screen.getAllByRole('button', { name: 'Register' }).at(-1)!)
+  await user.click(screen.getAllByRole('button', { name: 'Show password' })[1])
+  expect(screen.getByLabelText('Konfirmasi Password')).toHaveAttribute('type', 'text')
+  await user.click(screen.getByRole('button', { name: 'Daftar' }))
 
   expect(await screen.findByRole('heading', { name: 'Cek email kamu dulu' })).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Lengkapi Persona Pertama' })).not.toBeInTheDocument()
@@ -111,7 +120,8 @@ it('routes a registration requiring confirmation to check email without opening 
   expect(localStorage.getItem('reframe.authToken')).toBeNull()
 })
 
-it('routes an authenticated user with a persona to the dashboard', async () => {
+it('routes an authenticated user with a persona, locks Schedule, and handles an expired session', async () => {
+  const user = userEvent.setup()
   localStorage.setItem('reframe.authToken', 'access-token')
   vi.stubGlobal(
     'fetch',
@@ -146,6 +156,16 @@ it('routes an authenticated user with a persona to the dashboard', async () => {
 
   render(<App />)
 
-  expect(await screen.findByRole('heading', { name: 'Dashboard Reframe yang lebih fokus.' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Kontenmu dalam satu tampilan' })).toBeInTheDocument()
   expect(window.location.pathname).toBe('/dashboard')
+
+  await user.click(screen.getByRole('button', { name: 'Jadwal' }))
+  expect(await screen.findByRole('heading', { name: 'Jadwal' })).toBeInTheDocument()
+  expect(screen.getByText('Hubungkan Threads untuk membuat jadwal baru.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Kalender' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Hubungkan Threads' })).toBeInTheDocument()
+
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
+  expect(await screen.findByRole('status')).toHaveTextContent('Session kamu sudah berakhir.Silakan login kembali untuk melanjutkan.')
+  expect(window.location.pathname).toBe('/login')
 })

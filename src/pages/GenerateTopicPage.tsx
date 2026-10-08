@@ -2,11 +2,16 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { ContentGenerationProgress } from '../components/ContentGenerationProgress'
 import { useToast } from '../components/useToast'
+import { getUserFacingError } from '../utils/apiError'
 import { createContentTopic, generateContentTopics } from '../services/contentTopics'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
 
 type GenerateTopicPageProps = {
   userId: string
+  onContinueToContent?: () => void
+  tourStep?: number | null
+  onTopicsGenerated?: () => void
+  onTopicSaved?: () => void
 }
 
 type GeneratedTopic = string | Record<string, unknown>
@@ -220,7 +225,7 @@ function PillarCard({
       disabled={!pillar.id}
     >
       <div className="generate-card-topline">
-        <span className="generate-card-chip accent">Pillar</span>
+        <span className="generate-card-chip accent">Topik utama</span>
       </div>
       <strong>{getPillarTitle(pillar)}</strong>
       <p>{shortenText(getPillarDescription(pillar), 140)}</p>
@@ -228,7 +233,7 @@ function PillarCard({
   )
 }
 
-export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
+export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopicPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
@@ -241,7 +246,8 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
   const [topicDrafts, setTopicDrafts] = useState<TopicDraft[]>([])
   const [savedTopicIndices, setSavedTopicIndices] = useState<number[]>([])
   const [savingTopicIndices, setSavingTopicIndices] = useState<number[]>([])
-  const [tokenUsage, setTokenUsage] = useState<TokenUsageSummary | null>(null)
+  const [selectedTopicIndices, setSelectedTopicIndices] = useState<number[]>([])
+  const [, setTokenUsage] = useState<TokenUsageSummary | null>(null)
   const pillarsRailRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -302,6 +308,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
     setTopicDrafts(normalizedResponseTopics)
     setSavedTopicIndices([])
     setSavingTopicIndices([])
+    setSelectedTopicIndices(normalizedResponseTopics.map((_, index) => index))
   }, [normalizedResponseTopics])
 
   const canSubmitManual =
@@ -329,8 +336,8 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
       setStatusTone('error')
       setStatusMessage(
         !contentPillars.length
-          ? 'Sumber generate belum tersedia. Pastikan pillar ada dulu.'
-          : 'Pilih content pillar dan jumlah topic dulu.',
+        ? 'Topik utama belum tersedia. Lengkapi Content Brain terlebih dahulu.'
+          : 'Pilih topik utama dan jumlah ide terlebih dahulu.',
       )
       return
     }
@@ -359,9 +366,10 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
       })
       .catch((error) => {
         setStatusTone('error')
-        const errorMessage = error instanceof Error ? error.message : 'Gagal mengirim payload.'
+        const detail = getUserFacingError(error, 'Coba generate lagi dalam beberapa saat.')
+        const errorMessage = `Ide belum berhasil dibuat. ${detail}`
         setStatusMessage(errorMessage)
-        toastError('Generate request failed', errorMessage)
+        toastError('Ide belum berhasil dibuat', errorMessage)
       })
       .finally(() => {
         setIsSubmitting(false)
@@ -377,19 +385,19 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
     if (!userId || !contentPillarId || !personaConfigId || !draft.title.trim()) {
       setStatusTone('error')
-      setStatusMessage('Pilih content pillar yang valid dulu sebelum menyimpan topic.')
-      return
+      setStatusMessage('Pilih topik utama yang valid sebelum menyimpan ide.')
+      return false
     }
 
     if (!draft.categoryType.trim()) {
       setStatusTone('error')
-      setStatusMessage(`Topic "${draft.title}" belum punya category untuk disimpan.`)
-      return
+      setStatusMessage(`Ide "${draft.title}" belum memiliki kategori.`)
+      return false
     }
 
     setSavingTopicIndices((current) => (current.includes(index) ? current : [...current, index]))
     setStatusTone('idle')
-    setStatusMessage(`Menyimpan topic "${draft.title}"...`)
+    setStatusMessage(`Menyimpan ide "${draft.title}"...`)
 
     try {
       await createContentTopic({
@@ -403,16 +411,28 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
       setSavedTopicIndices((current) => (current.includes(index) ? current : [...current, index]))
       setStatusTone('success')
-      setStatusMessage(`Topic "${draft.title}" berhasil disimpan ke database.`)
-      toastSuccess('Topic saved', `"${draft.title}" sudah masuk ke database.`)
+      setStatusMessage(`Ide "${draft.title}" berhasil disimpan.`)
+      toastSuccess('Ide tersimpan', `"${draft.title}" sudah masuk ke ide tersimpan.`)
+      return true
     } catch (error) {
       setStatusTone('error')
-      const errorMessage = error instanceof Error ? error.message : 'Gagal menyimpan topic.'
+      const detail = getUserFacingError(error, 'Coba lagi sebelum membuat konten.')
+      const errorMessage = `Ide belum berhasil disimpan. ${detail}`
       setStatusMessage(errorMessage)
-      toastError('Save topic failed', errorMessage)
+      toastError('Ide belum berhasil disimpan', errorMessage)
+      return false
     } finally {
       setSavingTopicIndices((current) => current.filter((savedIndex) => savedIndex !== index))
     }
+  }
+
+  async function saveSelectedTopics(continueToContent: boolean) {
+    const pending = selectedTopicIndices.filter((index) => !savedTopicIndices.includes(index))
+    for (const index of pending) {
+      const saved = await handleSaveTopic(responseTopics[index], index)
+      if (!saved) return
+    }
+    if (continueToContent) onContinueToContent?.()
   }
 
   function handleDraftChange(index: number, key: keyof TopicDraft, value: string) {
@@ -452,8 +472,8 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
     <section className="generate-page">
       <header className="page-header generate-hero">
         <div>
-          <p className="eyebrow">Reframe Generator</p>
-          <h1>Generate Topic</h1>
+          <h1>Cari ide konten</h1>
+          <p className="page-description">Pilih topik utama dan tentukan berapa ide yang ingin kamu dapatkan.</p>
         </div>
 
         {/* <div className="generate-hero-metrics" style={{paddingTop:"15px"}}>
@@ -471,6 +491,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
           </div>
         </div> */}
       </header>
+      <div className="create-flow-progress" aria-label="Alur pembuatan konten"><strong>Ide</strong><span>→</span><span>Buat</span><span>→</span><span>Review</span></div>
 
       {statusMessage ? (
         <div className={`integration-note ${statusTone === 'error' ? 'integration-note-error' : ''}`}>
@@ -486,11 +507,10 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
           <article className="panel generate-panel">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Content Pillars</p>
-                <h2>Pilih pillar milik user aktif</h2>
+                <h2>Pilih topik utama</h2>
               </div>
               <div className="pillars-panel-meta">
-                <span className="pill subtle">{filteredPillars.length} pillar</span>
+                <span className="pill subtle">{filteredPillars.length} topik</span>
                 {filteredPillars.length > 2 ? (
                   <div className="pillars-carousel-actions">
                     <button
@@ -518,8 +538,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
               <div className="generate-empty-state">
                 <AppIcon name="info" />
                 <div>
-                  <strong>Memuat content pillar...</strong>
-                  <p>Sedang ambil daftar pillar yang bisa dipakai untuk generate.</p>
+                  <strong>Memuat topik utama...</strong>
                 </div>
               </div>
 	            ) : filteredPillars.length ? (
@@ -539,8 +558,8 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
               <div className="generate-empty-state">
                 <AppIcon name="layers" />
                 <div>
-                  <strong>Belum ada pillar yang cocok</strong>
-                  <p>Pastikan user ini punya content pillar yang sudah tersimpan.</p>
+                  <strong>Belum ada topik utama</strong>
+                  <p>Lengkapi Content Brain untuk mulai mencari ide.</p>
                 </div>
               </div>
             )}
@@ -549,14 +568,10 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
           <article className="panel generate-panel">
             <div className="panel-heading compact">
               <div>
-                <p className="eyebrow">Latest Response</p>
-                <h2>Hasil dari webhook</h2>
+                    <h2>{responseTopics.length ? 'Ide untuk kamu' : 'Hasil ide'}</h2>
               </div>
               <div className="generate-response-meta">
-                {tokenUsage ? (
-                  <span className="pill subtle">{tokenUsage.totalTokens} tokens used</span>
-                ) : null}
-                <span className="pill subtle">Live</span>
+                {responseTopics.length ? <span className="pill subtle">{responseTopics.length} ide</span> : null}
               </div>
             </div>
 
@@ -565,8 +580,8 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
                 <div className="generate-topics-preview">
                   <div className="panel-heading compact">
                     <div>
-                      <p className="eyebrow">Parsed Topics</p>
-                      <h2>Topics</h2>
+                      <h2>Ide untuk kamu</h2>
+                      <p className="page-description">Pilih ide yang ingin kamu jadikan konten.</p>
                     </div>
                     <span className="pill subtle">{responseTopics.length} items</span>
                   </div>
@@ -580,12 +595,13 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
 
                         return (
                           <article
-                            className="generate-topic-card"
+                            className={`generate-topic-card selectable${selectedTopicIndices.includes(index) ? ' selected' : ''}`}
                             key={`${normalizedTopic.title || topicLabel(sourceTopic, index)}-${index}`}
                           >
-                            <span className="generate-topic-index">Topic {index + 1}</span>
+                            <button className="idea-select-toggle" type="button" onClick={() => setSelectedTopicIndices((current) => current.includes(index) ? current.filter((item) => item !== index) : [...current,index])} aria-label={`Pilih ide ${index + 1}`}>{selectedTopicIndices.includes(index) ? '✓' : ''}</button>
+                            <span className="generate-topic-index">Ide {index + 1}</span>
                             <label className="generate-topic-field">
-                              <span>Topic Title</span>
+                              <span>Judul ide</span>
                               <input
                                 type="text"
                                 value={draft.title}
@@ -596,14 +612,14 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
                               />
                             </label>
                             <label className="generate-topic-field">
-                              <span>Category</span>
+                              <span>Kategori</span>
                               <select
                                 value={draft.categoryType}
                                 onChange={(event) =>
                                   handleDraftChange(index, 'categoryType', event.target.value)
                                 }
                               >
-                                <option value="">Pilih category</option>
+                                <option value="">Pilih kategori</option>
                                 {topicCategoryOptions.map((option) => (
                                   <option key={option} value={option}>
                                     {option}
@@ -631,43 +647,21 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
                                 Why it works: {draft.whyItWorks}
                               </p>
                             ) : null}
-                            <div className="generate-topic-actions">
-                              <button
-                                className="ghost-button generate-topic-save-button"
-                                type="button"
-                                onClick={() => void handleSaveTopic(sourceTopic, index)}
-                                disabled={
-                                  isSaving ||
-                                  isSaved ||
-                                  !userId ||
-                                  !selectedContentPillar?.id ||
-                                  !draft.title.trim() ||
-                                  !draft.categoryType.trim()
-                                }
-                              >
-                                {isSaved ? 'Saved' : isSaving ? 'Saving...' : 'Save'}
-                              </button>
-                            </div>
+                            {isSaved ? <span className="idea-saved-label">Tersimpan ✓</span> : isSaving ? <span className="idea-saved-label">Menyimpan...</span> : null}
                           </article>
                         )
                       })}
                     </div>
 
-                    {tokenUsage ? (
-                      <p className="generate-token-footnote">
-                        Total tokens used: <strong>{tokenUsage.totalTokens}</strong>
-                        {tokenUsage.promptTokens || tokenUsage.completionTokens
-                          ? ` · prompt ${tokenUsage.promptTokens} · completion ${tokenUsage.completionTokens}`
-                          : ''}
-                      </p>
-                    ) : null}
+                    <div className="idea-selection-actions"><strong>{selectedTopicIndices.length} dari {responseTopics.length} dipilih</strong><button className="primary-button" type="button" disabled={!selectedTopicIndices.length || savingTopicIndices.length > 0} onClick={() => void saveSelectedTopics(true)}>Buat Konten dari {selectedTopicIndices.length} Ide</button><button className="ghost-button" type="button" disabled={!selectedTopicIndices.length || savingTopicIndices.length > 0} onClick={() => void saveSelectedTopics(false)}>Simpan untuk nanti</button><button className="text-button" type="button" onClick={resetResponseState}>Cari ide lainnya</button></div>
+
                   </div>
               </div>
             ) : (
               <div className="generate-empty-state">
                 <AppIcon name="check" />
                 <div>
-                  <strong>Belum ada response</strong>
+                  <strong>Ide yang kamu cari akan muncul di sini</strong>
                   {/* <p>Setelah request sukses, response dari N8N akan tampil di sini.</p> */}
                 </div>
               </div>
@@ -675,21 +669,20 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
           </article>
         </div>
 
-        <aside className="generate-side-column">
+        {!responseTopics.length ? <aside className="generate-side-column">
           <form className="panel generate-panel generate-form-panel" onSubmit={handleSubmit}>
             <div className="panel-heading">
               <div>
-                <p className="eyebrow"></p>
-                <h2>Generate Topic</h2>
+                <h2>Jumlah ide</h2>
               </div>
               <span className={`pill${canSubmitManual ? ' subtle' : ''}`}>
-                {canSubmitManual ? 'Ready' : 'Needs setup'}
+                {canSubmitManual ? 'Siap' : 'Lengkapi data'}
               </span>
             </div>
 
             <div className="generate-summary">
               <div className="generate-summary-item">
-                <span>Content Pillar</span>
+                <span>Topik utama</span>
                 <strong>
                   {selectedContentPillar ? getPillarTitle(selectedContentPillar) : 'Belum dipilih'}
                 </strong>
@@ -697,7 +690,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
             </div>
 
             <label className="persona-field full-width">
-              <span>Jumlah Topics</span>
+              <span>Berapa ide yang kamu inginkan?</span>
               <div className="topic-stepper">
                 <button
                   className="stepper-button"
@@ -732,7 +725,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
                 type="submit"
                 disabled={!canSubmitManual}
               >
-                {isSubmitting ? 'Generating...' : 'Create Topics'}
+                {isSubmitting ? 'Mencari ide...' : `Cari ${jumlahTopics} Ide`}
               </button>
             </div>
 
@@ -743,7 +736,7 @@ export function GenerateTopicPage({ userId }: GenerateTopicPageProps) {
               </p>
             </div> */}
           </form>
-        </aside>
+        </aside> : null}
       </section>
     </section>
   )

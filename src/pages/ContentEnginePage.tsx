@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
+import { getUserFacingError } from '../utils/apiError'
 import {
   autoGenerateContentOutputs,
   deleteContentOutput,
@@ -17,6 +18,9 @@ type ContentEnginePageProps = {
   userId: string
   outputsRefreshKey?: number
   onScheduledJobCreated?: (jobId: string, targetCount: number) => void
+  onOpenSchedule?: () => void
+  tourStep?: number | null
+  onAutoModeSelected?: () => void
 }
 
 type AutoScheduleMode = 'now' | 'later'
@@ -29,7 +33,7 @@ type OutputEditForm = {
 
 const outputStatusOptions = [
   { value: 'draft', label: 'Draft' },
-  { value: 'approved', label: 'Approved' },
+  { value: 'approved', label: 'Siap' },
   // { value: 'failed', label: 'Failed' },
   // { value: 'posted', label: 'Posted' },
 ]
@@ -147,6 +151,11 @@ function formatStatusLabel(status: string) {
   if (!normalized) {
     return 'Draft'
   }
+
+  if (normalized === 'approved') return 'Siap'
+  if (normalized === 'posted' || normalized === 'published') return 'Terbit'
+  if (normalized === 'scheduled') return 'Terjadwal'
+  if (normalized === 'failed') return 'Gagal'
 
   return normalized
     .replace(/[_-]+/g, ' ')
@@ -277,6 +286,9 @@ export function ContentEnginePage({
   userId,
   outputsRefreshKey: externalOutputsRefreshKey = 0,
   onScheduledJobCreated,
+  onOpenSchedule,
+  tourStep,
+  onAutoModeSelected,
 }: ContentEnginePageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const pillarsRailRef = useRef<HTMLDivElement | null>(null)
@@ -284,7 +296,7 @@ export function ContentEnginePage({
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
   const [targetCount, setTargetCount] = useState(10)
   const [scheduleMode, setScheduleMode] = useState<AutoScheduleMode>('now')
-  const [viewMode, setViewMode] = useState<ContentEngineView>('chooser')
+  const [viewMode, setViewMode] = useState<ContentEngineView>('auto')
   const [scheduledAt, setScheduledAt] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
@@ -443,6 +455,12 @@ export function ContentEnginePage({
     })
   }, [contentTopics, selectedContentPillarId])
 
+  useEffect(() => {
+    if (selectedPillarTopics.length > 0) {
+      setTargetCount((current) => Math.min(Math.max(current, 1), Math.min(10, selectedPillarTopics.length)))
+    }
+  }, [selectedPillarTopics.length])
+
   const selectedContentOutput = useMemo(
     () => contentOutputs.find((output) => output.id === selectedOutputId) || null,
     [contentOutputs, selectedOutputId],
@@ -511,10 +529,10 @@ export function ContentEnginePage({
       setStatusTone('error')
       setStatusMessage(
         selectedContentPillarId && selectedPillarTopics.length === 0
-          ? 'Topic available untuk pillar ini masih 0.'
+          ? 'Belum ada ide yang bisa dibuat menjadi konten untuk topik utama ini.'
           : selectedContentPillarId && selectedPillarTopics.length < targetCount
-            ? `Topic available untuk pillar ini cuma ${selectedPillarTopics.length}, lebih kecil dari target ${targetCount}.`
-          : 'Lengkapi pillar, target count, dan scheduled at dulu.',
+            ? `Hanya ada ${selectedPillarTopics.length} ide yang tersedia.`
+          : 'Lengkapi topik utama, jumlah konten, dan waktu pembuatan.',
       )
       return
     }
@@ -524,13 +542,13 @@ export function ContentEnginePage({
 
     if (Number.isNaN(scheduledAtSource.getTime())) {
       setStatusTone('error')
-      setStatusMessage('Scheduled time tidak valid.')
+      setStatusMessage('Tanggal dan waktu yang dipilih tidak valid.')
       return
     }
 
     setIsSubmitting(true)
     setStatusTone('idle')
-    setStatusMessage('Mengirim auto-generate payload...')
+    setStatusMessage('Menyiapkan pembuatan konten...')
     void autoGenerateContentOutputs({
       contentPillarId: selectedContentPillarId,
       targetCount,
@@ -546,21 +564,22 @@ export function ContentEnginePage({
         onScheduledJobCreated?.(jobId, targetCount)
         setStatusTone('success')
         if (scheduleMode === 'now') {
-          setStatusMessage('Generate content berhasil. Silakan cek di list generated content.')
+          setStatusMessage('Konten berhasil dibuat. Silakan review hasilnya.')
           toastSuccess(
-            'Generate content berhasil',
-            'Silakan cek hasilnya di list generated content.',
+            'Konten berhasil dibuat',
+            'Hasilnya sudah siap untuk direview.',
           )
         } else {
-          setStatusMessage('Schedule auto-generate berhasil dikirim ke backend.')
-          toastSuccess('Schedule sent', 'Payload content engine sudah dijadwalkan.')
+          setStatusMessage('Pembuatan konten berhasil dijadwalkan.')
+          toastSuccess('Pembuatan dijadwalkan', 'Konten akan dibuat pada waktu yang dipilih.')
         }
       })
       .catch((error) => {
         setStatusTone('error')
-        const errorMessage = error instanceof Error ? error.message : 'Gagal mengirim payload.'
+        const detail = getUserFacingError(error, 'Coba buat konten lagi.')
+        const errorMessage = `Konten belum berhasil dibuat. ${detail}`
         setStatusMessage(errorMessage)
-        toastError('Auto-generate failed', errorMessage)
+        toastError('Konten belum berhasil dibuat', errorMessage)
       })
       .finally(() => {
         setIsSubmitting(false)
@@ -771,23 +790,23 @@ export function ContentEnginePage({
       <section className="generate-page">
         <header className="page-header generate-hero">
           <div>
-            <p className="eyebrow">Reframe Content Engine</p>
-            <h1>Generated Content</h1>
+            <h1>Konten Kamu</h1>
             <p className="page-description">
-              Lihat semua content yang sudah digenerate untuk user aktif. Data diambil dari tabel
-              output, bukan dari topic.
+              Review, edit, dan siapkan konten yang sudah pernah kamu buat.
             </p>
           </div>
+          {contentOutputs.some((record) => getOutputStatus(record) === 'approved') && onOpenSchedule ? <button className="schedule-primary" type="button" onClick={onOpenSchedule}>Jadwalkan Konten</button> : null}
         </header>
+        <div className="create-flow-progress" aria-label="Alur pembuatan konten"><span>Ide</span><span>→</span><span>Buat</span><span>→</span><strong>Review</strong></div>
 
         <div className="generate-mode-switcher">
-          <span className="pill subtle">List mode</span>
+          <span className="pill subtle">Konten Saya</span>
           <button
             className="ghost-button generate-mode-button"
             type="button"
-            onClick={() => setViewMode('chooser')}
+            onClick={() => setViewMode('auto')}
           >
-            Change flow
+            Buat Konten Baru
           </button>
           <button
             className="ghost-button generate-mode-button"
@@ -795,7 +814,7 @@ export function ContentEnginePage({
             onClick={handleReloadOutputs}
             disabled={isLoadingOutputs}
           >
-            Refresh
+            Muat ulang
           </button>
         </div>
 
@@ -811,8 +830,7 @@ export function ContentEnginePage({
         <article className="panel generate-panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Content Outputs</p>
-              <h2>Konten hasil generate</h2>
+              <h2>Review konten</h2>
             </div>
             <span className="pill subtle">{contentOutputs.length} item</span>
           </div>
@@ -831,11 +849,11 @@ export function ContentEnginePage({
                 <table className="content-output-table">
                   <thead>
                     <tr>
-                      <th>Output</th>
-                      <th>Platform</th>
+                      <th>Konten</th>
+                      <th>Tujuan</th>
                       <th>Status</th>
-                      <th>Created At</th>
-                      <th>Action</th>
+                      <th>Dibuat</th>
+                      <th>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -964,8 +982,8 @@ export function ContentEnginePage({
             <div className="generate-empty-state">
               <AppIcon name="check" />
               <div>
-                <strong>Belum ada output</strong>
-                <p>Kalau user belum pernah generate, daftar ini masih kosong.</p>
+                <strong>Belum ada konten</strong>
+                <p>Konten yang kamu buat akan muncul di sini untuk direview.</p>
               </div>
             </div>
           )}
@@ -983,7 +1001,7 @@ export function ContentEnginePage({
               <form className="content-output-modal-form" onSubmit={handleSaveOutput}>
                 <div className="content-output-modal-head">
                   <div>
-                    <p className="eyebrow">Edit Output</p>
+                    <p className="eyebrow">Review Konten</p>
                     <h3 id="content-output-modal-title">{getOutputTitle(selectedContentOutput)}</h3>
                   </div>
                   <button className="ghost-button" type="button" onClick={closeOutputEditor}>
@@ -993,7 +1011,7 @@ export function ContentEnginePage({
 
                 <div className="content-output-modal-meta content-output-modal-meta-edit">
                   <label className="persona-field">
-                    <span>Platform</span>
+                    <span>Tujuan</span>
                     <input
                       value={outputEditForm.platform}
                       placeholder="threads"
@@ -1024,7 +1042,7 @@ export function ContentEnginePage({
                 </div>
 
                 <label className="content-output-modal-body">
-                  <span className="content-output-modal-label">Content Output</span>
+                  <span className="content-output-modal-label">Isi konten</span>
                   <textarea
                     value={outputEditForm.content}
                     onChange={(event) => handleOutputFieldChange('content', event.target.value)}
@@ -1040,11 +1058,11 @@ export function ContentEnginePage({
                       onClick={closeOutputEditor}
                       disabled={isSavingOutput}
                     >
-                      {canChangeSelectedOutputStatus ? 'Cancel' : 'Close'}
+                      {canChangeSelectedOutputStatus ? 'Batal' : 'Tutup'}
                     </button>
                     {canChangeSelectedOutputStatus ? (
                       <button className="primary-button" type="submit" disabled={isSavingOutput}>
-                        {isSavingOutput ? 'Saving...' : 'Save changes'}
+                        {isSavingOutput ? 'Menyimpan...' : outputEditForm.status === 'approved' ? 'Simpan dan Tandai Siap' : 'Simpan Perubahan'}
                       </button>
                     ) : null}
 	                </div>
@@ -1114,8 +1132,8 @@ export function ContentEnginePage({
       <section className="generate-page">
         <header className="page-header generate-hero">
           <div>
-            <p className="eyebrow">Reframe Content Engine</p>
-            <h1>Pilih dulu flow yang mau kamu edit.</h1>
+            <p className="eyebrow">Create</p>
+            <h1>Create your content</h1>
             <p className="page-description">
               Kita mulai dari card supaya tampilan awal lebih tenang. Setelah dipilih, baru
               form yang sesuai muncul di bawah.
@@ -1139,12 +1157,13 @@ export function ContentEnginePage({
 
           <div className="generate-simple-chooser-grid">
             <button
+              data-tour-step={tourStep === 8 ? 8 : undefined}
               type="button"
               className="generate-simple-choice"
-              onClick={() => setViewMode('auto')}
+              onClick={() => { setViewMode('auto'); onAutoModeSelected?.() }}
             >
-              <strong>Auto Create</strong>
-              <p>Generate langsung dari content pillar dengan schedule.</p>
+              <strong>Buat Konten Baru</strong>
+              <p>Ubah ide tersimpan menjadi konten siap direview.</p>
             </button>
 
             <button
@@ -1152,8 +1171,8 @@ export function ContentEnginePage({
               className="generate-simple-choice"
               onClick={() => setViewMode('list')}
             >
-              <strong>List Generated Content</strong>
-              <p>Lihat semua content hasil generate yang sudah dibuat user aktif.</p>
+              <strong>Konten Saya</strong>
+              <p>Lihat konten yang sudah pernah kamu buat.</p>
             </button>
           </div>
         </article>
@@ -1169,11 +1188,9 @@ export function ContentEnginePage({
     <section className="generate-page">
       <header className="page-header generate-hero">
         <div>
-          <p className="eyebrow">Reframe Content Engine</p>
-          <h1>Content Engine untuk auto-generate output.</h1>
+          <h1>Buat Konten</h1>
           <p className="page-description">
-            Pilih content pillar, tentukan target count, lalu kirim payload ke endpoint
-            auto-generate. Generate Topic tetap ada di menu terpisah.
+            Ubah ide yang sudah kamu pilih menjadi konten siap direview.
           </p>
         </div>
 
@@ -1192,15 +1209,16 @@ export function ContentEnginePage({
           </div>
         </div> */}
       </header>
+      <div className="create-flow-progress" aria-label="Alur pembuatan konten"><span>Ide</span><span>→</span><strong>Buat</strong><span>→</span><span>Review</span></div>
 
       <div className="generate-mode-switcher">
-        <span className="pill subtle">Auto mode</span>
+        <span className="pill subtle">Konten Baru</span>
         <button
           className="ghost-button generate-mode-button"
           type="button"
-          onClick={() => setViewMode('chooser')}
+          onClick={() => setViewMode('list')}
         >
-          Change flow
+          Lihat Konten Saya
         </button>
       </div>
 
@@ -1216,11 +1234,10 @@ export function ContentEnginePage({
           <article className="panel generate-panel">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Content Pillars</p>
-                <h2>Pilih pillar milik user aktif</h2>
+                <h2>Pilih topik utama</h2>
               </div>
               <div className="pillars-panel-meta">
-                <span className="pill subtle">{contentPillars.length} pillar</span>
+                <span className="pill subtle">{contentPillars.length} topik</span>
                 {contentPillars.length > 2 ? (
                   <div className="pillars-carousel-actions">
                     <button
@@ -1248,8 +1265,7 @@ export function ContentEnginePage({
               <div className="generate-empty-state">
                 <AppIcon name="info" />
                 <div>
-                  <strong>Memuat content pillar...</strong>
-                  <p>Sedang ambil daftar pillar yang bisa dipakai untuk auto-generate.</p>
+                  <strong>Memuat topik utama...</strong>
                 </div>
               </div>
             ) : contentPillars.length ? (
@@ -1263,7 +1279,7 @@ export function ContentEnginePage({
                       onClick={() => pillar.id && setSelectedContentPillarId(pillar.id)}
                     >
                       <div className="generate-card-topline">
-                        <span className="generate-card-chip accent">Pillar</span>
+                      <span className="generate-card-chip accent">Topik utama</span>
                       </div>
                       <strong>{getPillarTitle(pillar)}</strong>
                       <p>{shortenText(getPillarDescription(pillar), 140)}</p>
@@ -1275,8 +1291,8 @@ export function ContentEnginePage({
               <div className="generate-empty-state">
                 <AppIcon name="layers" />
                 <div>
-                  <strong>Belum ada pillar yang cocok</strong>
-                  <p>Pastikan user ini punya content pillar yang sudah tersimpan.</p>
+                  <strong>Belum ada topik utama</strong>
+                  <p>Lengkapi Content Brain untuk mulai membuat konten.</p>
                 </div>
               </div>
             )}
@@ -1285,11 +1301,10 @@ export function ContentEnginePage({
           <article className="panel generate-panel">
             <div className="panel-heading compact">
               <div>
-                <p className="eyebrow">Available Topics</p>
-                <h2>Topic untuk pillar ini</h2>
+                <h2>Ide yang tersedia</h2>
               </div>
               <span className="pill subtle">
-                {selectedContentPillarId ? `${selectedPillarTopics.length} topic` : 'Pilih pillar'}
+                {selectedContentPillarId ? `${selectedPillarTopics.length} ide` : 'Pilih topik utama'}
               </span>
             </div>
 
@@ -1297,15 +1312,15 @@ export function ContentEnginePage({
               <div className="generate-empty-state">
                 <AppIcon name="info" />
                 <div>
-                  <strong>Pilih pillar dulu</strong>
-                  <p>Daftar topic available akan muncul setelah pillar dipilih.</p>
+                  <strong>Pilih topik utama</strong>
+                  <p>Ide yang tersedia akan muncul setelah topik utama dipilih.</p>
                 </div>
               </div>
             ) : isLoadingTopics ? (
               <div className="generate-empty-state">
                 <AppIcon name="info" />
                 <div>
-                  <strong>Memuat topic...</strong>
+                  <strong>Memuat ide...</strong>
                 </div>
               </div>
             ) : selectedPillarTopics.length ? (
@@ -1329,8 +1344,8 @@ export function ContentEnginePage({
               <div className="generate-empty-state">
                 <AppIcon name="info" />
                 <div>
-                  <strong>Belum ada topic untuk pillar ini</strong>
-                  <p>Pastikan endpoint content topics sudah punya data untuk pillar yang dipilih.</p>
+                  <strong>Belum ada ide untuk topik utama ini</strong>
+                  <p>Cari dan simpan ide terlebih dahulu.</p>
                 </div>
               </div>
             )}
@@ -1338,14 +1353,13 @@ export function ContentEnginePage({
         </div>
 
         <aside className="generate-side-column">
-          <form className="panel generate-panel generate-form-panel" onSubmit={handleSubmit}>
+          <form className="panel generate-panel generate-form-panel" data-tour-step={tourStep === 9 ? 9 : undefined} onSubmit={handleSubmit}>
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Auto Generate</p>
-                <h2>Auto generate content</h2>
+                <h2>Pengaturan konten</h2>
               </div>
               <span className={`pill${canSubmit ? ' subtle' : ''}`}>
-                {canSubmit ? 'Ready' : 'Needs setup'}
+                {canSubmit ? 'Siap' : 'Lengkapi data'}
               </span>
             </div>
 
@@ -1355,8 +1369,8 @@ export function ContentEnginePage({
                 className={`panel generate-entry-card${scheduleMode === 'now' ? ' selected' : ''}`}
                 onClick={() => setScheduleMode('now')}
               >
-                <span className="generate-entry-pill">Now</span>
-                <strong>Produce now</strong>
+                <span className="generate-entry-pill">Sekarang</span>
+                <strong>Buat sekarang</strong>
               </button>
 
               <button
@@ -1364,13 +1378,13 @@ export function ContentEnginePage({
                 className={`panel generate-entry-card${scheduleMode === 'later' ? ' selected' : ''}`}
                 onClick={() => setScheduleMode('later')}
               >
-                <span className="generate-entry-pill accent">Schedule</span>
-                <strong>Schedule</strong>
+                <span className="generate-entry-pill accent">Nanti</span>
+                <strong>Buat nanti</strong>
               </button>
             </div>
 
             <label className="persona-field full-width">
-              <span>Content Pillar</span>
+                <span>Topik utama</span>
               <input
                 type="text"
                 value={selectedContentPillar ? getPillarTitle(selectedContentPillar) : 'Belum dipilih'}
@@ -1379,7 +1393,7 @@ export function ContentEnginePage({
             </label>
 
             <label className="persona-field full-width">
-              <span>Target Count</span>
+              <span>Jumlah konten</span>
               <div className="topic-stepper">
                 <button
                   className="stepper-button"
@@ -1405,24 +1419,24 @@ export function ContentEnginePage({
                   <AppIcon name="plus" />
                 </button>
               </div>
-              <small className="field-hint">Masukkan angka 1 sampai 10.</small>
+              <small className="field-hint">Maksimum {Math.min(10, selectedPillarTopics.length)} ide tersedia.</small>
             </label>
 
             {scheduleMode === 'later' ? (
               <label className="persona-field full-width">
-                <span>Scheduled At</span>
+                <span>Tanggal & waktu</span>
                 <input
                   type="datetime-local"
                   value={scheduledAt}
                   onChange={(event) => setScheduledAt(event.target.value)}
                 />
-                <small className="field-hint">Pilih waktu kirim untuk payload auto-generate.</small>
+                <small className="field-hint">Pilih kapan proses pembuatan konten dimulai.</small>
               </label>
             ) : null}
 
             <div className="persona-actions persona-actions-preview generate-actions">
               <button className="primary-button" type="submit" disabled={!canSubmit}>
-                {isSubmitting ? 'Mengirim...' : 'Auto Generate'}
+                {isSubmitting ? 'Sedang membuat konten...' : `Buat ${targetCount} Konten`}
               </button>
             </div>
 

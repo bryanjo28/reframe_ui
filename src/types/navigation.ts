@@ -1,5 +1,7 @@
 export type NavKey =
   | 'dashboard'
+  | 'create'
+  | 'content-bank'
   | 'personalize'
   | 'create-persona-chat'
   | 'create-persona'
@@ -9,7 +11,9 @@ export type NavKey =
   | 'manual-post'
   | 'auto-post'
   | 'subscription-plans'
+  | 'payments'
   | 'connecting-apps'
+  | 'settings'
 
 export type AppTheme = 'dark' | 'light'
 

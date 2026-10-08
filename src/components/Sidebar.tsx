@@ -5,6 +5,7 @@ import type { AuthUser } from '../services/authService'
 import { getCurrentSubscription, listSubscriptionPlans } from '../services/subscriptionPlans'
 import { getMyUsage, USAGE_UPDATED_EVENT } from '../services/usage'
 import type { AppTheme } from '../types/navigation'
+import type { UiLanguage } from '../utils/uiLanguage'
 
 type SidebarProps = {
   activePage: NavKey
@@ -18,7 +19,9 @@ type SidebarProps = {
   onToggleTheme: () => void
   onToggleCollapse: () => void
   onClose: () => void
-  isThreadsConnected: boolean
+  onReplayTutorial: () => void
+  language: UiLanguage
+  onLanguageChange: (language: UiLanguage) => void
 }
 
 type SidebarMenuItem = MenuItem & {
@@ -26,22 +29,25 @@ type SidebarMenuItem = MenuItem & {
 }
 
 const overviewMenu: SidebarMenuItem[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid' },
-]
-
-const createMenu: SidebarMenuItem[] = [
-  { key: 'personalize', label: 'Persona', icon: 'user' },
-  { key: 'content-pillar', label: 'Content Pillar', icon: 'layers' },
-  { key: 'generate-topic', label: 'Topics', icon: 'sparkles' },
-  { key: 'content-engine', label: 'Generate Content', icon: 'plus' },
+  { key: 'dashboard', label: 'Home', icon: 'grid' },
+  { key: 'create', label: 'Create', icon: 'plus' },
+  { key: 'content-bank', label: 'Content Bank', icon: 'layers' },
+  { key: 'auto-post', label: 'Schedule', icon: 'calendar' },
 ]
 
 const settingsMenu: SidebarMenuItem[] = [
-  { key: 'connecting-apps', label: 'Integration', icon: 'link' },
+  { key: 'settings', label: 'Settings', icon: 'menu' },
+  { key: 'personalize', label: 'Content Brain', icon: 'user' },
+  { key: 'connecting-apps', label: 'Connected Accounts', icon: 'link' },
   { key: 'subscription-plans', label: 'Subscription', icon: 'calendar' },
+  { key: 'payments', label: 'Pembayaran', icon: 'sparkles' },
 ]
 
 function isMenuItemActive(activePage: NavKey, itemKey: NavKey) {
+  if (itemKey === 'create') {
+    return ['create', 'generate-topic', 'content-engine', 'manual-post'].includes(activePage)
+  }
+
   if (itemKey === 'personalize') {
     return activePage === 'personalize' || activePage === 'create-persona' || activePage === 'create-persona-chat'
   }
@@ -75,6 +81,7 @@ function SidebarSection({
             <div className="menu-entry" key={item.key}>
               <button
                 type="button"
+                data-tour-step={item.key === 'create' ? 0 : undefined}
                 className={`menu-item${isActive ? ' active' : ''}${isDisabled ? ' disabled' : ''}`}
                 onClick={() => onNavigate(item.key)}
                 title={isCollapsed ? tooltip : undefined}
@@ -108,7 +115,9 @@ export function Sidebar({
   onToggleTheme,
   onToggleCollapse,
   onClose,
-  isThreadsConnected,
+  onReplayTutorial,
+  language,
+  onLanguageChange,
 }: SidebarProps) {
   const [usedTokens, setUsedTokens] = useState(0)
   const [tokenLimit, setTokenLimit] = useState<number | null>(null)
@@ -231,32 +240,8 @@ export function Sidebar({
         </div>
 
         <SidebarSection
-          title="Overview"
+          title="Workspace"
           items={overviewMenu}
-          activePage={activePage}
-          onNavigate={onNavigate}
-          isCollapsed={isCollapsed}
-        />
-
-        <SidebarSection
-          title="Create"
-          items={createMenu}
-          activePage={activePage}
-          onNavigate={onNavigate}
-          isCollapsed={isCollapsed}
-        />
-
-        <SidebarSection
-          title="Publish"
-          items={[
-            { key: 'manual-post', label: 'Content Output', icon: 'layers' },
-            {
-              key: 'auto-post',
-              label: 'Auto Post',
-              icon: 'clock',
-              disabledReason: isThreadsConnected ? undefined : 'Hubungkan Threads dulu',
-            },
-          ]}
           activePage={activePage}
           onNavigate={onNavigate}
           isCollapsed={isCollapsed}
@@ -280,6 +265,8 @@ export function Sidebar({
           <AppIcon name="sun" />
           {!isCollapsed ? <span>{theme === 'light' ? 'Light Mode On' : 'Light Mode'}</span> : null}
         </button>
+        <button type="button" className="menu-item" onClick={onReplayTutorial} title={isCollapsed ? 'Lihat Tutorial Lagi' : undefined} aria-label="Lihat Tutorial Lagi"><AppIcon name="sparkles" />{!isCollapsed ? <span>Lihat Tutorial Lagi</span> : null}</button>
+        {!isCollapsed ? <label className="sidebar-language-setting"><span>Bahasa</span><select value={language} onChange={(event) => onLanguageChange(event.target.value as UiLanguage)}><option value="id">Indonesia</option><option value="en">Inggris</option></select></label> : null}
       </div>
 
       <div className="sidebar-bottom">

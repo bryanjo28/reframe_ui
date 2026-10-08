@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { AppIcon } from '../components/AppIcon'
 
 import { API_BASE_URL } from '../config/api'
 import {
@@ -20,6 +21,8 @@ export function ResetPasswordPage({ onSuccess = finishPasswordReset }: ResetPass
   const [{ accessToken, isValid }] = useState(() => parseRecoveryHash(window.location.hash))
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -80,25 +83,25 @@ export function ResetPasswordPage({ onSuccess = finishPasswordReset }: ResetPass
             <form className="auth-form" onSubmit={handleSubmit} noValidate>
               <label className="auth-field full-width">
                 <span>Password baru</span>
-                <input
-                  type="password"
+                <div className="password-input-wrap"><input
+                  type={showPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
                   autoComplete="new-password"
                   minLength={8}
                   required
-                />
+                /><button type="button" className="password-visibility" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'}><AppIcon name={showPassword ? 'eye-off' : 'eye'} /></button></div>
               </label>
               <label className="auth-field full-width">
                 <span>Konfirmasi password baru</span>
-                <input
-                  type="password"
+                <div className="password-input-wrap"><input
+                  type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   autoComplete="new-password"
                   minLength={8}
                   required
-                />
+                /><button type="button" className="password-visibility" onClick={() => setShowConfirmPassword((current) => !current)} aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}><AppIcon name={showConfirmPassword ? 'eye-off' : 'eye'} /></button></div>
               </label>
 
               <div className="auth-actions">

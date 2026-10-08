@@ -1,5 +1,6 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
+import { notifyUsageChanged } from './usage'
 
 const CONTENT_PILLARS_ENDPOINT = '/api/content-pillars'
 const CONTENT_PILLARS_ENHANCE_ENDPOINT = `${CONTENT_PILLARS_ENDPOINT}/enhance`
@@ -69,6 +70,22 @@ type ContentPillarEnhanceResponse =
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  const text = await response.text()
+  if (!text.trim()) return fallback
+  try {
+    const data = JSON.parse(text) as unknown
+    if (isRecord(data)) {
+      const message = [data.message, data.error, data.details, data.detail]
+        .find((value) => typeof value === 'string' && value.trim())
+      if (typeof message === 'string') return message
+    }
+  } catch {
+    // Use the response text below.
+  }
+  return text.trim() || fallback
 }
 
 function asString(value: unknown) {
@@ -258,7 +275,7 @@ export async function createContentPillar(payload: ContentPillarPayload) {
   })
 
   if (!response.ok) {
-    throw new Error('Gagal membuat content pillar.')
+    throw new Error(await readErrorMessage(response, 'Gagal membuat content pillar.'))
   }
 
   const data = (await response.json()) as ContentPillarItemResponse
@@ -279,7 +296,7 @@ export async function updateContentPillar(id: string, payload: ContentPillarPayl
   })
 
   if (!response.ok) {
-    throw new Error('Gagal memperbarui content pillar.')
+    throw new Error(await readErrorMessage(response, 'Gagal memperbarui content pillar.'))
   }
 
   const data = (await response.json()) as ContentPillarItemResponse
@@ -320,6 +337,7 @@ export async function enhanceContentPillar(id: string | undefined, payload: Cont
 
   if (contentType.includes('application/json')) {
     const data = (await response.json()) as ContentPillarEnhanceResponse
+    notifyUsageChanged(data)
     return unwrapEnhanceResponse(data)
   }
 

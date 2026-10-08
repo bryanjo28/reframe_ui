@@ -177,7 +177,7 @@ export function ConnectingAppsPage() {
     <section className="connecting-page">
       <header className="page-header">
         <p className="eyebrow">Reframe Account</p>
-        <h1>Reframe Connections</h1>
+        <h1>Connected Accounts</h1>
         <p className="page-description">
           Hubungkan akun media sosial Anda untuk memulai automasi.
         </p>

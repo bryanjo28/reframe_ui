@@ -1,777 +1,116 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import { listContentOutputs, type ContentOutputRecord } from '../services/contentOutputs'
 import { listPersonaConfigs, type PersonaConfigRecord } from '../services/personaConfigs'
-import {
-  getScheduledJobById,
-  listScheduledJobs,
-  scheduleThreadsAutoPost,
-  type ScheduledJobRecord,
-} from '../services/threadsAutoPost'
+import { cancelThreadsContentSchedule, rescheduleThreadsContent, scheduleThreadsAutoPost } from '../services/threadsAutoPost'
 
-type AutoPostPageProps = {
-  userId: string
-  isThreadsConnected: boolean
+type Props = { userId: string; isThreadsConnected: boolean; onConnectThreads: () => void; onReviewContent?: () => void }
+type View = 'calendar' | 'list'
+const TZ = 'Asia/Jakarta'
+const WEEKDAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
+
+function valueOf(record: Record<string, unknown> | null, keys: string[]) { if (!record) return ''; for (const key of keys) { const value = record[key]; if (typeof value === 'string' && value.trim()) return value.trim() } return '' }
+function outputId(record: ContentOutputRecord) { return valueOf(record, ['id']) }
+function personaId(record: ContentOutputRecord) { return valueOf(record, ['personaConfigId', 'persona_config_id']) }
+function titleOf(record: ContentOutputRecord) { return valueOf(record, ['title', 'topic', 'content', 'contentOutput', 'output']).slice(0, 110) || 'Konten tanpa judul' }
+function scheduledValue(record: ContentOutputRecord) { return valueOf(record, ['scheduledAt', 'scheduled_at']) }
+function publishJobId(record: ContentOutputRecord) { return valueOf(record, ['publishScheduledJobId', 'publish_scheduled_job_id']) }
+function personaName(record: PersonaConfigRecord | undefined) { return valueOf(record || null, ['persona', 'title', 'name']) || 'Persona' }
+function isPosted(record: ContentOutputRecord) { return ['posted', 'published'].includes(String(record.status || '').toLowerCase()) || Boolean(valueOf(record, ['externalPostId', 'external_post_id'])) }
+function isActuallyScheduled(record: ContentOutputRecord) { return String(record.status || '').toLowerCase() === 'approved' && String(record.platform || '').toLowerCase() === 'threads' && Boolean(scheduledValue(record)) && Boolean(publishJobId(record)) && !isPosted(record) }
+function isReady(record: ContentOutputRecord) { return String(record.status || '').toLowerCase() === 'approved' && String(record.platform || '').toLowerCase() === 'threads' && !isActuallyScheduled(record) && !isPosted(record) }
+function dateKey(date: Date) { const p = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date); const g = (t: string) => p.find((x) => x.type === t)?.value || ''; return `${g('year')}-${g('month')}-${g('day')}` }
+function parseDate(record: ContentOutputRecord) { const date = new Date(scheduledValue(record)); return Number.isNaN(date.getTime()) ? null : date }
+function wibIso(date: string, time: string) { const parsed = new Date(`${date}T${time}:00+07:00`); return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString() }
+function monthLabel(date: Date) { return new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(date) }
+function dayLabel(date: Date) { return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ }).format(date) }
+function timeLabel(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: TZ,
+  }).formatToParts(date)
+  const hour = parts.find((part) => part.type === 'hour')?.value
+  const minute = parts.find((part) => part.type === 'minute')?.value
+  return hour && minute ? `${hour}:${minute}` : ''
 }
+function shortDate(date: Date) { return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', timeZone: TZ }).format(date) }
+function listGroup(date: Date, today: Date) { const target = dateKey(date); const current = dateKey(today); const tomorrow = dateKey(new Date(today.getTime() + 86_400_000)); if (target === current) return 'HARI INI'; if (target === tomorrow) return 'BESOK'; return shortDate(date).toUpperCase() }
+function cellsFor(month: Date) { const y = month.getFullYear(); const m = month.getMonth(); const leading = (new Date(y, m, 1).getDay() + 6) % 7; const days = new Date(y, m + 1, 0).getDate(); return [...Array.from({ length: leading }, (_, i) => ({ key: `b${i}`, date: null })), ...Array.from({ length: days }, (_, i) => ({ key: `${y}-${m}-${i}`, date: new Date(y, m, i + 1) }))] }
 
-type AutoPostScheduleForm = {
-  personaConfigId: string
-  targetCount: number
-  scheduledAt: string
-}
+export function AutoPostPage({ userId, isThreadsConnected, onConnectThreads, onReviewContent }: Props) {
+  const { success, error } = useToast()
+  const today = useMemo(() => new Date(), [])
+  const [view, setView] = useState<View>('calendar')
+  const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
+  const [selectedDate, setSelectedDate] = useState(() => dateKey(today))
+  const [outputs, setOutputs] = useState<ContentOutputRecord[]>([])
+  const [personas, setPersonas] = useState<PersonaConfigRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedId, setSelectedId] = useState('')
+  const [editing, setEditing] = useState<ContentOutputRecord | null>(null)
+  const [showSchedule, setShowSchedule] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState<ContentOutputRecord | null>(null)
+  const [date, setDate] = useState(dateKey(today))
+  const [time, setTime] = useState('18:00')
+  const [saving, setSaving] = useState(false)
 
-function getRecordValue(record: PersonaConfigRecord | null, keys: string[]) {
-  if (!record) {
-    return ''
-  }
-
-  for (const key of keys) {
-    const value = record[key]
-
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim()
-    }
-  }
-
-  return ''
-}
-
-function getRecordUserId(record: PersonaConfigRecord | null) {
-  return getRecordValue(record, [
-    'userId',
-    'user_id',
-    'ownerId',
-    'owner_id',
-    'createdByUserId',
-    'created_by_user_id',
-  ])
-}
-
-function getScheduledJobValue(record: ScheduledJobRecord | null, keys: string[]) {
-  if (!record) {
-    return ''
-  }
-
-  for (const key of keys) {
-    const value = record[key]
-
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim()
-    }
-  }
-
-  return ''
-}
-
-function getScheduledJobUserId(record: ScheduledJobRecord | null) {
-  return getScheduledJobValue(record, ['userId', 'user_id'])
-}
-
-function getScheduledJobPersonaConfigId(record: ScheduledJobRecord | null) {
-  return getScheduledJobValue(record, ['personaConfigId', 'persona_config_id'])
-}
-
-function getScheduledJobStatus(record: ScheduledJobRecord | null) {
-  return getScheduledJobValue(record, ['status']) || 'registered'
-}
-
-function getScheduledJobDate(record: ScheduledJobRecord | null) {
-  return getScheduledJobValue(record, ['scheduledAt', 'scheduled_at'])
-}
-
-function readScheduledJobIdFromResponse(response: unknown) {
-  if (!response || typeof response !== 'object') {
-    return ''
-  }
-
-  const candidates = [
-    response,
-    (response as Record<string, unknown>).data,
-    (response as Record<string, unknown>).item,
-    (response as Record<string, unknown>).scheduledJob,
-    (response as Record<string, unknown>).scheduled_job,
-  ]
-
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== 'object') {
-      continue
-    }
-
-    const value = (candidate as Record<string, unknown>).id
-
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim()
-    }
-  }
-
-  return ''
-}
-
-function getPersonaLabel(record: PersonaConfigRecord) {
-  return (
-    getRecordValue(record, ['persona']) ||
-    getRecordValue(record, ['title']) ||
-    getRecordValue(record, ['name']) ||
-    'Untitled persona'
-  )
-}
-
-function getPersonaMeta(record: PersonaConfigRecord) {
-  const platform = getRecordValue(record, ['platform'])
-  const audience = getRecordValue(record, ['targetAudience', 'target_audience'])
-  const style = getRecordValue(record, ['contentStyle', 'content_style'])
-
-  return [platform, audience, style].filter(Boolean).join(' - ') || 'Belum ada ringkasan persona'
-}
-
-function normalizeDatetimeLocal(value: string) {
-  if (!value.trim()) {
-    return ''
-  }
-
-  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
-
-  if (!match) {
-    return ''
-  }
-
-  const [, year, month, day, hour, minute] = match
-  const utcMillis = Date.UTC(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour) - 7,
-    Number(minute),
-  )
-  const parsed = new Date(utcMillis)
-
-  if (Number.isNaN(parsed.getTime())) {
-    return ''
-  }
-
-  return parsed.toISOString()
-}
-
-function formatDateTimeWib(value: string) {
-  if (!value.trim()) {
-    return ''
-  }
-
-  const parsed = new Date(value)
-
-  if (Number.isNaN(parsed.getTime())) {
-    return value
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Jakarta',
-  }).format(parsed)
-}
-
-function buildScheduledJobSummary(record: ScheduledJobRecord | null) {
-  if (!record) {
-    return 'Auto post berhasil dijadwalkan.'
-  }
-
-  const scheduledAt = getScheduledJobDate(record)
-  const scheduledLabel = scheduledAt ? formatDateTimeWib(scheduledAt) : ''
-  const parts = [
-    scheduledLabel
-      ? `Auto post berhasil dijadwalkan ${scheduledLabel} WIB.`
-      : 'Auto post berhasil dijadwalkan.',
-  ]
-
-  const status = getScheduledJobStatus(record)
-
-  if (status) {
-    parts.push(`Status: ${status}.`)
-  }
-
-  return parts.join(' ')
-}
-
-function isApprovedOutput(record: ContentOutputRecord): boolean {
-  return record.status?.toLowerCase().trim() === 'approved'
-}
-
-function isDraftOutput(record: ContentOutputRecord): boolean {
-  return record.status?.toLowerCase().trim() === 'draft'
-}
-
-function isFailedOutput(record: ContentOutputRecord): boolean {
-  return record.status?.toLowerCase().trim() === 'failed'
-}
-
-function isPostedOutput(record: ContentOutputRecord): boolean {
-  const status = record.status?.toLowerCase().trim()
-  const externalPostId = record.externalPostId || record.external_post_id
-
-  return status === 'posted' || (typeof externalPostId === 'string' && externalPostId.trim().length > 0)
-}
-
-function isThreadsPlatform(record: ContentOutputRecord): boolean {
-  return record.platform?.toLowerCase().trim() === 'threads'
-}
-
-function getOutputPersonaConfigId(record: ContentOutputRecord): string {
-  const candidates = [record.personaConfigId, record.persona_config_id]
-
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim()) {
-      return candidate.trim()
-    }
-  }
-
-  return ''
-}
-
-function getOutputPreviewText(record: ContentOutputRecord): string {
-  return (
-    record.content ||
-    record.contentOutput ||
-    record.output ||
-    record.topic ||
-    record.title ||
-    'Konten tidak tersedia'
-  )
-}
-
-export function AutoPostPage({ userId, isThreadsConnected }: AutoPostPageProps) {
-  const { success: toastSuccess, error: toastError } = useToast()
-  const [personaConfigs, setPersonaConfigs] = useState<PersonaConfigRecord[]>([])
-  const [contentOutputs, setContentOutputs] = useState<ContentOutputRecord[]>([])
-  const [form, setForm] = useState<AutoPostScheduleForm>({
-    personaConfigId: '',
-    targetCount: 5,
-    scheduledAt: '',
-  })
-  const [statusMessage, setStatusMessage] = useState(
-    'Pilih persona lalu atur target dan waktu schedule.',
-  )
-  const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
-  const [isLoadingPersonas, setIsLoadingPersonas] = useState(true)
-  const [isLoadingOutputs, setIsLoadingOutputs] = useState(true)
-  const [isLoadingScheduledJobs, setIsLoadingScheduledJobs] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [scheduledJobs, setScheduledJobs] = useState<ScheduledJobRecord[]>([])
-
-  async function refreshScheduledJobs() {
-    setIsLoadingScheduledJobs(true)
-
+  const refresh = useCallback(async () => {
+    setLoading(true)
     try {
-      const records = await listScheduledJobs()
-      const ownedRecords = userId
-        ? records.filter((record) => {
-            const ownerId = getScheduledJobUserId(record)
-            return !ownerId || ownerId === userId
-          })
-        : records
+      const [content, configs] = await Promise.all([listContentOutputs(userId || undefined), listPersonaConfigs()])
+      setOutputs(content); setPersonas(configs)
+    } catch { error('Data jadwal belum termuat', 'Coba muat ulang halaman.') }
+    finally { setLoading(false) }
+  }, [error, userId])
+  useEffect(() => { void refresh() }, [refresh])
 
-      setScheduledJobs(ownedRecords)
-    } catch {
-      setScheduledJobs([])
-    } finally {
-      setIsLoadingScheduledJobs(false)
-    }
-  }
+  const ready = useMemo(() => outputs.filter(isReady), [outputs])
+  const scheduled = useMemo(() => outputs.filter(isActuallyScheduled).map((item) => ({ item, date: parseDate(item) })).filter((x): x is { item: ContentOutputRecord; date: Date } => Boolean(x.date)).sort((a, b) => a.date.getTime() - b.date.getTime()), [outputs])
+  const grouped = useMemo(() => { const map = new Map<string, typeof scheduled>(); scheduled.forEach((row) => map.set(dateKey(row.date), [...(map.get(dateKey(row.date)) || []), row])); return map }, [scheduled])
+  const selectedDay = grouped.get(selectedDate) || []
+  const personaFor = (record: ContentOutputRecord) => personaName(personas.find((p) => p.id === personaId(record)))
+  const selectedContent = ready.find((item) => outputId(item) === selectedId) || null
 
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadPersonaConfigs() {
-      setIsLoadingPersonas(true)
-
-      try {
-        const records = await listPersonaConfigs()
-        const ownedRecords = userId
-          ? records.filter((record) => {
-              const ownerId = getRecordUserId(record)
-              return !ownerId || ownerId === userId
-            })
-          : records
-
-        if (!isMounted) {
-          return
-        }
-
-        setPersonaConfigs(ownedRecords)
-        setForm((current) => ({
-          ...current,
-          personaConfigId: current.personaConfigId || ownedRecords[0]?.id || '',
-        }))
-      } catch (error) {
-        if (!isMounted) {
-          return
-        }
-
-        setPersonaConfigs([])
-        setForm((current) => ({
-          ...current,
-          personaConfigId: '',
-        }))
-        const errorMessage = error instanceof Error ? error.message : 'Gagal memuat persona configs.'
-        setStatusTone('error')
-        setStatusMessage(errorMessage)
-      } finally {
-        if (isMounted) {
-          setIsLoadingPersonas(false)
-        }
-      }
-    }
-
-    void loadPersonaConfigs()
-
-    return () => {
-      isMounted = false
-    }
-  }, [userId])
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadScheduledJobs() {
-      try {
-        await refreshScheduledJobs()
-      } finally {
-        if (!isMounted) {
-          return
-        }
-      }
-    }
-
-    void loadScheduledJobs()
-
-    return () => {
-      isMounted = false
-    }
-  }, [userId])
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadContentOutputs() {
-      setIsLoadingOutputs(true)
-
-      try {
-        const records = await listContentOutputs(userId || undefined)
-
-        if (!isMounted) {
-          return
-        }
-
-        setContentOutputs(records)
-      } catch {
-        if (isMounted) {
-          setContentOutputs([])
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingOutputs(false)
-        }
-      }
-    }
-
-    void loadContentOutputs()
-
-    return () => {
-      isMounted = false
-    }
-  }, [userId])
-
-  const selectedPersona = useMemo(
-    () => personaConfigs.find((persona) => persona.id === form.personaConfigId) || null,
-    [form.personaConfigId, personaConfigs],
-  )
-
-  const personaScopedOutputs = useMemo(() => {
-    if (!form.personaConfigId.trim()) {
-      return []
-    }
-
-    return contentOutputs.filter((record) => {
-      return getOutputPersonaConfigId(record) === form.personaConfigId.trim()
-    })
-  }, [contentOutputs, form.personaConfigId])
-
-  const approvedOutputs = useMemo(() => {
-    return personaScopedOutputs.filter((record) => {
-      return isApprovedOutput(record) && isThreadsPlatform(record)
-    })
-  }, [personaScopedOutputs])
-
-  const readyToScheduleCount = useMemo(() => {
-    return personaScopedOutputs.filter((record) => {
-      return isThreadsPlatform(record) && isApprovedOutput(record)
-    }).length
-  }, [personaScopedOutputs])
-
-  const scheduledCount = useMemo(() => {
-    return scheduledJobs.filter((record) => {
-      if (getScheduledJobStatus(record).toLowerCase() !== 'active') {
-        return false
-      }
-
-      if (!form.personaConfigId.trim()) {
-        return true
-      }
-
-      return getScheduledJobPersonaConfigId(record) === form.personaConfigId.trim()
-    }).length
-  }, [form.personaConfigId, scheduledJobs])
-
-  const needsReviewCount = useMemo(() => {
-    return personaScopedOutputs.filter((record) => {
-      return isThreadsPlatform(record) && (isFailedOutput(record) || isDraftOutput(record))
-    }).length
-  }, [personaScopedOutputs])
-
-  const postedCount = useMemo(() => {
-    return personaScopedOutputs.filter((record) => {
-      return isThreadsPlatform(record) && isPostedOutput(record)
-    }).length
-  }, [personaScopedOutputs])
-
-  const excludedOutputCount = Math.max(personaScopedOutputs.length - approvedOutputs.length, 0)
-
-  const previewQueue = useMemo(
-    () => approvedOutputs.slice(0, form.targetCount),
-    [approvedOutputs, form.targetCount],
-  )
-
-  const canSubmit =
-    isThreadsConnected &&
-    Boolean(form.personaConfigId.trim()) &&
-    form.targetCount >= 1 &&
-    form.targetCount <= 100 &&
-    Boolean(form.scheduledAt.trim()) &&
-    previewQueue.length > 0 &&
-    approvedOutputs.length >= form.targetCount &&
-    !isSubmitting &&
-    !isLoadingPersonas
-
-  function updateForm(key: keyof AutoPostScheduleForm, value: string | number) {
-    setForm((current) => ({
-      ...current,
-      [key]: value,
-    }))
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!isThreadsConnected) {
-      setStatusTone('error')
-      setStatusMessage('Hubungkan akun Threads terlebih dahulu sebelum membuat schedule.')
-      return
-    }
-
-    const scheduledAtIso = normalizeDatetimeLocal(form.scheduledAt)
-
-    if (!form.personaConfigId.trim() || !scheduledAtIso || form.targetCount < 1) {
-      setStatusTone('error')
-      setStatusMessage('Lengkapi persona, target, dan scheduled time dulu.')
-      return
-    }
-
-    if (approvedOutputs.length < form.targetCount) {
-      setStatusTone('error')
-      setStatusMessage(
-        `Approved content Threads untuk persona ini cuma ${approvedOutputs.length}, lebih kecil dari target ${form.targetCount}.`,
-      )
-      return
-    }
-
-    if (!previewQueue[0]?.id) {
-      setStatusTone('error')
-      setStatusMessage('Belum ada approved content Threads untuk persona ini.')
-      return
-    }
-
-    setIsSubmitting(true)
-    setStatusTone('idle')
-    setStatusMessage('Mengirim schedule auto post...')
-
-    const payload = {
-      personaConfigId: form.personaConfigId.trim(),
-      scheduledAt: scheduledAtIso,
-      limit: form.targetCount,
-    }
-
-    console.log('[AutoPost] submitting payload', payload)
-    console.log(
-      '[AutoPost] approved outputs before schedule',
-      approvedOutputs.map((record) => ({
-        id: record.id,
-        status: record.status,
-        platform: record.platform,
-        personaConfigId: getOutputPersonaConfigId(record),
-        scheduled_at: record.scheduled_at || record.scheduledAt,
-      })),
-    )
-
+  function openNew(prefillDate?: string) { if (!isThreadsConnected) { onConnectThreads(); return } if (prefillDate) setDate(prefillDate); setEditing(null); setShowSchedule(true) }
+  function openEdit(record: ContentOutputRecord) { const parsed = parseDate(record); if (!parsed || isPosted(record)) return; setEditing(record); setDate(dateKey(parsed)); setTime(timeLabel(parsed)); setShowSchedule(true) }
+  async function submit(event: FormEvent) { event.preventDefault(); const iso = wibIso(date, time); const target = editing || selectedContent; if (!target || !iso) return; setSaving(true); try { if (editing) await rescheduleThreadsContent(outputId(target), iso); else await scheduleThreadsAutoPost({ contentOutputId: outputId(target), scheduledAt: iso, limit: 1 }); await refresh(); setShowSchedule(false); setSelectedId(''); setSelectedDate(date); setMonth(new Date(`${date}T12:00:00`)); success(editing ? 'Jadwal diperbarui' : 'Konten dijadwalkan', `${time} WIB`) } catch (cause) { error('Jadwal belum tersimpan', cause instanceof Error ? cause.message : 'Coba lagi.') } finally { setSaving(false) } }
+  async function cancelSchedule() {
+    if (!cancelTarget) return
+    setSaving(true)
     try {
-      const response = await scheduleThreadsAutoPost(payload)
-      const scheduledJobId = readScheduledJobIdFromResponse(response)
-      let successSummary = 'Auto post berhasil dijadwalkan.'
+      await cancelThreadsContentSchedule(outputId(cancelTarget))
+      await refresh()
+      setCancelTarget(null)
+      success('Jadwal dibatalkan', 'Konten kembali ke Belum dijadwalkan.')
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Coba lagi.'
+      const isAlreadyUnscheduled = /not currently scheduled|scheduled content not found/i.test(message)
 
-      console.log('[AutoPost] scheduleThreadsAutoPost response', response)
-      console.log('[AutoPost] scheduleValue sent ->', scheduledAtIso)
-
-      if (scheduledJobId) {
-        try {
-          const scheduledJob = await getScheduledJobById(scheduledJobId)
-
-          console.log('[AutoPost] getScheduledJobById response', scheduledJob)
-          successSummary = buildScheduledJobSummary(scheduledJob)
-
-          if (!userId || !getScheduledJobUserId(scheduledJob) || getScheduledJobUserId(scheduledJob) === userId) {
-            void listContentOutputs(userId || undefined)
-              .then((records) => {
-                setContentOutputs(records)
-              })
-              .catch(() => {})
-          }
-
-          void refreshScheduledJobs()
-        } catch (scheduledJobError) {
-          console.log('[AutoPost] getScheduledJobById failed', scheduledJobError)
-          successSummary = buildScheduledJobSummary({
-            id: scheduledJobId,
-            scheduledAt: scheduledAtIso,
-            status: 'registered',
-          })
-          void listContentOutputs(userId || undefined)
-            .then((records) => {
-              setContentOutputs(records)
-            })
-            .catch(() => {})
-          void refreshScheduledJobs()
-        }
+      if (isAlreadyUnscheduled) {
+        await refresh()
+        setCancelTarget(null)
+        success('Jadwal sudah dibatalkan', 'Daftar jadwal telah disinkronkan kembali.')
       } else {
-        successSummary = buildScheduledJobSummary({
-          scheduledAt: scheduledAtIso,
-          status: 'registered',
-        })
-        void listContentOutputs(userId || undefined)
-          .then((records) => {
-            setContentOutputs(records)
-          })
-          .catch(() => {})
-        void refreshScheduledJobs()
+        error('Jadwal belum dibatalkan', message)
       }
-
-      setStatusTone('success')
-      setStatusMessage(successSummary)
-      toastSuccess('Schedule sent', 'Request auto post sudah dikirim ke backend.')
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Gagal menjadwalkan auto post.'
-      setStatusTone('error')
-      setStatusMessage(errorMessage)
-      toastError('Schedule failed', errorMessage)
     } finally {
-      setIsSubmitting(false)
+      setSaving(false)
     }
   }
 
-  return (
-    <section className="generate-page auto-post-page">
-      <header className="page-header generate-hero">
-        <div>
-          <p className="eyebrow">Reframe Auto Post</p>
-          <h1>Schedule auto post.</h1>
-          <p className="page-description">
-            Pilih persona, tentukan target konten approved yang mau di-schedule, lalu set waktu postingnya.
-            Hanya konten berstatus <strong>approved</strong> yang akan ikut batch.
-          </p>
-        </div>
+  return <section className="generate-page auto-post-page schedule-workspace">
+    <header className="schedule-page-header"><div><h1>Jadwal</h1><p>Atur konten yang akan tayang dan kapan waktunya.</p></div></header>
+    {!isThreadsConnected ? <div className="schedule-message error"><AppIcon name="info" /><span>Hubungkan Threads untuk membuat jadwal baru.</span><button className="schedule-text-button" onClick={onConnectThreads}>Hubungkan Threads</button></div> : null}
+    <nav className="schedule-main-tabs"><button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Kalender</button><button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>List <span>{scheduled.length}</span></button></nav>
 
-        <div className="generate-hero-metrics pt-2">
-          <div className="metric-card">
-            <span>Siap dipost</span>
-            <strong>{isLoadingOutputs ? '...' : `${readyToScheduleCount}x`}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Sudah terjadwal</span>
-            <strong>{isLoadingScheduledJobs ? '...' : `${scheduledCount}x`}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Draft</span>
-            <strong>{isLoadingOutputs ? '...' : `${needsReviewCount}x`}</strong>
-          </div>
-          <div className="metric-card">
-            <span>Sudah dipublish</span>
-            <strong>{isLoadingOutputs ? '...' : `${postedCount}x`}</strong>
-          </div>
-        </div>
-      </header>
+    <div className="schedule-content-workspace"><main>
+      {view === 'calendar' ? <><div className="schedule-calendar-toolbar"><div className="schedule-month-nav"><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>‹</button><h2>{monthLabel(month)}</h2><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>›</button></div><button className="schedule-text-button" onClick={() => { setMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedDate(dateKey(today)) }}>Hari ini</button></div><div className="schedule-calendar"><div className="schedule-weekdays">{WEEKDAYS.map((day) => <span key={day}>{day}</span>)}</div><div className="schedule-month-grid">{cellsFor(month).map(({ key, date: cellDate }) => { if (!cellDate) return <span className="schedule-day blank" key={key} />; const keyDate = dateKey(cellDate); const events = grouped.get(keyDate) || []; return <button key={key} className={`schedule-day${selectedDate === keyDate ? ' selected' : ''}${dateKey(today) === keyDate ? ' today' : ''}`} onClick={() => setSelectedDate(keyDate)}><span className="day-number">{cellDate.getDate()}</span>{events.slice(0, 2).map(({ item, date: eventDate }) => <span className="calendar-event" key={outputId(item)} onClick={(event) => { event.stopPropagation(); openEdit(item) }}><b>{timeLabel(eventDate)}</b> {titleOf(item)}</span>)}{events.length > 2 ? <small>+{events.length - 2} lainnya</small> : null}{events.length ? <i className="schedule-dot" /> : null}</button> })}</div></div><section className="schedule-day-agenda"><div className="agenda-heading"><div><span>Agenda</span><h3>{dayLabel(new Date(`${selectedDate}T12:00:00`))}</h3></div></div>{selectedDay.length ? <div className="agenda-list">{selectedDay.map(({ item, date: itemDate }) => <article key={outputId(item)} onClick={() => openEdit(item)}><time>{timeLabel(itemDate)}</time><div><strong>{titleOf(item)}</strong><span>{personaFor(item)}</span></div><button className="schedule-row-menu" aria-label="Edit jadwal">•••</button></article>)}</div> : <div className="schedule-empty compact"><strong>Belum ada konten terjadwal.</strong></div>}</section></> : <div className="schedule-list-view">{scheduled.length ? scheduled.map(({ item, date: itemDate }, index) => { const heading = listGroup(itemDate, today); const previous = index ? listGroup(scheduled[index - 1].date, today) : ''; return <Fragment key={outputId(item)}>{heading !== previous ? <h3 className="schedule-list-group">{heading}</h3> : null}<article onClick={() => openEdit(item)}><time><b>{timeLabel(itemDate)}</b><span>WIB</span></time><div><strong>{titleOf(item)}</strong><span>{personaFor(item)}</span></div><button className="schedule-row-menu" aria-label="Edit jadwal">•••</button></article></Fragment> }) : <div className="schedule-empty"><strong>Belum ada konten terjadwal</strong><p>Konten yang kamu jadwalkan akan muncul di sini.</p></div>}</div>}
+    </main><aside className="schedule-unscheduled"><div className="schedule-ready-head"><div><h2>Belum dijadwalkan</h2><p>{ready.length} konten</p></div></div>{loading ? <div className="schedule-empty compact">Memuat konten...</div> : ready.length ? <div className="schedule-ready-list">{ready.map((item) => { const active = selectedId === outputId(item); return <button className={active ? 'selected' : ''} key={outputId(item)} onClick={() => setSelectedId(active ? '' : outputId(item))}><span className="idea-check">{active ? '✓' : ''}</span><div><strong>{titleOf(item)}</strong><span>{personaFor(item)} · Siap</span></div></button> })}</div> : <div className="schedule-empty compact"><strong>Belum ada konten yang siap dijadwalkan</strong><p>Review dan approve konten terlebih dahulu.</p>{onReviewContent ? <button className="schedule-text-button" onClick={onReviewContent}>Review Konten</button> : null}</div>}{selectedContent ? <div className="schedule-ready-action"><span>1 konten dipilih</span><button className="schedule-primary" onClick={() => openNew()}>Pilih waktu</button></div> : null}</aside></div>
 
-      {statusMessage ? (
-        <div className={`integration-note ${statusTone === 'error' ? 'integration-note-error' : ''}`}>
-          <AppIcon name={statusTone === 'success' ? 'check' : 'info'} />
-          <p>{statusMessage}</p>
-        </div>
-      ) : null}
-
-      <section className="generate-layout auto-post-layout">
-        <form className="panel generate-panel auto-post-form-panel" onSubmit={handleSubmit}>
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Schedule Form</p>
-              <h2>Isi data auto post</h2>
-            </div>
-            <span className={`pill${canSubmit ? ' subtle' : ''}`}>
-              {canSubmit ? 'Ready' : 'Needs input'}
-            </span>
-          </div>
-
-          {!isThreadsConnected ? (
-            <div className="integration-note integration-note-error">
-              <AppIcon name="info" />
-              <p>Hubungkan akun Threads di Reframe Connections untuk mengaktifkan Schedule.</p>
-            </div>
-          ) : null}
-
-          <label className="persona-field full-width">
-            <span>Persona Config</span>
-            <div className="select-wrap">
-              <select
-                value={form.personaConfigId}
-                onChange={(event) => updateForm('personaConfigId', event.target.value)}
-                disabled={isLoadingPersonas || personaConfigs.length === 0}
-              >
-                <option value="">
-                  {isLoadingPersonas ? 'Loading persona configs...' : 'Choose persona'}
-                </option>
-                {personaConfigs.map((persona) => (
-                  <option key={persona.id || getPersonaLabel(persona)} value={persona.id || ''}>
-                    {getPersonaLabel(persona)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </label>
-
-          {selectedPersona ? (
-            <div className="generate-empty-state auto-post-now-note">
-              <AppIcon name="user" />
-              <div>
-                <strong>{getPersonaLabel(selectedPersona)}</strong>
-                <p>{getPersonaMeta(selectedPersona)}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="generate-empty-state auto-post-now-note">
-              <AppIcon name="info" />
-              <div>
-                <strong>Belum ada persona</strong>
-                <p>Pilih persona config dulu supaya schedule bisa dikirim ke backend.</p>
-              </div>
-            </div>
-          )}
-
-          <label className="persona-field">
-            <span>Target</span>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={form.targetCount}
-              onChange={(event) =>
-                updateForm('targetCount', Number.parseInt(event.target.value || '0', 10) || 1)
-              }
-              placeholder="5"
-            />
-            <small className="field-hint">Jumlah konten approved yang akan diambil untuk batch auto post.</small>
-          </label>
-
-          <label className="persona-field full-width">
-            <span>Scheduled At (WIB)</span>
-            <input
-              type="datetime-local"
-              value={form.scheduledAt}
-              onChange={(event) => updateForm('scheduledAt', event.target.value)}
-            />
-            <small className="field-hint">Pilih tanggal dan jam posting dalam WIB.</small>
-          </label>
-
-          <div className="persona-actions persona-actions-preview">
-            <button className="primary-button" type="submit" disabled={!canSubmit}>
-              {isSubmitting ? 'Menjadwalkan...' : 'Schedule'}
-            </button>
-          </div>
-
-        </form>
-
-        <aside className="generate-side-column auto-post-side-column">
-          <article className="panel generate-panel">
-            <div className="panel-heading compact">
-              <div>
-                <p className="eyebrow">Approved Content</p>
-                <h2>Preview antrian post</h2>
-              </div>
-              <span className="pill subtle">approved + Threads</span>
-            </div>
-
-            <div className="integration-note">
-              <AppIcon name="info" />
-              <p>
-                Hanya konten persona ini dengan status <strong>approved</strong> untuk platform <strong>Threads</strong> yang akan ikut batch auto post.
-                {excludedOutputCount > 0 && !isLoadingOutputs
-                  ? ` ${excludedOutputCount} konten persona ini tidak cocok filter dan tidak akan ikut.`
-                  : null}
-              </p>
-            </div>
-
-            {isLoadingOutputs ? (
-              <div className="generate-empty-state">
-                <AppIcon name="info" />
-                <div>
-                  <strong>Memuat content outputs...</strong>
-                </div>
-              </div>
-            ) : !form.personaConfigId.trim() ? (
-              <div className="generate-empty-state">
-                <AppIcon name="info" />
-                <div>
-                  <strong>Pilih persona dulu</strong>
-                  <p>Daftar content output akan difilter setelah persona dipilih.</p>
-                </div>
-              </div>
-            ) : approvedOutputs.length === 0 ? (
-              <div className="generate-empty-state">
-                <AppIcon name="info" />
-                <div>
-                  <strong>Belum ada approved content untuk persona ini</strong>
-                  <p>Pastikan ada content output persona ini yang approved dan platform-nya Threads.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="auto-post-output-list">
-                {previewQueue.map((record, index) => (
-                  <div key={record.id || index} className="auto-post-output-item">
-                    <div className="auto-post-output-meta">
-                      <span className="pill subtle">#{index + 1}</span>
-                      <span className="pill">approved</span>
-                    </div>
-                    <p className="auto-post-output-text">
-                      {getOutputPreviewText(record).slice(0, 120)}
-                      {getOutputPreviewText(record).length > 120 ? '...' : ''}
-                    </p>
-                  </div>
-                ))}
-                {approvedOutputs.length > form.targetCount ? (
-                  <p className="field-hint" style={{ textAlign: 'center', marginTop: '8px' }}>
-                    +{approvedOutputs.length - form.targetCount} konten approved lain tidak masuk target ini.
-                  </p>
-                ) : null}
-              </div>
-            )}
-          </article>
-        </aside>
-      </section>
-    </section>
-  )
+    {showSchedule ? <div className="schedule-dialog-backdrop"><section className="schedule-dialog" role="dialog" aria-modal="true"><header><div><h2>{editing ? 'Edit jadwal' : 'Jadwalkan konten'}</h2><p>{titleOf(editing || selectedContent!)}</p></div><button onClick={() => setShowSchedule(false)}>×</button></header><form onSubmit={submit}><div className="schedule-date-time"><label><span>Tanggal</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label><label><span>Waktu</span><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /><small>WIB</small></label></div><div className="schedule-dialog-actions"><button className="ghost-button" type="button" onClick={() => setShowSchedule(false)}>Batal</button><button className="schedule-primary schedule-submit" disabled={saving}>{saving ? 'Menyimpan...' : editing ? 'Simpan' : 'Jadwalkan konten'}</button></div>{editing && onReviewContent ? <button className="schedule-view-action" type="button" onClick={onReviewContent}>Lihat konten</button> : null}{editing ? <button className="schedule-cancel-action" type="button" onClick={() => { setShowSchedule(false); setCancelTarget(editing) }}>Batalkan jadwal</button> : null}</form></section></div> : null}
+    {cancelTarget ? <div className="schedule-dialog-backdrop"><section className="schedule-dialog schedule-confirm" role="alertdialog"><header><div><h2>Batalkan jadwal?</h2><p>Konten tidak akan dihapus dan bisa dijadwalkan kembali.</p></div></header><div className="schedule-confirm-actions"><button className="ghost-button" onClick={() => setCancelTarget(null)}>Batal</button><button className="danger-button" disabled={saving} onClick={() => void cancelSchedule()}>{saving ? 'Membatalkan...' : 'Batalkan Jadwal'}</button></div></section></div> : null}
+  </section>
 }

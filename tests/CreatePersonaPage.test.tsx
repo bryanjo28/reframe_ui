@@ -23,7 +23,7 @@ describe('CreatePersonaPage actions', () => {
   it('shows only Create Persona during the initial setup', () => {
     renderPage(true)
 
-    expect(screen.getByRole('button', { name: 'Create Persona' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Simpan & Lanjut' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New Persona' })).not.toBeInTheDocument()
   })
 

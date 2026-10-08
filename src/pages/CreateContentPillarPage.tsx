@@ -225,7 +225,7 @@ function PillarVersionCard({
   )
 }
 
-export function CreateContentPillarPage() {
+export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { isInitialSetup?: boolean; onSaved?: (pillar: ContentPillarRecord) => void }) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [formValues, setFormValues] = useState<ContentPillarPayload>(emptyPillarForm)
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfigRecord[]>([])
@@ -396,12 +396,12 @@ export function CreateContentPillarPage() {
           : 'Content pillar created',
         successMessage,
       )
+      onSaved?.(nextRecord)
     } catch (error) {
       setStatusTone('error')
-      const errorMessage =
-        error instanceof Error ? error.message : 'Gagal menyimpan content pillar.'
+      const errorMessage = `Content Pillar belum berhasil disimpan. ${error instanceof Error ? error.message : 'Periksa data lalu coba lagi.'}`
       setStatusMessage(errorMessage)
-      toastError('Content pillar save failed', errorMessage)
+      toastError('Content Pillar belum berhasil disimpan', errorMessage)
     } finally {
       setIsSaving(false)
     }
@@ -462,11 +462,10 @@ export function CreateContentPillarPage() {
   return (
     <section className="persona-page">
       <header className="page-header">
-        <p className="eyebrow">Workspace</p>
-        <h1>Reframe Content Pillar Studio</h1>
+        <p className="eyebrow">{isInitialSetup ? 'Content Brain · 2 of 2' : 'Content Brain'}</p>
+        <h1>{isInitialSetup ? 'Kamu mau dikenal bahas apa?' : 'Content Pillars'}</h1>
         <p className="page-description">
-          Klik versi lama di samping kalau mau edit data sebelumnya. Kalau belum ada
-          record, form akan tetap kosong dan siap dipakai untuk create baru.
+          {isInitialSetup ? 'Tentukan topik utama yang akan menjadi arah kontenmu.' : 'Topik utama yang menjadi arah ide dan kontenmu.'}
         </p>
       </header>
 
@@ -477,7 +476,7 @@ export function CreateContentPillarPage() {
       ) : null}
 
       <section className="persona-layout">
-        <article className="panel persona-form-panel">
+        <article className="panel persona-form-panel" data-tour-step={isInitialSetup ? 3 : undefined}>
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Reframe Pillar Builder</p>
@@ -536,7 +535,7 @@ export function CreateContentPillarPage() {
               form="content-pillar-form"
               disabled={isSaving || isDeleting || isBusy || !selectedPersonaConfigId}
             >
-              {isSaving ? 'Menyimpan...' : hasExistingRecord ? 'Update Pillar' : 'Create Pillar'}
+              {isSaving ? 'Menyimpan...' : isInitialSetup ? 'Simpan & Lanjut' : hasExistingRecord ? 'Update Pillar' : 'Create Pillar'}
             </button>
           </div>
 

@@ -22,11 +22,39 @@ let usageCache:
 
 let usageRequest: Promise<UsageSummary | null> | null = null
 
-export function notifyUsageChanged() {
+export type UsageUpdatedDetail = { creditsUsed?: number }
+
+export function extractCreditsUsed(payload: unknown): number | undefined {
+  const visited = new Set<object>()
+  function find(value: unknown, depth: number): number | undefined {
+    if (!isRecord(value) || depth > 5 || visited.has(value)) return undefined
+    visited.add(value)
+    const direct = readFirstNumber(value, ['creditsUsed', 'credits_used', 'totalTokens', 'total_tokens'])
+    if (typeof direct === 'number' && direct > 0) return Math.floor(direct)
+    const priority = ['subscriptionUsage', 'subscription_usage', 'usage', 'data', 'result', 'generationLog', 'generation_log', 'outputPayload', 'output_payload']
+    for (const key of priority) {
+      const found = find(value[key], depth + 1)
+      if (found) return found
+    }
+    for (const nested of Object.values(value)) {
+      if (Array.isArray(nested)) {
+        for (const item of nested) { const found = find(item, depth + 1); if (found) return found }
+      } else {
+        const found = find(nested, depth + 1)
+        if (found) return found
+      }
+    }
+    return undefined
+  }
+  return find(payload, 0)
+}
+
+export function notifyUsageChanged(payload?: unknown) {
   usageCache = null
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(USAGE_UPDATED_EVENT))
+    const creditsUsed = typeof payload === 'number' ? payload : extractCreditsUsed(payload)
+    window.dispatchEvent(new CustomEvent<UsageUpdatedDetail>(USAGE_UPDATED_EVENT, { detail: { creditsUsed } }))
   }
 }
 

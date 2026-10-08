@@ -1,8 +1,18 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
-import { getApiError } from '../utils/apiError'
+import { getApiError, SESSION_EXPIRED_EVENT } from '../utils/apiError'
 
 const AUTH_TOKEN_STORAGE_KEY = 'reframe.authToken'
 const AUTH_STATE_CACHE_TTL_MS = 10_000
+const DUMMY_THREADS_CONNECTION_ENABLED = import.meta.env.DEV && import.meta.env.MODE !== 'test'
+
+const DUMMY_THREADS_CONNECTION: ThreadsSocialAccountState = {
+  status: 'connected',
+  connected: true,
+  needsReconnect: false,
+  username: '@reframe_dummy',
+  accountId: 'threads-dummy-account',
+  threadsId: 'threads-dummy-user',
+}
 
 export type AuthCredentials = {
   email: string
@@ -356,12 +366,17 @@ function normalizeAuthMeState(payload: ApiResponse): AuthMeState | null {
       typeof hasPersona === 'boolean'
         ? { hasPersona }
         : null,
-    socialAccounts: socialAccountsRecord
+    socialAccounts: DUMMY_THREADS_CONNECTION_ENABLED
       ? {
-          ...socialAccountsRecord,
-          threads: threads ?? undefined,
+          ...(socialAccountsRecord ?? {}),
+          threads: DUMMY_THREADS_CONNECTION,
         }
-      : null,
+      : socialAccountsRecord
+        ? {
+            ...socialAccountsRecord,
+            threads: threads ?? undefined,
+          }
+        : null,
   }
 }
 
@@ -526,6 +541,7 @@ export async function getCurrentAuthState() {
       value: null,
     }
 
+    if (token && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
     return null
   }
 
