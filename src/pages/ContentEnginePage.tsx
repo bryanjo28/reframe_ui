@@ -39,6 +39,19 @@ const outputStatusOptions = [
 ]
 
 const outputsPerPage = 5
+const threadSplitMarker = '---THREAD_SPLIT---'
+
+function splitThreadContent(content: string) {
+  const parts = content
+    .split(/\s*---THREAD_SPLIT---\s*/g)
+    .map((part) => part.trim())
+
+  return parts.length ? parts : ['']
+}
+
+function joinThreadContent(parts: string[]) {
+  return parts.map((part) => part.trim()).join(`\n\n${threadSplitMarker}\n\n`)
+}
 
 function getRecordValue(record: ContentPillarRecord | null, keys: string[]) {
   if (!record) {
@@ -316,6 +329,7 @@ export function ContentEnginePage({
   const [retryModalOutputId, setRetryModalOutputId] = useState('')
   const [retryScheduledAt, setRetryScheduledAt] = useState('')
   const [outputEditForm, setOutputEditForm] = useState<OutputEditForm>(getOutputEditForm(null))
+  const [outputThreadParts, setOutputThreadParts] = useState<string[]>([''])
 
   useEffect(() => {
     let isMounted = true
@@ -506,6 +520,7 @@ export function ContentEnginePage({
       ...nextForm,
       status: nextForm.status.trim().toLowerCase(),
     })
+    setOutputThreadParts(splitThreadContent(nextForm.content))
   }, [isOutputEditorOpen, selectedContentOutput])
 
   useEffect(() => {
@@ -640,6 +655,12 @@ export function ContentEnginePage({
     }))
   }
 
+  function handleThreadPartChange(index: number, value: string) {
+    setOutputThreadParts((current) =>
+      current.map((part, partIndex) => (partIndex === index ? value : part)),
+    )
+  }
+
   function openRetryModal(record: ContentOutputRecord) {
     const outputId = getOutputId(record)
 
@@ -667,7 +688,7 @@ export function ContentEnginePage({
     const payload = {
       id: selectedOutputIdValue,
       status: outputEditForm.status.trim(),
-      content: outputEditForm.content.trim(),
+      content: joinThreadContent(outputThreadParts),
     }
 
     console.log('[ContentEngine] handleSaveOutput', {
@@ -1041,15 +1062,29 @@ export function ContentEnginePage({
                   </label>
                 </div>
 
-                <label className="content-output-modal-body">
-                  <span className="content-output-modal-label">Isi konten</span>
-                  <textarea
-                    value={outputEditForm.content}
-                    onChange={(event) => handleOutputFieldChange('content', event.target.value)}
-                    rows={8}
-                    placeholder="Edit isi output di sini..."
-                  />
-                </label>
+                <div className="content-output-modal-body">
+                  <div className="content-output-thread-heading">
+                    <span className="content-output-modal-label">Isi Threads</span>
+                    <span>{outputThreadParts.length} bagian</span>
+                  </div>
+                  <div className="content-output-thread-list">
+                    {outputThreadParts.map((part, index) => (
+                      <label className="content-output-thread-card" key={index}>
+                        <span className="content-output-thread-card-head">
+                          <strong>Thread {index + 1}</strong>
+                          <small>{part.length} karakter</small>
+                        </span>
+                        <textarea
+                          aria-label={`Thread ${index + 1}`}
+                          value={part}
+                          onChange={(event) => handleThreadPartChange(index, event.target.value)}
+                          rows={5}
+                          placeholder={`Tulis isi Thread ${index + 1}...`}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="content-output-modal-actions">
                     <button
@@ -1213,13 +1248,13 @@ export function ContentEnginePage({
 
       <div className="generate-mode-switcher">
         <span className="pill subtle">Konten Baru</span>
-        <button
+        {/* <button
           className="ghost-button generate-mode-button"
           type="button"
           onClick={() => setViewMode('list')}
         >
           Lihat Konten Saya
-        </button>
+        </button> */}
       </div>
 
       {statusMessage ? (

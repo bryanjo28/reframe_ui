@@ -657,8 +657,6 @@ function AppShell() {
 	          isCollapsed={isSidebarCollapsed}
 	          isMobile={isSidebarMobile}
 	          isOpen={isSidebarMobile ? isSidebarOpen : true}
-            theme={theme}
-            onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
 	          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
 	          onClose={() => setIsSidebarOpen(false)}
             onReplayTutorial={() => setShowTutorial(true)}

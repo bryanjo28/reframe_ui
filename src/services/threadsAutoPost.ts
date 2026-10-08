@@ -5,10 +5,8 @@ const THREADS_AUTO_POST_ENDPOINT = '/api/threads/auto-post'
 const SCHEDULED_JOBS_ENDPOINT = '/api/scheduled-jobs'
 
 export type ScheduleThreadsAutoPostPayload = {
-  personaConfigId?: string
-  contentOutputId?: string
+  contentOutputId: string
   scheduledAt: string
-  limit: number
 }
 
 export type ScheduledJobRecord = {
@@ -191,10 +189,8 @@ export async function scheduleThreadsAutoPost(payload: ScheduleThreadsAutoPostPa
     method: 'POST',
     headers: buildHeaders(true),
     body: JSON.stringify({
-      ...(payload.personaConfigId ? { personaConfigId: payload.personaConfigId } : {}),
-      ...(payload.contentOutputId ? { contentOutputId: payload.contentOutputId } : {}),
+      contentOutputId: payload.contentOutputId,
       scheduledAt: payload.scheduledAt,
-      limit: payload.limit,
     }),
   })
 

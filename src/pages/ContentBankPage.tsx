@@ -6,6 +6,15 @@ import type { NavKey } from '../types/navigation'
 import { getUserFacingError } from '../utils/apiError'
 
 type Filter = 'all' | 'review' | 'ready' | 'scheduled' | 'published'
+const threadSplitMarker = '---THREAD_SPLIT---'
+
+function splitThreadContent(content: string) {
+  return content.split(/\s*---THREAD_SPLIT---\s*/g).map((part) => part.trim())
+}
+
+function joinThreadContent(parts: string[]) {
+  return parts.map((part) => part.trim()).join(`\n\n${threadSplitMarker}\n\n`)
+}
 
 function valueOf(record: ContentOutputRecord | null, keys: string[]) {
   if (!record) return ''
@@ -34,8 +43,9 @@ export function ContentBankPage({ userId, onNavigate }: { userId: string; onNavi
   const [filter, setFilter] = useState<Filter>('review')
   const [query, setQuery] = useState('')
   const [reviewing, setReviewing] = useState<ContentOutputRecord | null>(null)
-  const [draft, setDraft] = useState('')
+  const [draftParts, setDraftParts] = useState<string[]>([''])
   const [saving, setSaving] = useState(false)
+  const [approvingId, setApprovingId] = useState('')
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -57,16 +67,29 @@ export function ContentBankPage({ userId, onNavigate }: { userId: string; onNavi
     return !needle || `${outputTitle(item)} ${outputContent(item)} ${item.platform || ''}`.toLowerCase().includes(needle)
   }), [filter, outputs, query])
 
-  function openReview(item: ContentOutputRecord) { setReviewing(item); setDraft(outputContent(item)) }
-  async function saveReview(approve: boolean) {
-    if (!reviewing || !outputId(reviewing) || !draft.trim()) return
+  function openReview(item: ContentOutputRecord) { setReviewing(item); setDraftParts(splitThreadContent(outputContent(item))) }
+  async function saveReview() {
+    const content = joinThreadContent(draftParts)
+    if (!reviewing || !outputId(reviewing) || !content.trim()) return
     setSaving(true)
     try {
-      await updateContentOutput(outputId(reviewing), { content: draft.trim(), status: approve ? 'approved' : String(reviewing.status || 'draft') })
+      await updateContentOutput(outputId(reviewing), { content, status: String(reviewing.status || 'draft') })
       await refresh(); setReviewing(null)
-      success(approve ? 'Konten siap dijadwalkan' : 'Perubahan disimpan', approve ? 'Konten sudah disetujui.' : 'Draft berhasil diperbarui.')
+      success('Perubahan disimpan', 'Draft berhasil diperbarui.')
     } catch (cause) { error('Konten belum tersimpan', getUserFacingError(cause)) }
     finally { setSaving(false) }
+  }
+
+  async function approveContent(item: ContentOutputRecord) {
+    const id = outputId(item)
+    if (!id) return
+    setApprovingId(id)
+    try {
+      await updateContentOutput(id, { content: outputContent(item), status: 'approved' })
+      await refresh()
+      success('Konten siap dijadwalkan', 'Konten sudah disetujui.')
+    } catch (cause) { error('Konten belum disetujui', getUserFacingError(cause)) }
+    finally { setApprovingId('') }
   }
 
   const filters: Array<{ key: Filter; label: string; count: number }> = [
@@ -79,7 +102,7 @@ export function ContentBankPage({ userId, onNavigate }: { userId: string; onNavi
   return <section className="content-bank-page">
     <header className="content-bank-header"><div><p className="eyebrow">Workspace</p><h1>Content Bank</h1><p>Simpan, review, dan siapkan seluruh kontenmu dari satu tempat.</p></div></header>
     <div className="content-bank-toolbar"><div className="content-bank-search"><AppIcon name="search" /><input aria-label="Cari konten" placeholder="Cari konten..." value={query} onChange={(event) => setQuery(event.target.value)} /></div><div className="content-bank-filters">{filters.map((item) => <button key={item.key} className={filter === item.key ? 'active' : ''} onClick={() => setFilter(item.key)}>{item.label}<span>{item.count}</span></button>)}</div></div>
-    {loading ? <div className="content-bank-empty"><strong>Memuat Content Bank...</strong></div> : visible.length ? <div className="content-bank-list">{visible.map((item) => { const state = stateOf(item); return <article key={outputId(item)}><div className={`content-bank-status ${state}`}>{labelOf(item)}</div><div className="content-bank-copy"><strong>{outputTitle(item)}</strong><p>{outputContent(item)}</p><span>{String(item.platform || 'Threads')} · {formatDate(outputDate(item)) || 'Baru dibuat'}</span></div><div className="content-bank-actions">{state === 'review' ? <button className="primary-button compact" onClick={() => openReview(item)}>Review</button> : state === 'ready' ? <button className="primary-button compact" onClick={() => onNavigate('auto-post')}>Jadwalkan</button> : state === 'scheduled' ? <button className="ghost-button compact" onClick={() => onNavigate('auto-post')}>Lihat Jadwal</button> : <button className="ghost-button compact" onClick={() => openReview(item)}>Lihat</button>}</div></article> })}</div> : <div className="content-bank-empty"><AppIcon name="layers" /><strong>{query ? 'Konten tidak ditemukan' : filter === 'all' ? 'Content Bank masih kosong' : `Belum ada konten ${filters.find((item) => item.key === filter)?.label.toLowerCase()}`}</strong><p>{query ? 'Coba kata kunci atau filter lain.' : 'Buat konten baru untuk mulai mengisi Content Bank.'}</p>{!query && filter === 'all' ? <button className="primary-button" onClick={() => onNavigate('create')}>Buat Konten</button> : null}</div>}
-    {reviewing ? <div className="content-bank-dialog-backdrop"><section className="content-bank-dialog" role="dialog" aria-modal="true" aria-label="Review konten"><header><div><p className="eyebrow">Review Konten</p><h2>{outputTitle(reviewing)}</h2></div><button aria-label="Tutup" onClick={() => setReviewing(null)}>×</button></header><form onSubmit={(event: FormEvent) => { event.preventDefault(); void saveReview(false) }}><label><span>Konten</span><textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={12} /></label><div className="content-bank-dialog-actions"><button type="button" className="ghost-button" onClick={() => setReviewing(null)}>Batal</button>{stateOf(reviewing) === 'review' ? <button type="button" className="ghost-button approve" disabled={saving} onClick={() => void saveReview(true)}><AppIcon name="check" /> Setujui</button> : null}<button className="primary-button" disabled={saving || !draft.trim()}>{saving ? 'Menyimpan...' : 'Simpan'}</button></div></form></section></div> : null}
+    {loading ? <div className="content-bank-empty"><strong>Memuat Content Bank...</strong></div> : visible.length ? <div className="content-bank-list">{visible.map((item) => { const state = stateOf(item); const id = outputId(item); return <article key={id}><div className={`content-bank-status ${state}`}>{labelOf(item)}</div><div className="content-bank-copy"><strong>{outputTitle(item)}</strong><p>{outputContent(item)}</p><span>{String(item.platform || 'Threads')} · {formatDate(outputDate(item)) || 'Baru dibuat'}</span></div><div className="content-bank-actions">{state === 'review' ? <><button className="primary-button compact" onClick={() => openReview(item)}>Review</button><button className="primary-button compact approve" disabled={approvingId === id} onClick={() => void approveContent(item)}><AppIcon name="check" />{approvingId === id ? 'Menyetujui...' : 'Setujui'}</button></> : state === 'ready' ? <button className="primary-button compact" onClick={() => onNavigate('auto-post')}>Jadwalkan</button> : state === 'scheduled' ? <button className="ghost-button compact" onClick={() => onNavigate('auto-post')}>Lihat Jadwal</button> : <button className="ghost-button compact" onClick={() => openReview(item)}>Lihat</button>}</div></article> })}</div> : <div className="content-bank-empty"><AppIcon name="layers" /><strong>{query ? 'Konten tidak ditemukan' : filter === 'all' ? 'Content Bank masih kosong' : `Belum ada konten ${filters.find((item) => item.key === filter)?.label.toLowerCase()}`}</strong><p>{query ? 'Coba kata kunci atau filter lain.' : 'Buat konten baru untuk mulai mengisi Content Bank.'}</p>{!query && filter === 'all' ? <button className="primary-button" onClick={() => onNavigate('create')}>Buat Konten</button> : null}</div>}
+    {reviewing ? <div className="content-bank-dialog-backdrop"><section className="content-bank-dialog" role="dialog" aria-modal="true" aria-label="Review konten"><header><div><p className="eyebrow">Review Konten</p><h2>{outputTitle(reviewing)}</h2></div><button aria-label="Tutup" onClick={() => setReviewing(null)}>×</button></header><form onSubmit={(event: FormEvent) => { event.preventDefault(); void saveReview() }}><div className="content-bank-thread-editor"><div className="content-bank-thread-heading"><span>Isi Threads</span><small>{draftParts.length} bagian</small></div><div className="content-output-thread-list">{draftParts.map((part, index) => <label className="content-output-thread-card" key={index}><span className="content-output-thread-card-head"><strong>Thread {index + 1}</strong><small>{part.length} karakter</small></span><textarea aria-label={`Thread ${index + 1}`} value={part} onChange={(event) => setDraftParts((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} rows={5} placeholder={`Tulis isi Thread ${index + 1}...`} /></label>)}</div></div><div className="content-bank-dialog-actions"><button type="button" className="ghost-button" onClick={() => setReviewing(null)}>Batal</button><button className="primary-button" disabled={saving || !joinThreadContent(draftParts).trim()}>{saving ? 'Menyimpan...' : 'Simpan'}</button></div></form></section></div> : null}
   </section>
 }

@@ -4,7 +4,6 @@ import type { MenuItem, NavKey } from '../types/navigation'
 import type { AuthUser } from '../services/authService'
 import { getCurrentSubscription, listSubscriptionPlans } from '../services/subscriptionPlans'
 import { getMyUsage, USAGE_UPDATED_EVENT } from '../services/usage'
-import type { AppTheme } from '../types/navigation'
 import type { UiLanguage } from '../utils/uiLanguage'
 
 type SidebarProps = {
@@ -15,8 +14,6 @@ type SidebarProps = {
   isCollapsed: boolean
   isMobile: boolean
   isOpen: boolean
-  theme: AppTheme
-  onToggleTheme: () => void
   onToggleCollapse: () => void
   onClose: () => void
   onReplayTutorial: () => void
@@ -36,11 +33,11 @@ const overviewMenu: SidebarMenuItem[] = [
 ]
 
 const settingsMenu: SidebarMenuItem[] = [
-  { key: 'settings', label: 'Settings', icon: 'menu' },
   { key: 'personalize', label: 'Content Brain', icon: 'user' },
   { key: 'connecting-apps', label: 'Connected Accounts', icon: 'link' },
   { key: 'subscription-plans', label: 'Subscription', icon: 'calendar' },
   { key: 'payments', label: 'Pembayaran', icon: 'sparkles' },
+  { key: 'settings', label: 'Settings', icon: 'menu' },
 ]
 
 function isMenuItemActive(activePage: NavKey, itemKey: NavKey) {
@@ -111,8 +108,6 @@ export function Sidebar({
   isCollapsed,
   isMobile,
   isOpen,
-  theme,
-  onToggleTheme,
   onToggleCollapse,
   onClose,
   onReplayTutorial,
@@ -255,16 +250,6 @@ export function Sidebar({
           isCollapsed={isCollapsed}
         />
 
-        <button
-          type="button"
-          className={`menu-item sidebar-theme-toggle${theme === 'light' ? ' active-theme' : ''}`}
-          onClick={onToggleTheme}
-          title={isCollapsed ? 'Toggle light mode' : undefined}
-          aria-label="Toggle light mode"
-        >
-          <AppIcon name="sun" />
-          {!isCollapsed ? <span>{theme === 'light' ? 'Light Mode On' : 'Light Mode'}</span> : null}
-        </button>
         <button type="button" className="menu-item" onClick={onReplayTutorial} title={isCollapsed ? 'Lihat Tutorial Lagi' : undefined} aria-label="Lihat Tutorial Lagi"><AppIcon name="sparkles" />{!isCollapsed ? <span>Lihat Tutorial Lagi</span> : null}</button>
         {!isCollapsed ? <label className="sidebar-language-setting"><span>Bahasa</span><select value={language} onChange={(event) => onLanguageChange(event.target.value as UiLanguage)}><option value="id">Indonesia</option><option value="en">Inggris</option></select></label> : null}
       </div>

@@ -568,7 +568,12 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
           <article className="panel generate-panel">
             <div className="panel-heading compact">
               <div>
-                    <h2>{responseTopics.length ? 'Ide untuk kamu' : 'Hasil ide'}</h2>
+                <h2>{responseTopics.length ? 'Ide untuk kamu' : 'Hasil ide'}</h2>
+                {responseTopics.length ? (
+                  <p className="page-description generate-results-description">
+                    Pilih ide yang ingin kamu jadikan konten.
+                  </p>
+                ) : null}
               </div>
               <div className="generate-response-meta">
                 {responseTopics.length ? <span className="pill subtle">{responseTopics.length} ide</span> : null}
@@ -578,14 +583,6 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
             {responseTopics.length ? (
               <div className="generate-response-stack">
                 <div className="generate-topics-preview">
-                  <div className="panel-heading compact">
-                    <div>
-                      <h2>Ide untuk kamu</h2>
-                      <p className="page-description">Pilih ide yang ingin kamu jadikan konten.</p>
-                    </div>
-                    <span className="pill subtle">{responseTopics.length} items</span>
-                  </div>
-
                     <div className="generate-topic-grid">
                       {normalizedResponseTopics.map((normalizedTopic, index) => {
                         const isSaved = savedTopicIndices.includes(index)
@@ -600,33 +597,35 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
                           >
                             <button className="idea-select-toggle" type="button" onClick={() => setSelectedTopicIndices((current) => current.includes(index) ? current.filter((item) => item !== index) : [...current,index])} aria-label={`Pilih ide ${index + 1}`}>{selectedTopicIndices.includes(index) ? '✓' : ''}</button>
                             <span className="generate-topic-index">Ide {index + 1}</span>
-                            <label className="generate-topic-field">
-                              <span>Judul ide</span>
-                              <input
-                                type="text"
-                                value={draft.title}
-                                onChange={(event) =>
-                                  handleDraftChange(index, 'title', event.target.value)
-                                }
-                                placeholder="Edit judul topic"
-                              />
-                            </label>
-                            <label className="generate-topic-field">
-                              <span>Kategori</span>
-                              <select
-                                value={draft.categoryType}
-                                onChange={(event) =>
-                                  handleDraftChange(index, 'categoryType', event.target.value)
-                                }
-                              >
-                                <option value="">Pilih kategori</option>
-                                {topicCategoryOptions.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            <div className="generate-topic-fields">
+                              <label className="generate-topic-field generate-topic-title-field">
+                                <span>Judul ide</span>
+                                <input
+                                  type="text"
+                                  value={draft.title}
+                                  onChange={(event) =>
+                                    handleDraftChange(index, 'title', event.target.value)
+                                  }
+                                  placeholder="Edit judul ide"
+                                />
+                              </label>
+                              <label className="generate-topic-field generate-topic-category-field">
+                                <span>Kategori</span>
+                                <select
+                                  value={draft.categoryType}
+                                  onChange={(event) =>
+                                    handleDraftChange(index, 'categoryType', event.target.value)
+                                  }
+                                >
+                                  <option value="">Pilih kategori</option>
+                                  {topicCategoryOptions.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
                             <div className="generate-topic-metadata">
                               <span className="pill subtle">
                                 {draft.categoryType || 'No category_type'}
@@ -653,7 +652,36 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
                       })}
                     </div>
 
-                    <div className="idea-selection-actions"><strong>{selectedTopicIndices.length} dari {responseTopics.length} dipilih</strong><button className="primary-button" type="button" disabled={!selectedTopicIndices.length || savingTopicIndices.length > 0} onClick={() => void saveSelectedTopics(true)}>Buat Konten dari {selectedTopicIndices.length} Ide</button><button className="ghost-button" type="button" disabled={!selectedTopicIndices.length || savingTopicIndices.length > 0} onClick={() => void saveSelectedTopics(false)}>Simpan untuk nanti</button><button className="text-button" type="button" onClick={resetResponseState}>Cari ide lainnya</button></div>
+                    <div
+                      className="idea-selection-actions"
+                      role="toolbar"
+                      aria-label="Aksi ide terpilih"
+                    >
+                      <strong className="idea-selection-summary">
+                        {selectedTopicIndices.length} dari {responseTopics.length} dipilih
+                      </strong>
+                      <button
+                        className="primary-button idea-selection-primary"
+                        type="button"
+                        disabled={!selectedTopicIndices.length || savingTopicIndices.length > 0}
+                        onClick={() => void saveSelectedTopics(true)}
+                      >
+                        Buat Konten dari {selectedTopicIndices.length} Ide
+                      </button>
+                      <div className="idea-selection-secondary-actions">
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          disabled={!selectedTopicIndices.length || savingTopicIndices.length > 0}
+                          onClick={() => void saveSelectedTopics(false)}
+                        >
+                          Simpan untuk nanti
+                        </button>
+                        <button className="text-button" type="button" onClick={resetResponseState}>
+                          Cari ide lainnya
+                        </button>
+                      </div>
+                    </div>
 
                   </div>
               </div>

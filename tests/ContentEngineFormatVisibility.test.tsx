@@ -1,11 +1,10 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 
 import { ToastProvider } from '../src/components/Toast'
 import { ContentEnginePage } from '../src/pages/ContentEnginePage'
 
-test('hides format from the generated content table and editor', async () => {
+test('does not show the redundant Content Bank shortcut', () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string | URL | Request) => {
@@ -38,21 +37,11 @@ test('hides format from the generated content table and editor', async () => {
     }),
   )
 
-  const user = userEvent.setup()
-
   render(
     <ToastProvider>
       <ContentEnginePage userId="user-1" />
     </ToastProvider>,
   )
 
-  await user.click(screen.getByRole('button', { name: /Lihat Konten Saya/i }))
-
-  expect(await screen.findByText('Generated content preview')).toBeInTheDocument()
-  expect(screen.queryByRole('columnheader', { name: 'Format' })).not.toBeInTheDocument()
-
-  await user.click(screen.getByRole('button', { name: 'Generated content preview' }))
-
-  expect(screen.getByRole('dialog')).toBeInTheDocument()
-  expect(screen.queryByText('Format')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /Lihat Konten Saya/i })).not.toBeInTheDocument()
 })
