@@ -134,3 +134,49 @@ test('approves review content from the Content Bank list instead of the review m
     })
   })
 })
+
+test('deletes a content output from the Content Bank table after confirmation', async () => {
+  let deleteRequests = 0
+  let deleted = false
+
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+
+      if (url.includes('/api/content-outputs/output-1') && init?.method === 'DELETE') {
+        deleteRequests += 1
+        deleted = true
+        return new Response(null, { status: 204 })
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        data: deleted ? [] : [{
+          id: 'output-1',
+          userId: 'user-1',
+          title: 'Konten yang akan dihapus',
+          platform: 'threads',
+          content: 'Draft content',
+          status: 'draft',
+          createdAt: '2026-09-29T10:00:00.000Z',
+        }],
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }),
+  )
+
+  const user = userEvent.setup()
+  render(
+    <ToastProvider>
+      <ContentBankPage userId="user-1" onNavigate={vi.fn()} />
+    </ToastProvider>,
+  )
+
+  await user.click(await screen.findByRole('button', { name: 'Hapus output Konten yang akan dihapus' }))
+
+  await waitFor(() => expect(deleteRequests).toBe(1))
+  expect(window.confirm).toHaveBeenCalledWith('Hapus output "Konten yang akan dihapus"?')
+  expect(await screen.findByText('Belum ada konten perlu review')).toBeInTheDocument()
+  expect(screen.getByText('Output berhasil dihapus.')).toBeInTheDocument()
+})

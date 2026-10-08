@@ -4585,11 +4585,12 @@ th {
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 920px) {
   .generation-progress {
     left: 12px;
     right: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    z-index: 90;
     width: auto;
     grid-template-columns: 28px minmax(0, 1fr);
     gap: 10px;
@@ -5340,6 +5341,7 @@ body{background-color:#080609;background-image:radial-gradient(circle at 90% 0%,
 .content-bank-dialog-actions .approve:disabled{color:#fff!important;background:#16a34a!important;opacity:.45}
 .content-bank-dialog-actions .approve svg{fill:#fff!important}
 .content-bank-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}.content-bank-actions .approve{display:inline-flex;align-items:center;gap:7px;color:#fff!important;border-color:#16a34a!important;background:#16a34a!important;box-shadow:none!important}.content-bank-actions .approve:hover:not(:disabled){border-color:#22c55e!important;background:#22c55e!important}.content-bank-actions .approve:active:not(:disabled){background:#15803d!important}.content-bank-actions .approve:disabled{opacity:.55}.content-bank-actions .approve svg{width:15px;fill:#fff!important}
+.content-bank-actions .content-bank-delete{display:inline-flex;align-items:center;gap:6px;color:#ff718f;border-color:rgba(255,92,122,.24);background:rgba(255,92,122,.06)}.content-bank-actions .content-bank-delete:hover:not(:disabled){border-color:rgba(255,92,122,.42);background:rgba(255,92,122,.12)}.content-bank-actions .content-bank-delete:disabled{opacity:.5}.content-bank-actions .content-bank-delete svg{width:15px;fill:currentColor}
 
 /* Responsive Threads review editor. */
 .content-output-modal{width:min(760px,100%);max-height:min(92dvh,900px);padding:0;overflow:hidden;background:var(--surface-elevated)}

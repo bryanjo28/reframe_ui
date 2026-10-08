@@ -117,4 +117,45 @@ test('recognizes every terminal progress status', () => {
   expect(isScheduledJobProgressTerminal({ status: 'completed_with_errors' })).toBe(true)
   expect(isScheduledJobProgressTerminal({ status: 'failed' })).toBe(true)
   expect(isScheduledJobProgressTerminal({ status: 'pending' })).toBe(false)
+  expect(isScheduledJobProgressTerminal({ status: 'active', lastRunStatus: 'completed_with_errors' } as never)).toBe(true)
+  expect(isScheduledJobProgressTerminal({ status: 'failed', lastRunStatus: 'running' } as never)).toBe(true)
+})
+
+test('preserves job and run errors returned by the scheduled job endpoint', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          data: {
+            id: 'job-error',
+            status: 'completed',
+            lastRunStatus: 'completed_with_errors',
+            lastRunError: 'Daily generation limit exceeded',
+            errorMessage: 'Job completed with errors',
+            progress: {
+              status: 'completed_with_errors',
+              targetCount: 3,
+              processedCount: 1,
+              errorMessage: 'Daily generation limit exceeded',
+            },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ),
+  )
+
+  const job = await getScheduledJobById('job-error')
+
+  expect(job).toMatchObject({
+    status: 'completed',
+    lastRunStatus: 'completed_with_errors',
+    lastRunError: 'Daily generation limit exceeded',
+    errorMessage: 'Job completed with errors',
+    progress: {
+      status: 'completed_with_errors',
+      errorMessage: 'Daily generation limit exceeded',
+    },
+  })
 })

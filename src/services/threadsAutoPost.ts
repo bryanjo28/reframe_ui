@@ -20,6 +20,9 @@ export type ScheduledJobRecord = {
   personaConfigId?: string
   persona_config_id?: string
   progress?: ScheduledJobProgress
+  lastRunStatus?: string
+  lastRunError?: string
+  errorMessage?: string
   [key: string]: unknown
 }
 
@@ -33,6 +36,7 @@ export type ScheduledJobProgress = {
   percentage?: number
   startedAt?: string | null
   finishedAt?: string | null
+  errorMessage?: string
 }
 
 type ScheduledJobItemResponse =
@@ -80,13 +84,26 @@ function normalizeProgress(value: unknown): ScheduledJobProgress | undefined {
     percentage: readNumber(value.percentage),
     startedAt: readString(value.startedAt) || null,
     finishedAt: readString(value.finishedAt) || null,
+    errorMessage: readString(value.errorMessage) || readString(value.error_message),
   }
 }
 
-export function isScheduledJobProgressTerminal(progress?: Pick<ScheduledJobProgress, 'status'>) {
-  return Boolean(
-    progress && ['completed', 'completed_with_errors', 'failed'].includes(progress.status),
-  )
+type ScheduledJobStatusSource = {
+  status?: string
+  lastRunStatus?: string
+  progress?: Pick<ScheduledJobProgress, 'status'>
+}
+
+export function getScheduledJobRunStatus(job?: ScheduledJobStatusSource) {
+  return job?.progress?.status || job?.lastRunStatus || job?.status || ''
+}
+
+export function isScheduledJobProgressTerminal(source?: ScheduledJobStatusSource) {
+  if (!source) return false
+  const terminalStatuses = ['completed', 'completed_with_errors', 'failed']
+  return terminalStatuses.includes(source.status || '') ||
+    terminalStatuses.includes(source.lastRunStatus || '') ||
+    terminalStatuses.includes(source.progress?.status || '')
 }
 
 function unwrapScheduledJobResponse(response: ScheduledJobItemResponse): ScheduledJobRecord | null {
@@ -261,6 +278,9 @@ export async function getScheduledJobById(id: string) {
 
   return {
     ...scheduledJob,
+    lastRunStatus: readString(scheduledJob.lastRunStatus) || readString(scheduledJob.last_run_status),
+    lastRunError: readString(scheduledJob.lastRunError) || readString(scheduledJob.last_run_error),
+    errorMessage: readString(scheduledJob.errorMessage) || readString(scheduledJob.error_message),
     progress: normalizeProgress(scheduledJob.progress),
   }
 }

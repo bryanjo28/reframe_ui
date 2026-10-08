@@ -147,6 +147,18 @@ it('routes an authenticated user with a persona, locks Schedule, and handles an 
         )
       }
 
+      if (pathname === '/api/auth/login') {
+        return new Response(
+          JSON.stringify({
+            data: {
+              user: { id: 'user-1', email: 'user@example.com' },
+              accessToken: 'access-token',
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+
       return new Response(JSON.stringify({ data: [] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -168,4 +180,11 @@ it('routes an authenticated user with a persona, locks Schedule, and handles an 
   window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
   expect(await screen.findByRole('status')).toHaveTextContent('Session kamu sudah berakhir.Silakan login kembali untuk melanjutkan.')
   expect(window.location.pathname).toBe('/login')
+
+  await user.type(screen.getByRole('textbox', { name: 'Email' }), 'user@example.com')
+  await user.type(screen.getByLabelText('Password'), 'password-baru')
+  await user.click(screen.getAllByRole('button', { name: 'Login' }).at(-1)!)
+
+  expect(await screen.findByRole('heading', { name: 'Kontenmu dalam satu tampilan' })).toBeInTheDocument()
+  expect(sessionStorage.getItem('reframe.authHelperMessage')).toBeNull()
 })

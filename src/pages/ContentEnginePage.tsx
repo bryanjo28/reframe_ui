@@ -18,6 +18,12 @@ type ContentEnginePageProps = {
   userId: string
   outputsRefreshKey?: number
   onScheduledJobCreated?: (jobId: string, targetCount: number) => void
+  generationCompletion?: {
+    jobId: string
+    status: string
+    errorMessage?: string
+  } | null
+  onGenerationCompletionHandled?: () => void
   onOpenSchedule?: () => void
   tourStep?: number | null
   onAutoModeSelected?: () => void
@@ -299,6 +305,8 @@ export function ContentEnginePage({
   userId,
   outputsRefreshKey: externalOutputsRefreshKey = 0,
   onScheduledJobCreated,
+  generationCompletion,
+  onGenerationCompletionHandled,
   onOpenSchedule,
   tourStep,
   onAutoModeSelected,
@@ -330,6 +338,29 @@ export function ContentEnginePage({
   const [retryScheduledAt, setRetryScheduledAt] = useState('')
   const [outputEditForm, setOutputEditForm] = useState<OutputEditForm>(getOutputEditForm(null))
   const [outputThreadParts, setOutputThreadParts] = useState<string[]>([''])
+
+  useEffect(() => {
+    if (!generationCompletion) return
+
+    if (generationCompletion.status !== 'completed') {
+      const backendMessage = generationCompletion.errorMessage
+      const message = backendMessage === 'Daily generation limit exceeded'
+        ? 'Batas generate konten harian Anda sudah habis.'
+        : backendMessage || (generationCompletion.status === 'completed_with_errors'
+          ? 'Sebagian atau seluruh konten gagal dibuat.'
+          : 'Generate konten gagal. Silakan coba kembali.')
+      setStatusTone('error')
+      setStatusMessage(message)
+      toastError('Konten belum berhasil dibuat', message)
+      onGenerationCompletionHandled?.()
+      return
+    }
+
+    setStatusTone('success')
+    setStatusMessage('Konten berhasil dibuat. Silakan review hasilnya.')
+    toastSuccess('Konten berhasil dibuat', 'Hasilnya sudah siap untuk direview.')
+    onGenerationCompletionHandled?.()
+  }, [generationCompletion, onGenerationCompletionHandled, toastError, toastSuccess])
 
   useEffect(() => {
     let isMounted = true
@@ -577,14 +608,11 @@ export function ContentEnginePage({
         }
 
         onScheduledJobCreated?.(jobId, targetCount)
-        setStatusTone('success')
         if (scheduleMode === 'now') {
-          setStatusMessage('Konten berhasil dibuat. Silakan review hasilnya.')
-          toastSuccess(
-            'Konten berhasil dibuat',
-            'Hasilnya sudah siap untuk direview.',
-          )
+          setStatusTone('idle')
+          setStatusMessage('Konten sedang dibuat. Pantau progres sampai selesai.')
         } else {
+          setStatusTone('success')
           setStatusMessage('Pembuatan konten berhasil dijadwalkan.')
           toastSuccess('Pembuatan dijadwalkan', 'Konten akan dibuat pada waktu yang dipilih.')
         }

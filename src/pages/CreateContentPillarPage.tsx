@@ -340,13 +340,34 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
     setStatusTone('idle')
   }
 
-  function handlePersonaChange(personaConfigId: string) {
+  async function handlePersonaChange(personaConfigId: string) {
     setSelectedPersonaConfigId(personaConfigId)
-    setSelectedPillar((current) => (current?.personaConfigId === personaConfigId ? current : null))
-    setFormValues((current) => ({
-      ...current,
-      personaConfigId,
-    }))
+    setStatusMessage('')
+    setStatusTone('idle')
+
+    const newestPillar = sortContentPillarsDescending(
+      savedPillars.filter((pillar) => pillar.personaConfigId === personaConfigId),
+    )[0]
+
+    if (!newestPillar?.id) {
+      setSelectedPillar(null)
+      setFormValues({ ...emptyPillarForm, personaConfigId })
+      return
+    }
+
+    setIsLoadingDetail(true)
+    try {
+      const record = await getContentPillarById(newestPillar.id)
+      setSelectedPillar(record)
+      setFormValues(createFormValuesFromRecord(record))
+    } catch (error) {
+      setSelectedPillar(null)
+      setFormValues({ ...emptyPillarForm, personaConfigId })
+      setStatusTone('error')
+      setStatusMessage(error instanceof Error ? error.message : 'Gagal memuat content pillar.')
+    } finally {
+      setIsLoadingDetail(false)
+    }
   }
 
   function handleChangeField(key: PillarFieldKey, value: string) {

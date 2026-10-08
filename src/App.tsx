@@ -42,6 +42,7 @@ import {
 } from './services/personaConfigs'
 import {
   getScheduledJobById,
+  getScheduledJobRunStatus,
   isScheduledJobProgressTerminal,
   type ScheduledJobProgress,
 } from './services/threadsAutoPost'
@@ -79,6 +80,11 @@ function takeStoredAuthHelperMessage() {
   const message = sessionStorage.getItem(AUTH_HELPER_STORAGE_KEY) || ''
   sessionStorage.removeItem(AUTH_HELPER_STORAGE_KEY)
   return message
+}
+
+function clearStoredAuthHelperMessage() {
+  if (typeof sessionStorage === 'undefined') return
+  sessionStorage.removeItem(AUTH_HELPER_STORAGE_KEY)
 }
 
 function getStoredTheme(): AppTheme {
@@ -193,6 +199,7 @@ function AppShell() {
   const [personaConfig, setPersonaConfig] = useState<PersonaConfigRecord | null>(null)
   const [activeGenerationJobId, setActiveGenerationJobId] = useState('')
   const [generationProgress, setGenerationProgress] = useState<ScheduledJobProgress | null>(null)
+  const [generationCompletion, setGenerationCompletion] = useState<{ jobId: string; status: string; errorMessage?: string } | null>(null)
   const [contentOutputsRefreshKey, setContentOutputsRefreshKey] = useState(0)
   const [showTutorial, setShowTutorial] = useState(() => localStorage.getItem(TUTORIAL_STORAGE_KEY) !== 'true')
   const [language, setLanguage] = useState<UiLanguage>(() => localStorage.getItem(LANGUAGE_STORAGE_KEY) === 'en' ? 'en' : 'id')
@@ -260,8 +267,6 @@ function AppShell() {
 
     let isCancelled = false
     let pollTimeoutId: number | undefined
-    let dismissTimeoutId: number | undefined
-
     async function pollJob() {
       try {
         const job = await getScheduledJobById(activeGenerationJobId)
@@ -272,16 +277,19 @@ function AppShell() {
 
         if (job.progress) {
           setGenerationProgress(job.progress)
+        }
 
-          if (isScheduledJobProgressTerminal(job.progress)) {
+        if (isScheduledJobProgressTerminal(job)) {
+          const runStatus = getScheduledJobRunStatus(job)
+          const errorMessage = job.progress?.errorMessage || job.lastRunError || job.errorMessage
+          if (runStatus === 'completed') {
             setContentOutputsRefreshKey((current) => current + 1)
-            notifyUsageChanged()
-            dismissTimeoutId = window.setTimeout(() => {
-              setActiveGenerationJobId('')
-              setGenerationProgress(null)
-            }, 2400)
-            return
           }
+          notifyUsageChanged(job)
+          setActiveGenerationJobId('')
+          setGenerationProgress(null)
+          setGenerationCompletion({ jobId: activeGenerationJobId, status: runStatus, errorMessage })
+          return
         }
       } catch {
         // Keep the current progress visible and retry transient polling failures.
@@ -297,11 +305,11 @@ function AppShell() {
     return () => {
       isCancelled = true
       window.clearTimeout(pollTimeoutId)
-      window.clearTimeout(dismissTimeoutId)
     }
   }, [activeGenerationJobId])
 
   const handleScheduledJobCreated = useCallback((jobId: string, targetCount: number) => {
+    setGenerationCompletion(null)
     setActiveGenerationJobId(jobId)
     setGenerationProgress({
       status: 'pending',
@@ -314,6 +322,10 @@ function AppShell() {
       startedAt: null,
       finishedAt: null,
     })
+  }, [])
+
+  const handleGenerationCompletionHandled = useCallback(() => {
+    setGenerationCompletion(null)
   }, [])
 
   const loadPersonaConfig = useCallback(async (userId: string, runId?: number) => {
@@ -378,6 +390,7 @@ function AppShell() {
       ))
       setStoredPendingVerificationEmail(undefined)
       setPendingVerificationEmail('')
+      clearStoredAuthHelperMessage()
       setAuthHelperMessage('')
       setAuthStatus('authenticated')
 
@@ -521,6 +534,7 @@ function AppShell() {
       setUnauthenticatedView('login')
       setStoredPendingVerificationEmail(undefined)
       setPendingVerificationEmail('')
+      clearStoredAuthHelperMessage()
       setAuthHelperMessage('')
       setActivePage('dashboard')
 
@@ -552,6 +566,7 @@ function AppShell() {
     } finally {
       resetWorkspaceState()
       setUnauthenticatedView('login')
+      clearStoredAuthHelperMessage()
       setAuthHelperMessage('')
       setAuthStatus('unauthenticated')
       replaceAppPath('/login')
@@ -686,6 +701,8 @@ function AppShell() {
                 userId={currentUser?.id || ''}
                 outputsRefreshKey={contentOutputsRefreshKey}
                 onScheduledJobCreated={handleScheduledJobCreated}
+                generationCompletion={generationCompletion}
+                onGenerationCompletionHandled={handleGenerationCompletionHandled}
                 onOpenSchedule={() => handleNavigate('auto-post')}
               />
             ) : activePage === 'content-bank' ? (
