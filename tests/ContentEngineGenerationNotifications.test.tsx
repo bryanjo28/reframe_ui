@@ -1,10 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 
 import { ToastProvider } from '../src/components/Toast'
 import { ContentEnginePage } from '../src/pages/ContentEnginePage'
-import { autoGenerateContentOutputs } from '../src/services/contentOutputs'
 
 vi.mock('../src/services/contentPillars', () => ({
   listContentPillars: vi.fn().mockResolvedValue([
@@ -28,15 +26,12 @@ vi.mock('../src/services/contentOutputs', async (importOriginal) => {
 })
 
 test('shows the success notification only after the background generation job completes', async () => {
-  const user = userEvent.setup()
   const view = render(
     <ToastProvider>
       <ContentEnginePage userId="user-1" onScheduledJobCreated={vi.fn()} />
     </ToastProvider>,
   )
 
-  await user.click(await screen.findByRole('button', { name: 'Buat 1 Konten' }))
-  await waitFor(() => expect(autoGenerateContentOutputs).toHaveBeenCalled())
   expect(screen.queryByText('Konten berhasil dibuat')).not.toBeInTheDocument()
 
   view.rerender(
@@ -68,6 +63,6 @@ test('shows a friendly backend error when generation completes with errors', asy
     </ToastProvider>,
   )
 
-  expect(await screen.findAllByText('Batas generate konten harian Anda sudah habis.')).toHaveLength(2)
+  expect(await screen.findByText('Batas generate konten harian Anda sudah habis.')).toBeInTheDocument()
   expect(screen.queryByText('Konten berhasil dibuat')).not.toBeInTheDocument()
 })

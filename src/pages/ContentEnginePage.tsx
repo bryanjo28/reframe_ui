@@ -13,6 +13,7 @@ import {
 } from '../services/contentOutputs'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
 import { listContentTopics, type ContentTopicRecord } from '../services/contentTopics'
+import { ManualPostPage } from './ManualPostPage'
 
 type ContentEnginePageProps = {
   userId: string
@@ -25,12 +26,14 @@ type ContentEnginePageProps = {
   } | null
   onGenerationCompletionHandled?: () => void
   onOpenSchedule?: () => void
+  onViewContentBank?: () => void
   tourStep?: number | null
   onAutoModeSelected?: () => void
 }
 
 type AutoScheduleMode = 'now' | 'later'
 type ContentEngineView = 'chooser' | 'auto' | 'list'
+type ContentCreationMode = 'pillar' | 'topic-variants'
 type OutputEditForm = {
   platform: string
   status: string
@@ -308,6 +311,7 @@ export function ContentEnginePage({
   generationCompletion,
   onGenerationCompletionHandled,
   onOpenSchedule,
+  onViewContentBank,
   tourStep,
   onAutoModeSelected,
 }: ContentEnginePageProps) {
@@ -316,9 +320,10 @@ export function ContentEnginePage({
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
   const [targetCount, setTargetCount] = useState(10)
-  const [scheduleMode, setScheduleMode] = useState<AutoScheduleMode>('now')
+  const [scheduleMode] = useState<AutoScheduleMode>('now')
   const [viewMode, setViewMode] = useState<ContentEngineView>('auto')
-  const [scheduledAt, setScheduledAt] = useState('')
+  const [creationMode] = useState<ContentCreationMode>('topic-variants')
+  const [scheduledAt] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
   const [isLoadingPillars, setIsLoadingPillars] = useState(true)
@@ -1247,6 +1252,29 @@ export function ContentEnginePage({
     return renderListOutputsView()
   }
 
+  if (creationMode === 'topic-variants') {
+    return (
+      <section className="generate-page">
+        <header className="page-header generate-hero">
+          <div>
+            <h1>Buat Konten</h1>
+            <p className="page-description">
+              Buat beberapa angle konten dari satu topic yang sudah tersedia.
+            </p>
+          </div>
+        </header>
+        <div className="create-flow-progress" aria-label="Alur pembuatan konten"><span>Ide</span><span>→</span><strong>Buat</strong><span>→</span><span>Review</span></div>
+
+        <div className="generate-mode-switcher content-creation-switcher">
+          <span className="pill subtle">From Topic</span>
+          <p className="content-creation-direct-copy">Pilih topic, atur variant, lalu generate langsung.</p>
+        </div>
+
+        <ManualPostPage userId={userId} embedded onGenerated={onViewContentBank} />
+      </section>
+    )
+  }
+
   return (
     <section className="generate-page">
       <header className="page-header generate-hero">
@@ -1274,8 +1302,29 @@ export function ContentEnginePage({
       </header>
       <div className="create-flow-progress" aria-label="Alur pembuatan konten"><span>Ide</span><span>→</span><strong>Buat</strong><span>→</span><span>Review</span></div>
 
-      <div className="generate-mode-switcher">
+      <div className="generate-mode-switcher content-creation-switcher" role="group" aria-label="Cara membuat konten">
         <span className="pill subtle">Konten Baru</span>
+        {/* Flow By Pillar dan opsi scheduling di-comment out sementara.
+        <div className="content-creation-tabs">
+          <button
+            type="button"
+            className="content-creation-tab active"
+            aria-pressed={true}
+          >
+            <AppIcon name="layers" />
+            <span><strong>By Pillar</strong><small>Beberapa topic sekaligus</small></span>
+          </button>
+          <button
+            type="button"
+            className="content-creation-tab"
+            aria-pressed={false}
+            onClick={() => setCreationMode('topic-variants')}
+          >
+            <AppIcon name="edit" />
+            <span><strong>From Topic</strong><small>Hingga 5 variant</small></span>
+          </button>
+        </div>
+        */}
         {/* <button
           className="ghost-button generate-mode-button"
           type="button"
@@ -1426,6 +1475,7 @@ export function ContentEnginePage({
               </span>
             </div>
 
+            {/* Opsi Buat sekarang / Buat nanti di-comment out sementara.
             <div className="generate-mode-chooser content-engine-mode-chooser">
               <button
                 type="button"
@@ -1445,6 +1495,7 @@ export function ContentEnginePage({
                 <strong>Buat nanti</strong>
               </button>
             </div>
+            */}
 
             <label className="persona-field full-width">
                 <span>Topik utama</span>
@@ -1485,7 +1536,7 @@ export function ContentEnginePage({
               <small className="field-hint">Maksimum {Math.min(10, selectedPillarTopics.length)} ide tersedia.</small>
             </label>
 
-            {scheduleMode === 'later' ? (
+            {/* {scheduleMode === 'later' ? (
               <label className="persona-field full-width">
                 <span>Tanggal & waktu</span>
                 <input
@@ -1495,7 +1546,7 @@ export function ContentEnginePage({
                 />
                 <small className="field-hint">Pilih kapan proses pembuatan konten dimulai.</small>
               </label>
-            ) : null}
+            ) : null} */}
 
             <div className="persona-actions persona-actions-preview generate-actions">
               <button className="primary-button" type="submit" disabled={!canSubmit}>

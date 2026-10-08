@@ -704,6 +704,7 @@ function AppShell() {
                 generationCompletion={generationCompletion}
                 onGenerationCompletionHandled={handleGenerationCompletionHandled}
                 onOpenSchedule={() => handleNavigate('auto-post')}
+                onViewContentBank={() => handleNavigate('content-bank')}
               />
             ) : activePage === 'content-bank' ? (
               <ContentBankPage userId={currentUser?.id || ''} onNavigate={handleNavigate} />
