@@ -38,6 +38,13 @@ export type RetryContentOutputPayload = {
   scheduledAt: string
 }
 
+export type PublishedPostRecord = {
+  contentOutputId: string
+  postUrl: string
+  status: string
+  sequenceNumber: number
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -274,6 +281,26 @@ export async function retryContentOutputPost(payload: RetryContentOutputPayload)
   }
 
   return data
+}
+
+export async function listPublishedPosts(contentOutputId: string): Promise<PublishedPostRecord[]> {
+  const url = buildApiUrl('/api/published-posts')
+  url.searchParams.set('contentOutputId', contentOutputId)
+  const response = await fetchWithTimeout(url, { method: 'GET', headers: buildHeaders() })
+  const body = await readResponseBodyWithTimeout(response)
+
+  if (!response.ok) {
+    throw createApiResponseError(response.status, body)
+  }
+
+  const data = isRecord(body) && 'data' in body ? body.data : body
+  const records = Array.isArray(data) ? data : [data]
+  return records.filter(isRecord).map((record) => ({
+    contentOutputId: asString(record.contentOutputId) || asString(record.content_output_id) || '',
+    postUrl: asString(record.postUrl) || asString(record.post_url) || '',
+    status: asString(record.status) || '',
+    sequenceNumber: typeof record.sequenceNumber === 'number' ? record.sequenceNumber : typeof record.sequence_number === 'number' ? record.sequence_number : 0,
+  })).sort((first, second) => first.sequenceNumber - second.sequenceNumber)
 }
 
 function isContentOutputRecord(value: unknown): value is ContentOutputRecord {

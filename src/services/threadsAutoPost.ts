@@ -98,6 +98,12 @@ export function getScheduledJobRunStatus(job?: ScheduledJobStatusSource) {
   return job?.progress?.status || job?.lastRunStatus || job?.status || ''
 }
 
+export function getJobBadge(job: ScheduledJobStatusSource) {
+  if (job.status === 'failed' || job.lastRunStatus === 'failed') return 'Gagal'
+  if (job.lastRunStatus === 'completed_with_errors') return 'Ada post gagal'
+  return job.status || ''
+}
+
 export function isScheduledJobProgressTerminal(source?: ScheduledJobStatusSource) {
   if (!source) return false
   const terminalStatuses = ['completed', 'completed_with_errors', 'failed']

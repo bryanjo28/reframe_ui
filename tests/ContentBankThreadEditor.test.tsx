@@ -139,7 +139,6 @@ test('deletes a content output from the Content Bank table after confirmation', 
   let deleteRequests = 0
   let deleted = false
 
-  vi.spyOn(window, 'confirm').mockReturnValue(true)
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -174,9 +173,11 @@ test('deletes a content output from the Content Bank table after confirmation', 
   )
 
   await user.click(await screen.findByRole('button', { name: 'Hapus output Konten yang akan dihapus' }))
+  const deleteDialog = screen.getByRole('dialog', { name: 'Konfirmasi hapus konten' })
+  expect(deleteRequests).toBe(0)
+  await user.click(within(deleteDialog).getByRole('button', { name: 'Hapus' }))
 
   await waitFor(() => expect(deleteRequests).toBe(1))
-  expect(window.confirm).toHaveBeenCalledWith('Hapus output "Konten yang akan dihapus"?')
   expect(await screen.findByText('Belum ada konten perlu review')).toBeInTheDocument()
   expect(screen.getByText('Output berhasil dihapus.')).toBeInTheDocument()
 })
