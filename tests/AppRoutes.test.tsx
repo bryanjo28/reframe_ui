@@ -17,14 +17,22 @@ describe('public auth routes', () => {
     expect(screen.getByRole('button', { name: 'Kirim link reset password' })).toBeInTheDocument()
   })
 
-  it('renders the public content demo at the frontend root', () => {
+  it('renders the marketing landing page at the frontend root', () => {
     window.history.replaceState({}, '', '/')
 
     render(<App />)
 
-    expect(
-      screen.getByRole('heading', { name: 'Ubah satu ide menjadi thread yang siap posting.' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ide ngalir,konten terbit.' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Mulai Gratis' })[0]).toHaveAttribute('href', '/register')
+    expect(screen.getAllByRole('link', { name: 'Login' })[0]).toHaveAttribute('href', '/login')
+  })
+
+  it('keeps the public content demo available at /demo', () => {
+    window.history.replaceState({}, '', '/demo')
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Ubah satu ide menjadi thread yang siap posting.' })).toBeInTheDocument()
     expect(screen.getByText('Demo gratis')).toBeInTheDocument()
   })
 

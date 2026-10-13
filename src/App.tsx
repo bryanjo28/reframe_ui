@@ -30,6 +30,7 @@ import { AiCreditsPage } from './pages/AiCreditsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { OnboardingTutorial } from './components/OnboardingTutorial'
 import { LegalPage } from './pages/LegalPage'
+import { LandingPage } from './pages/LandingPage'
 import { watchLanguage, type UiLanguage } from './utils/uiLanguage'
 import { reportError, SESSION_EXPIRED_EVENT, UPGRADE_PLAN_REQUIRED_EVENT } from './utils/apiError'
 import {
@@ -817,6 +818,10 @@ function App() {
   }
 
   if (window.location.pathname === '/') {
+    return <LandingPage />
+  }
+
+  if (window.location.pathname === '/demo') {
     return (
       <ToastProvider>
         <CreateContentDemoPage

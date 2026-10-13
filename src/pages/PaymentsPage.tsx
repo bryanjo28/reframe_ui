@@ -1,23 +1,38 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
-import { createPaymentOrder, getPaymentPage, type PaymentPageData } from '../services/payments'
+import { createPaymentOrder, getPaymentPage, type PaymentPageData, type TokenPackage } from '../services/payments'
 
-const money = (value: number) =>
-  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
+const money = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
+const formatDate = (value: string) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+const allowedPackages = new Set(['mini', 'basic', 'plus', 'max'])
+
+function packageBenefit(pack: TokenPackage) {
+  if (pack.code.toLowerCase() === 'mini') return 'Cocok untuk kebutuhan tambahan kecil.'
+  if (pack.code.toLowerCase() === 'basic') return 'Pilihan praktis untuk produksi rutin.'
+  if (pack.code.toLowerCase() === 'plus') return 'Lebih leluasa untuk banyak variasi konten.'
+  return 'Kapasitas terbesar untuk produksi intensif.'
+}
 
 export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void }) {
   const [data, setData] = useState<PaymentPageData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [buying, setBuying] = useState('')
+  const [buying, setBuying] = useState(false)
+  const [selectedId, setSelectedId] = useState('')
   const [error, setError] = useState('')
   const toast = useToast()
-  const packages = data?.packages.filter((pack) => ['mini', 'basic', 'plus', 'max'].includes(pack.code.toLowerCase())) || []
+  const packages = useMemo(() => data?.packages.filter((pack) => allowedPackages.has(pack.code.toLowerCase())) || [], [data?.packages])
+  const selectedPackage = packages.find((pack) => pack.id === selectedId) || packages[0] || null
 
   const load = useCallback(async () => {
     try {
-      setData(await getPaymentPage())
+      const nextData = await getPaymentPage()
+      setData(nextData)
       setError('')
+      setSelectedId((current) => {
+        const nextPackages = nextData.packages.filter((pack) => allowedPackages.has(pack.code.toLowerCase()))
+        return nextPackages.some((pack) => pack.id === current) ? current : nextPackages[0]?.id || ''
+      })
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Gagal memuat pembayaran.')
     } finally {
@@ -27,27 +42,58 @@ export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void 
 
   useEffect(() => { void load() }, [load])
 
-  async function buy(packageId: string) {
-    setBuying(packageId)
+  async function checkout() {
+    if (!selectedPackage || buying) return
+    setBuying(true)
     try {
-      const order = await createPaymentOrder(packageId)
+      const order = await createPaymentOrder(selectedPackage.id)
       toast.info('Order pembayaran dibuat', order.message)
-      if (order.checkoutUrl) window.location.assign(order.checkoutUrl)
+      if (order.checkoutUrl) {
+        window.location.assign(order.checkoutUrl)
+        return
+      }
       await load()
     } catch (buyError) {
       toast.error('Pembayaran gagal', buyError instanceof Error ? buyError.message : 'Coba lagi.')
     } finally {
-      setBuying('')
+      setBuying(false)
     }
   }
 
-  if (loading) return <section className="payments-page"><div className="generate-empty-state"><AppIcon name="sparkles" /><div><strong>Memuat paket top up...</strong><p>Menyiapkan pilihan credits untukmu.</p></div></div></section>
+  if (loading) return <section className="payments-page"><div className="generate-empty-state"><AppIcon name="sparkles" /><div><strong>Memuat halaman pembayaran...</strong><p>Menyiapkan paket dan saldo AI Credits kamu.</p></div></div></section>
 
-  return <section className="payments-page top-up-page">
-    <button className="settings-back" type="button" onClick={onBackToCredits}><AppIcon name="chevron-left" /> Kembali ke AI Credits</button>
-    <header className="page-header payment-hero"><div><p className="eyebrow">Top up</p><h1>Top up AI Credits</h1><p className="page-description">Pilih jumlah credits yang kamu butuhkan. Saldo masuk setelah pembayaran diverifikasi server.</p></div><div className="payment-balance"><span>Total AI Credits</span><strong>{(data?.balance || 0).toLocaleString('id-ID')}</strong><small>Langganan {(data?.subscriptionBalance || 0).toLocaleString('id-ID')} · Top up {(data?.topUpBalance || 0).toLocaleString('id-ID')}</small></div></header>
-    {error ? <div className="integration-note integration-note-error"><AppIcon name="info" /><p>{error}</p></div> : null}
-    <div className="payment-provider-note"><AppIcon name="info" /><div><strong>Pembayaran aman melalui Midtrans</strong><p>Top up berlaku 12 bulan dan baru ditambahkan setelah status pembayaran diverifikasi oleh server.</p></div></div>
-    <div className="token-package-grid">{packages.map((pack) => <article className="token-package-card" key={pack.id}><span className="subscription-badge">{pack.code}</span><h3>{pack.name}</h3><strong className="token-package-amount">{pack.token_amount.toLocaleString('id-ID')} credits</strong><p>{(pack.token_amount * 5000).toLocaleString('id-ID')} token allowance</p><p>{money(pack.price_idr)}</p><button className="primary-button" type="button" disabled={buying === pack.id} onClick={() => void buy(pack.id)}>{buying === pack.id ? 'Membuat order...' : 'Top Up'}</button></article>)}</div>
-  </section>
+  return (
+    <section className="payments-page top-up-page payment-checkout-page">
+      <button className="settings-back" type="button" onClick={onBackToCredits}><AppIcon name="chevron-left" /> Kembali ke AI Credits</button>
+      <header className="page-header payment-checkout-header"><div><p className="eyebrow">Pembayaran</p><h1>Top up AI Credits</h1><p className="page-description">Pilih paket credits, periksa ringkasan order, lalu selesaikan pembayaran melalui halaman pembayaran yang aman.</p></div><div className="payment-balance"><span>Saldo saat ini</span><strong>{(data?.balance || 0).toLocaleString('id-ID')}</strong><small>AI Credits tersedia</small></div></header>
+      {error ? <div className="integration-note integration-note-error"><AppIcon name="info" /><p>{error}</p></div> : null}
+
+      <div className="payment-checkout-layout">
+        <div className="payment-checkout-main">
+          <section className="payment-checkout-section">
+            <div className="payment-step-title"><span>1</span><div><h2>Pilih paket credits</h2><p>Top up tidak mengubah paket langganan atau entitlement akun.</p></div></div>
+            <div className="payment-package-options" role="radiogroup" aria-label="Paket top up AI Credits">
+              {packages.map((pack) => {
+                const selected = selectedPackage?.id === pack.id
+                return <label className={`payment-package-option${selected ? ' selected' : ''}`} key={pack.id}><input type="radio" name="credit-package" value={pack.id} checked={selected} onChange={() => setSelectedId(pack.id)} /><span className="payment-radio" aria-hidden="true" /><span className="payment-package-copy"><span className="subscription-badge">{pack.code}</span><strong>{pack.name}</strong><small>{packageBenefit(pack)}</small></span><span className="payment-package-value"><strong>{pack.token_amount.toLocaleString('id-ID')}</strong><small>AI Credits</small><b>{money(pack.price_idr)}</b></span></label>
+              })}
+            </div>
+          </section>
+
+          <section className="payment-checkout-section">
+            <div className="payment-step-title"><span>2</span><div><h2>Metode pembayaran</h2><p>Pilih metode pembayaran pada langkah berikutnya.</p></div></div>
+            <div className="payment-method-card"><span className="payment-method-icon"><AppIcon name="lock" /></span><div><strong>Pembayaran Aman</strong><p>Virtual account, QRIS, e-wallet, dan metode lain ditampilkan sesuai ketersediaan.</p></div><span className="payment-method-status"><AppIcon name="check" /> Aman</span></div>
+          </section>
+
+          {data?.orders.length ? <section className="payment-checkout-section payment-order-history"><div className="payment-step-title plain"><div><h2>Order terakhir</h2><p>Status pembayaran terbaru dari akun kamu.</p></div></div>{data.orders.slice(0, 4).map((order) => <div className="payment-order-row" key={order.id}><div><strong>{order.token_amount.toLocaleString('id-ID')} AI Credits</strong><small>{formatDate(order.created_at)} · {order.id.slice(0, 8).toUpperCase()}</small></div><span>{money(order.amount_idr)}</span><b className={`payment-order-status ${order.status}`}>{order.status}</b></div>)}</section> : null}
+        </div>
+
+        <aside className="payment-summary-card" aria-label="Ringkasan pembayaran">
+          <p className="eyebrow">Ringkasan order</p>
+          {selectedPackage ? <><div className="payment-summary-product"><span><AppIcon name="sparkles" /></span><div><strong>{selectedPackage.name}</strong><small>{selectedPackage.token_amount.toLocaleString('id-ID')} AI Credits</small></div></div><dl><div><dt>Harga paket</dt><dd>{money(selectedPackage.price_idr)}</dd></div><div><dt>Biaya layanan</dt><dd>Rp0</dd></div><div className="payment-summary-total"><dt>Total pembayaran</dt><dd>{money(selectedPackage.price_idr)}</dd></div></dl><button className="primary-button payment-checkout-button" type="button" disabled={buying} onClick={() => void checkout()}>{buying ? 'Membuat order...' : 'Lanjut Pembayaran'}<AppIcon name="chevron-right" /></button><p className="payment-summary-note"><AppIcon name="info" /> Credits masuk setelah pembayaran berhasil diverifikasi oleh server dan berlaku selama 12 bulan.</p></> : <p className="payment-empty">Belum ada paket top up yang tersedia.</p>}
+          <div className="payment-trust-list"><span><AppIcon name="lock" /> Pembayaran terenkripsi</span><span><AppIcon name="check" /> Credits diberikan otomatis</span><span><AppIcon name="refresh" /> Webhook aman dan idempotent</span></div>
+        </aside>
+      </div>
+    </section>
+  )
 }
