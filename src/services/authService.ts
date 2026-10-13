@@ -139,6 +139,16 @@ function looksLikeThreadsAccountRecord(record: Record<string, unknown>) {
   )
 }
 
+function withoutThreadsTokens(record: Record<string, unknown>) {
+  const safe = { ...record }
+  delete safe.token
+  delete safe.accessToken
+  delete safe.access_token
+  delete safe.refreshToken
+  delete safe.refresh_token
+  return safe
+}
+
 function getTokenFromRecord(value: unknown) {
   if (!isRecord(value)) {
     return undefined
@@ -280,12 +290,7 @@ function normalizeThreadsSocialAccount(candidate: unknown) {
       : connectedOverride ?? hasConnectionRow
   const needsReconnect = explicitNeedsReconnect
 
-  const safeCandidate = { ...candidate }
-  delete safeCandidate.token
-  delete safeCandidate.accessToken
-  delete safeCandidate.access_token
-  delete safeCandidate.refreshToken
-  delete safeCandidate.refresh_token
+  const safeCandidate = withoutThreadsTokens(candidate)
 
   return {
     ...safeCandidate,
@@ -357,7 +362,7 @@ function normalizeAuthMeState(payload: ApiResponse): AuthMeState | null {
         : null,
     socialAccounts: socialAccountsRecord
       ? {
-          ...socialAccountsRecord,
+          ...withoutThreadsTokens(socialAccountsRecord),
           threads: threads ?? undefined,
         }
       : null,

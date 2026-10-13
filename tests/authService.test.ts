@@ -111,6 +111,25 @@ describe('authService verification flow', () => {
     expect(threads).not.toHaveProperty('token')
   })
 
+  it('discards token fields from a direct social account payload', async () => {
+    clearAuthSession()
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, 'app-login-token')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: {
+        user: { id: 'user-1' },
+        socialAccounts: {
+          provider: 'threads', status: 'connected', accountId: 'threads-1',
+          access_token: 'must-not-reach-fe', refresh_token: 'must-not-reach-fe',
+        },
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+
+    const socialAccounts = (await getCurrentAuthState())?.socialAccounts
+    expect(socialAccounts).not.toHaveProperty('access_token')
+    expect(socialAccounts).not.toHaveProperty('refresh_token')
+    expect(socialAccounts?.threads).toEqual(expect.objectContaining({ status: 'connected' }))
+  })
+
   it('normalizes explicit and boolean Threads connection states', () => {
     expect(getThreadsConnectionStatus({ status: 'connected' })).toBe('connected')
     expect(getThreadsConnectionStatus({ connected: false, needsReconnect: true })).toBe('needs_reconnect')
