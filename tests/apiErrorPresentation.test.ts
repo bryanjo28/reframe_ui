@@ -14,11 +14,13 @@ describe('user-facing API errors', () => {
     expect(getUserFacingError({ status: 503, message: 'Internal error' })).toContain('Reframe sedang mengalami kendala')
   })
 
-  it('signals only clearly expired authenticated sessions', () => {
+  it('signals only application authentication failures', () => {
     let expired = 0
     window.addEventListener(SESSION_EXPIRED_EVENT, () => { expired += 1 })
-    createApiResponseError(401, { error_code: 'TOKEN_EXPIRED', message: 'JWT expired' })
-    createApiResponseError(429, { error_code: 'MONTHLY_AI_CREDITS_EXCEEDED', message: 'quota exhausted' })
-    expect(expired).toBe(1)
+    createApiResponseError(401, { error_code: 'INVALID_ACCESS_TOKEN', message: 'JWT expired' })
+    createApiResponseError(401, { error_code: 'UNAUTHORIZED', message: 'Login required' })
+    createApiResponseError(401, { error_code: 'THREADS_RECONNECT_REQUIRED', message: 'Reconnect Threads' })
+    createApiResponseError(401, { error_code: 'THREADS_REFRESH_FAILED', message: 'Temporary Threads failure' })
+    expect(expired).toBe(2)
   })
 })

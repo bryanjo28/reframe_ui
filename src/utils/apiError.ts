@@ -24,6 +24,14 @@ const DEFAULT_API_ERROR: ApiError = {
 
 export const SESSION_EXPIRED_EVENT = 'reframe:session-expired'
 
+export function isApplicationAuthError(error: ApiError) {
+  return error.status === 401 && (
+    error.code === 'INVALID_ACCESS_TOKEN' ||
+    error.code === 'UNAUTHORIZED' ||
+    error.code === 'TOKEN_EXPIRED'
+  )
+}
+
 export function getUserFacingError(error: unknown, fallback = DEFAULT_API_ERROR.message) {
   if (error instanceof TypeError) return 'Koneksi internet bermasalah. Periksa koneksi kamu lalu coba lagi.'
   const apiError = getApiError(error)
@@ -81,9 +89,7 @@ export function createApiResponseError(status: number, data: unknown) {
         data,
       },
     })
-  // Every authenticated 401 means the current client session can no longer be
-  // used. Do not depend on inconsistent backend error wording to sign out.
-  if (typeof window !== 'undefined' && apiError.status === 401) {
+  if (typeof window !== 'undefined' && isApplicationAuthError(apiError)) {
     window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
   }
   return new ApiResponseError(apiError)
