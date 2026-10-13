@@ -275,9 +275,7 @@ export async function retryContentOutputPost(payload: RetryContentOutputPayload)
   const data = await readResponseBodyWithTimeout(response)
 
   if (!response.ok) {
-    const errorMessage = typeof data === 'string' ? data : 'Gagal menjadwalkan retry post.'
-
-    throw new Error(errorMessage || 'Gagal menjadwalkan retry post.')
+    throw createApiResponseError(response.status, data)
   }
 
   return data

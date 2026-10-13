@@ -1,5 +1,6 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
+import { createApiResponseError } from '../utils/apiError'
 
 const THREADS_AUTO_POST_ENDPOINT = '/api/threads/auto-post'
 const SCHEDULED_JOBS_ENDPOINT = '/api/scheduled-jobs'
@@ -200,8 +201,7 @@ export async function runThreadsAutoPost() {
     .catch(async () => await response.text())
 
   if (!response.ok) {
-    const errorMessage = typeof data === 'string' ? data : 'Gagal menjalankan auto post job.'
-    throw new Error(errorMessage || 'Gagal menjalankan auto post job.')
+    throw createApiResponseError(response.status, data)
   }
 
   return data
@@ -222,12 +222,7 @@ export async function scheduleThreadsAutoPost(payload: ScheduleThreadsAutoPostPa
     .catch(async () => await response.text())
 
   if (!response.ok) {
-    const errorMessage = typeof data === 'string'
-      ? data
-      : isRecord(data) && typeof data.message === 'string'
-        ? data.message
-        : 'Gagal menjadwalkan auto post.'
-    throw new Error(errorMessage || 'Gagal menjadwalkan auto post.')
+    throw createApiResponseError(response.status, data)
   }
 
   return data
@@ -244,7 +239,7 @@ export async function rescheduleThreadsContent(contentOutputId: string, schedule
       : isRecord(data) && typeof data.message === 'string'
         ? data.message
         : 'Gagal mengubah jadwal konten.'
-    throw new Error(message)
+    throw createApiResponseError(response.status, data || message)
   }
   return data
 }
@@ -260,7 +255,7 @@ export async function cancelThreadsContentSchedule(contentOutputId: string) {
       : isRecord(data) && typeof data.message === 'string'
         ? data.message
         : 'Gagal membatalkan jadwal konten.'
-    throw new Error(message)
+    throw createApiResponseError(response.status, data || message)
   }
   return data
 }
