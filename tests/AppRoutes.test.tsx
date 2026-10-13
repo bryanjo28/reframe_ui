@@ -26,6 +26,26 @@ describe('public auth routes', () => {
     expect(screen.getByText('Free demo')).toBeInTheDocument()
   })
 
+  it('renders the privacy policy without requiring authentication', () => {
+    window.history.replaceState({}, '', '/privacy-policy')
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Kebijakan Privasi' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Penghapusan data' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ketentuan Layanan' })).toHaveAttribute('href', '/terms-of-service')
+  })
+
+  it('renders the terms of service without requiring authentication', () => {
+    window.history.replaceState({}, '', '/terms-of-service')
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'Ketentuan Layanan' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Penggunaan layanan' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Kebijakan Privasi' })).toHaveAttribute('href', '/privacy-policy')
+  })
+
   it('renders check-email with the stored registration email', () => {
     localStorage.setItem('reframe.pendingVerificationEmail', 'user@example.com')
     window.history.replaceState({}, '', '/check-email')

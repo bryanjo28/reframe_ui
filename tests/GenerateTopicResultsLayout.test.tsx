@@ -56,4 +56,8 @@ test('shows one results heading and one localized idea count after generating to
   expect(screen.getByRole('textbox', { name: 'Judul ide' })).toBeInTheDocument()
   expect(screen.getByRole('combobox', { name: 'Kategori' })).toBeInTheDocument()
   expect(screen.getByRole('toolbar', { name: 'Aksi ide terpilih' })).toBeInTheDocument()
+
+  const closeButton = screen.getByRole('button', { name: 'Tutup hasil ide' })
+  expect(closeButton.querySelector('svg')).toBeInTheDocument()
+  expect(closeButton).toHaveTextContent('')
 })

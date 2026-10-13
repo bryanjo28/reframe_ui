@@ -27,6 +27,7 @@ import { TokenBalance } from './components/TokenBalance'
 import { PaymentsPage } from './pages/PaymentsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { OnboardingTutorial } from './components/OnboardingTutorial'
+import { LegalPage } from './pages/LegalPage'
 import { watchLanguage, type UiLanguage } from './utils/uiLanguage'
 import { reportError, SESSION_EXPIRED_EVENT } from './utils/apiError'
 import {
@@ -755,6 +756,14 @@ function AppShell() {
 }
 
 function App() {
+  if (window.location.pathname === '/privacy-policy') {
+    return <LegalPage document="privacy" />
+  }
+
+  if (window.location.pathname === '/terms-of-service') {
+    return <LegalPage document="terms" />
+  }
+
   if (isRootEmailConfirmationCallback()) {
     return <EmailConfirmedPage />
   }

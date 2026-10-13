@@ -678,7 +678,7 @@ export function GenerateTopicPage({ userId, onContinueToContent, onUpgrade }: Ge
               </div>
               <div className="generate-response-meta">
                 {responseTopics.length ? <span className="pill subtle">{responseTopics.length} ide</span> : null}
-                <button className="generate-results-close" type="button" onClick={(event) => dismissModal(resetResponseState, event.currentTarget)} aria-label="Tutup hasil ide">×</button>
+                <button className="generate-results-close" type="button" onClick={(event) => dismissModal(resetResponseState, event.currentTarget)} aria-label="Tutup hasil ide"><AppIcon name="close" /></button>
               </div>
             </div>
 
