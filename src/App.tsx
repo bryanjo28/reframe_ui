@@ -187,7 +187,6 @@ function AppShell() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
   const [authError, setAuthError] = useState('')
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
-  const [isThreadsConnected, setIsThreadsConnected] = useState(false)
   const [threadsStatus, setThreadsStatus] = useState<ThreadsConnectionStatus>('disconnected')
   const [unauthenticatedView, setUnauthenticatedView] = useState<UnauthenticatedView>('login')
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState(getStoredPendingVerificationEmail)
@@ -358,7 +357,6 @@ function AppShell() {
 
   function resetWorkspaceState() {
     setCurrentUser(null)
-    setIsThreadsConnected(false)
     setThreadsStatus('disconnected')
     setPersonaConfig(null)
     setActivePage('dashboard')
@@ -389,9 +387,6 @@ function AppShell() {
 
       const { user, onboarding, socialAccounts } = authState
       setCurrentUser(user)
-      setIsThreadsConnected(Boolean(
-        socialAccounts?.threads?.connected && !socialAccounts.threads.needsReconnect,
-      ))
       setThreadsStatus(getThreadsConnectionStatus(socialAccounts?.threads))
       setStoredPendingVerificationEmail(undefined)
       setPendingVerificationEmail('')
@@ -531,10 +526,6 @@ function AppShell() {
       }
 
       setCurrentUser(authState.user)
-      setIsThreadsConnected(Boolean(
-        authState.socialAccounts?.threads?.connected &&
-          !authState.socialAccounts.threads.needsReconnect,
-      ))
       setThreadsStatus(getThreadsConnectionStatus(authState.socialAccounts?.threads))
       setAuthStatus('authenticated')
       setUnauthenticatedView('login')
@@ -734,7 +725,6 @@ function AppShell() {
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage onStatusChange={(status) => {
                 setThreadsStatus(status)
-                setIsThreadsConnected(status === 'connected')
               }} />
             ) : activePage === 'settings' ? (
               <SettingsPage user={currentUser} language={language} onLanguageChange={setLanguage} theme={theme} onThemeChange={setTheme} onReplayTutorial={() => setShowTutorial(true)} onLogout={handleLogout} />

@@ -280,14 +280,12 @@ function normalizeThreadsSocialAccount(candidate: unknown) {
       : connectedOverride ?? hasConnectionRow
   const needsReconnect = explicitNeedsReconnect
 
-  const {
-    token: _token,
-    accessToken: _accessToken,
-    access_token: _accessTokenSnake,
-    refreshToken: _refreshToken,
-    refresh_token: _refreshTokenSnake,
-    ...safeCandidate
-  } = candidate
+  const safeCandidate = { ...candidate }
+  delete safeCandidate.token
+  delete safeCandidate.accessToken
+  delete safeCandidate.access_token
+  delete safeCandidate.refreshToken
+  delete safeCandidate.refresh_token
 
   return {
     ...safeCandidate,
