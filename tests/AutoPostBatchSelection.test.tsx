@@ -38,7 +38,7 @@ test('sends one auto-post request per checked content without legacy batch field
   const user = userEvent.setup()
   render(
     <ToastProvider>
-      <AutoPostPage userId="user-1" isThreadsConnected onConnectThreads={vi.fn()} />
+      <AutoPostPage userId="user-1" threadsStatus="connected" onConnectThreads={vi.fn()} />
     </ToastProvider>,
   )
 
@@ -59,4 +59,16 @@ test('sends one auto-post request per checked content without legacy batch field
     expect(body).not.toHaveProperty('personaConfigId')
     expect(body).not.toHaveProperty('contentOutputIds')
   })
+})
+
+test('offers reconnect instead of treating an expired Threads account as disconnected', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: [] }), {
+    status: 200, headers: { 'Content-Type': 'application/json' },
+  })))
+  const onConnectThreads = vi.fn()
+  const user = userEvent.setup()
+  render(<ToastProvider><AutoPostPage userId="user-1" threadsStatus="needs_reconnect" onConnectThreads={onConnectThreads} /></ToastProvider>)
+  await user.click(await screen.findByRole('button', { name: /hubungkan ulang threads/i }))
+  expect(onConnectThreads).toHaveBeenCalledOnce()
+  expect(screen.getByText(/kedaluwarsa/i)).toBeInTheDocument()
 })

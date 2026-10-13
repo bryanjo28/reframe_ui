@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import { getUserFacingError } from '../utils/apiError'
+import { getThreadsErrorAction } from '../utils/threadsErrors'
 import {
   autoGenerateContentOutputs,
   deleteContentOutput,
@@ -26,6 +27,7 @@ type ContentEnginePageProps = {
   } | null
   onGenerationCompletionHandled?: () => void
   onOpenSchedule?: () => void
+  onConnectThreads?: () => void
   onViewContentBank?: () => void
   tourStep?: number | null
   onAutoModeSelected?: () => void
@@ -311,6 +313,7 @@ export function ContentEnginePage({
   generationCompletion,
   onGenerationCompletionHandled,
   onOpenSchedule,
+  onConnectThreads,
   onViewContentBank,
   tourStep,
   onAutoModeSelected,
@@ -830,10 +833,12 @@ export function ContentEnginePage({
       setStatusMessage('Retry post berhasil dijadwalkan.')
       setOutputsRefreshKey((current) => current + 1)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Gagal menjadwalkan retry post.'
+      const action = getThreadsErrorAction(error)
+      const errorMessage = action.message
       setStatusTone('error')
       setStatusMessage(errorMessage)
       toastError('Retry failed', errorMessage)
+      if (action.action === 'reconnect' || action.action === 'connect') onConnectThreads?.()
     } finally {
       setRetryingOutputId('')
     }

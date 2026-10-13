@@ -4,6 +4,7 @@ import { useToast } from '../components/useToast'
 import { deleteContentOutput, listContentOutputs, listPublishedPosts, retryContentOutputPost, updateContentOutput, type ContentOutputRecord, type PublishedPostRecord } from '../services/contentOutputs'
 import type { NavKey } from '../types/navigation'
 import { getUserFacingError } from '../utils/apiError'
+import { getThreadsErrorAction } from '../utils/threadsErrors'
 
 type Filter = 'all' | 'review' | 'ready' | 'scheduled' | 'failed' | 'published'
 const threadSplitMarker = '---THREAD_SPLIT---'
@@ -140,7 +141,9 @@ export function ContentBankPage({ userId, onNavigate }: { userId: string; onNavi
       setFilter('scheduled')
       success('Retry dijadwalkan', 'Konten akan diposting ulang sesuai jadwal baru.')
     } catch (cause) {
-      error('Retry belum dijadwalkan', getUserFacingError(cause))
+      const action = getThreadsErrorAction(cause)
+      error('Retry belum dijadwalkan', action.message)
+      if (action.action === 'reconnect' || action.action === 'connect') onNavigate('connecting-apps')
     } finally {
       setIsRetrying(false)
     }

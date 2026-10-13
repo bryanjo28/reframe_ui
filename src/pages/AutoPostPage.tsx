@@ -4,8 +4,10 @@ import { useToast } from '../components/useToast'
 import { listContentOutputs, type ContentOutputRecord } from '../services/contentOutputs'
 import { listPersonaConfigs, type PersonaConfigRecord } from '../services/personaConfigs'
 import { cancelThreadsContentSchedule, rescheduleThreadsContent, scheduleThreadsAutoPost } from '../services/threadsAutoPost'
+import type { ThreadsConnectionStatus } from '../services/authService'
+import { getThreadsErrorAction } from '../utils/threadsErrors'
 
-type Props = { userId: string; isThreadsConnected: boolean; onConnectThreads: () => void; onReviewContent?: () => void }
+type Props = { userId: string; threadsStatus: ThreadsConnectionStatus; onConnectThreads: () => void; onReviewContent?: () => void }
 type View = 'calendar' | 'list'
 const TZ = 'Asia/Jakarta'
 const WEEKDAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
@@ -40,7 +42,7 @@ function shortDate(date: Date) { return new Intl.DateTimeFormat('id-ID', { day: 
 function listGroup(date: Date, today: Date) { const target = dateKey(date); const current = dateKey(today); const tomorrow = dateKey(new Date(today.getTime() + 86_400_000)); if (target === current) return 'HARI INI'; if (target === tomorrow) return 'BESOK'; return shortDate(date).toUpperCase() }
 function cellsFor(month: Date) { const y = month.getFullYear(); const m = month.getMonth(); const leading = (new Date(y, m, 1).getDay() + 6) % 7; const days = new Date(y, m + 1, 0).getDate(); return [...Array.from({ length: leading }, (_, i) => ({ key: `b${i}`, date: null })), ...Array.from({ length: days }, (_, i) => ({ key: `${y}-${m}-${i}`, date: new Date(y, m, i + 1) }))] }
 
-export function AutoPostPage({ userId, isThreadsConnected, onConnectThreads, onReviewContent }: Props) {
+export function AutoPostPage({ userId, threadsStatus, onConnectThreads, onReviewContent }: Props) {
   const { success, error } = useToast()
   const today = useMemo(() => new Date(), [])
   const [view, setView] = useState<View>('calendar')
@@ -75,6 +77,7 @@ export function AutoPostPage({ userId, isThreadsConnected, onConnectThreads, onR
   const selectedContents = ready.filter((item) => selectedIds.includes(outputId(item)))
   const selectedContent = selectedContents[0] || null
 
+  const isThreadsConnected = threadsStatus === 'connected'
   function openNew(prefillDate?: string) { if (!isThreadsConnected) { onConnectThreads(); return } if (prefillDate) setDate(prefillDate); setEditing(null); setShowSchedule(true) }
   function openEdit(record: ContentOutputRecord) { const parsed = parseDate(record); if (!parsed || isPosted(record)) return; setEditing(record); setDate(dateKey(parsed)); setTime(timeLabel(parsed)); setShowSchedule(true) }
   async function submit(event: FormEvent) {
@@ -92,14 +95,23 @@ export function AutoPostPage({ userId, isThreadsConnected, onConnectThreads, onR
         const failedIds = selectedContents.filter((_, index) => results[index].status === 'rejected').map(outputId)
         const successCount = results.length - failedIds.length
         setSelectedIds(failedIds)
-        if (failedIds.length) error('Sebagian jadwal belum tersimpan', `${successCount} berhasil, ${failedIds.length} gagal. Coba lagi untuk konten yang masih terpilih.`)
+        if (failedIds.length) {
+          const firstFailure = results.find((result) => result.status === 'rejected')
+          const action = getThreadsErrorAction(firstFailure?.status === 'rejected' ? firstFailure.reason : null)
+          error('Sebagian jadwal belum tersimpan', action.action === 'error' ? `${successCount} berhasil, ${failedIds.length} gagal. Coba lagi untuk konten yang masih terpilih.` : action.message)
+          if (action.action === 'reconnect' || action.action === 'connect') onConnectThreads()
+        }
         else success(`${successCount} konten dijadwalkan`, `${time} WIB`)
       }
       await refresh()
       setShowSchedule(false)
       setSelectedDate(date)
       setMonth(new Date(`${date}T12:00:00`))
-    } catch (cause) { error('Jadwal belum tersimpan', cause instanceof Error ? cause.message : 'Coba lagi.') }
+    } catch (cause) {
+      const action = getThreadsErrorAction(cause)
+      error('Jadwal belum tersimpan', action.message)
+      if (action.action === 'reconnect' || action.action === 'connect') onConnectThreads()
+    }
     finally { setSaving(false) }
   }
   async function cancelSchedule() {
@@ -128,7 +140,7 @@ export function AutoPostPage({ userId, isThreadsConnected, onConnectThreads, onR
 
   return <section className="generate-page auto-post-page schedule-workspace">
     <header className="schedule-page-header"><div><h1>Jadwal</h1><p>Atur konten yang akan tayang dan kapan waktunya.</p></div></header>
-    {!isThreadsConnected ? <div className="schedule-message error"><AppIcon name="info" /><span>Hubungkan Threads untuk membuat jadwal baru.</span><button className="schedule-text-button" onClick={onConnectThreads}>Hubungkan Threads</button></div> : null}
+    {!isThreadsConnected ? <div className="schedule-message error"><AppIcon name="info" /><span>{threadsStatus === 'needs_reconnect' ? 'Koneksi Threads telah kedaluwarsa. Hubungkan kembali akun Anda.' : 'Hubungkan Threads untuk membuat jadwal baru.'}</span><button className="schedule-text-button" onClick={onConnectThreads}>{threadsStatus === 'needs_reconnect' ? 'Hubungkan Ulang Threads' : 'Hubungkan Threads'}</button></div> : null}
     <nav className="schedule-main-tabs"><button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Kalender</button><button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>List <span>{scheduled.length}</span></button></nav>
 
     <div className="schedule-content-workspace"><main>

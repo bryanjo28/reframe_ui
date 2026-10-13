@@ -33,8 +33,10 @@ import {
   clearAuthSession,
   getCurrentAuthToken,
   getCurrentAuthState,
+  getThreadsConnectionStatus,
   logout,
   type AuthUser,
+  type ThreadsConnectionStatus,
 } from './services/authService'
 import {
   findPersonaConfigForUser,
@@ -186,6 +188,7 @@ function AppShell() {
   const [authError, setAuthError] = useState('')
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [isThreadsConnected, setIsThreadsConnected] = useState(false)
+  const [threadsStatus, setThreadsStatus] = useState<ThreadsConnectionStatus>('disconnected')
   const [unauthenticatedView, setUnauthenticatedView] = useState<UnauthenticatedView>('login')
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState(getStoredPendingVerificationEmail)
   const [authHelperMessage, setAuthHelperMessage] = useState(takeStoredAuthHelperMessage)
@@ -356,6 +359,7 @@ function AppShell() {
   function resetWorkspaceState() {
     setCurrentUser(null)
     setIsThreadsConnected(false)
+    setThreadsStatus('disconnected')
     setPersonaConfig(null)
     setActivePage('dashboard')
     setPersonaStatus('idle')
@@ -388,6 +392,7 @@ function AppShell() {
       setIsThreadsConnected(Boolean(
         socialAccounts?.threads?.connected && !socialAccounts.threads.needsReconnect,
       ))
+      setThreadsStatus(getThreadsConnectionStatus(socialAccounts?.threads))
       setStoredPendingVerificationEmail(undefined)
       setPendingVerificationEmail('')
       clearStoredAuthHelperMessage()
@@ -530,6 +535,7 @@ function AppShell() {
         authState.socialAccounts?.threads?.connected &&
           !authState.socialAccounts.threads.needsReconnect,
       ))
+      setThreadsStatus(getThreadsConnectionStatus(authState.socialAccounts?.threads))
       setAuthStatus('authenticated')
       setUnauthenticatedView('login')
       setStoredPendingVerificationEmail(undefined)
@@ -704,6 +710,7 @@ function AppShell() {
                 generationCompletion={generationCompletion}
                 onGenerationCompletionHandled={handleGenerationCompletionHandled}
                 onOpenSchedule={() => handleNavigate('auto-post')}
+                onConnectThreads={() => handleNavigate('connecting-apps')}
                 onViewContentBank={() => handleNavigate('content-bank')}
               />
             ) : activePage === 'content-bank' ? (
@@ -716,7 +723,7 @@ function AppShell() {
             ) : activePage === 'auto-post' ? (
               <AutoPostPage
                 userId={currentUser?.id || ''}
-                isThreadsConnected={isThreadsConnected}
+                threadsStatus={threadsStatus}
                 onConnectThreads={() => handleNavigate('connecting-apps')}
                 onReviewContent={() => handleNavigate('content-bank')}
               />
