@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   clearAuthSession,
+  getThreadsConnectionStatus,
   getCurrentAuthState,
   login,
   register,
@@ -87,6 +88,35 @@ describe('authService verification flow', () => {
     const authState = await getCurrentAuthState()
 
     expect(authState?.onboarding).toEqual({ hasPersona: false })
+  })
+
+  it('discards backend-managed Threads tokens from auth state', async () => {
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, 'app-login-token')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: {
+        user: { id: 'user-1' },
+        socialAccounts: {
+          threads: {
+            status: 'connected', connected: true, accountId: 'threads-1',
+            accessToken: 'must-not-reach-fe', refreshToken: 'must-not-reach-fe', token: 'also-secret',
+          },
+        },
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+
+    const threads = (await getCurrentAuthState())?.socialAccounts?.threads
+    expect(threads).toEqual(expect.objectContaining({ status: 'connected', connected: true, accountId: 'threads-1' }))
+    expect(threads).not.toHaveProperty('accessToken')
+    expect(threads).not.toHaveProperty('refreshToken')
+    expect(threads).not.toHaveProperty('token')
+  })
+
+  it('normalizes explicit and boolean Threads connection states', () => {
+    expect(getThreadsConnectionStatus({ status: 'connected' })).toBe('connected')
+    expect(getThreadsConnectionStatus({ connected: false, needsReconnect: true })).toBe('needs_reconnect')
+    expect(getThreadsConnectionStatus({ status: 'needs_reconnect', connected: false })).toBe('needs_reconnect')
+    expect(getThreadsConnectionStatus({ status: 'disconnected', connected: true })).toBe('disconnected')
+    expect(getThreadsConnectionStatus(null)).toBe('disconnected')
   })
 
   it('resends verification to the registered email', async () => {

@@ -3,17 +3,6 @@ import { getApiError, SESSION_EXPIRED_EVENT } from '../utils/apiError'
 
 const AUTH_TOKEN_STORAGE_KEY = 'reframe.authToken'
 const AUTH_STATE_CACHE_TTL_MS = 10_000
-const DUMMY_THREADS_CONNECTION_ENABLED = import.meta.env.DEV && import.meta.env.MODE !== 'test'
-
-const DUMMY_THREADS_CONNECTION: ThreadsSocialAccountState = {
-  status: 'connected',
-  connected: true,
-  needsReconnect: false,
-  username: '@reframe_dummy',
-  accountId: 'threads-dummy-account',
-  threadsId: 'threads-dummy-user',
-}
-
 export type AuthCredentials = {
   email: string
   password: string
@@ -54,8 +43,6 @@ export type ThreadsSocialAccountState = {
   username?: string
   accountId?: string
   threadsId?: string
-  token?: string
-  refreshToken?: string
   expiresAt?: string
   updatedAt?: string
   [key: string]: unknown
@@ -141,8 +128,8 @@ function getBooleanFromKeys(record: Record<string, unknown>, keys: string[]) {
 
 function looksLikeThreadsAccountRecord(record: Record<string, unknown>) {
   return Boolean(
+    getStringFromKeys(record, ['status']) ||
     getStringFromKeys(record, ['expiresAt', 'expires_at']) ||
-      getStringFromKeys(record, ['refreshToken', 'refresh_token']) ||
       getStringFromKeys(record, ['platformUserId', 'platform_user_id']) ||
       getStringFromKeys(record, ['accountId', 'account_id']) ||
       getStringFromKeys(record, ['threadsId', 'threads_id']) ||
@@ -276,36 +263,40 @@ function normalizeThreadsSocialAccount(candidate: unknown) {
   const expiresAt =
     getStringFromKeys(candidate, ['expiresAt', 'expires_at']) ||
     getString(candidate.expiresAt)
-  const parsedExpiresAt = expiresAt ? Date.parse(expiresAt) : Number.NaN
-  const hasValidExpiry = Number.isFinite(parsedExpiresAt)
-  const isExpired = hasValidExpiry ? parsedExpiresAt <= Date.now() : true
-  const refreshToken = getStringFromKeys(candidate, ['refreshToken', 'refresh_token'])
-  const token = getStringFromKeys(candidate, ['token', 'accessToken', 'access_token'])
   const accountId = getStringFromKeys(candidate, ['accountId', 'account_id', 'platformUserId', 'platform_user_id'])
   const threadsId = getStringFromKeys(candidate, ['threadsId', 'threads_id'])
   const username = getStringFromKeys(candidate, ['username', 'user_name'])
   const connectedOverride = getBooleanFromKeys(candidate, ['connected'])
   const needsReconnectOverride = getBooleanFromKeys(candidate, ['needsReconnect', 'needs_reconnect'])
-  const hasConnectionRow = Boolean(token || refreshToken || accountId || threadsId || username)
-  const isDisconnectedStatus = status === 'disconnected'
-  const inferredConnected = hasConnectionRow && !isExpired && hasValidExpiry && !isDisconnectedStatus
+  const normalizedStatus = status?.toLowerCase()
+  const hasConnectionRow = Boolean(accountId || threadsId || username)
+  const explicitNeedsReconnect = normalizedStatus === 'needs_reconnect' || needsReconnectOverride === true
+  const explicitDisconnected = normalizedStatus === 'disconnected'
+  const explicitConnected = normalizedStatus === 'connected'
+  const connected = explicitDisconnected || explicitNeedsReconnect
+    ? false
+    : explicitConnected
+      ? true
+      : connectedOverride ?? hasConnectionRow
+  const needsReconnect = explicitNeedsReconnect
+
+  const {
+    token: _token,
+    accessToken: _accessToken,
+    access_token: _accessTokenSnake,
+    refreshToken: _refreshToken,
+    refresh_token: _refreshTokenSnake,
+    ...safeCandidate
+  } = candidate
 
   return {
-    ...candidate,
-    status,
-    connected:
-      connectedOverride ??
-      inferredConnected,
-    needsReconnect:
-      needsReconnectOverride ??
-      (hasConnectionRow && !isDisconnectedStatus
-        ? !(connectedOverride ?? inferredConnected)
-        : false),
+    ...safeCandidate,
+    status: explicitNeedsReconnect ? 'needs_reconnect' : connected ? 'connected' : 'disconnected',
+    connected,
+    needsReconnect,
     username,
     accountId,
     threadsId,
-    token,
-    refreshToken,
     expiresAt,
     updatedAt: getStringFromKeys(candidate, ['updatedAt', 'updated_at']),
   }
@@ -366,17 +357,12 @@ function normalizeAuthMeState(payload: ApiResponse): AuthMeState | null {
       typeof hasPersona === 'boolean'
         ? { hasPersona }
         : null,
-    socialAccounts: DUMMY_THREADS_CONNECTION_ENABLED
+    socialAccounts: socialAccountsRecord
       ? {
-          ...(socialAccountsRecord ?? {}),
-          threads: DUMMY_THREADS_CONNECTION,
+          ...socialAccountsRecord,
+          threads: threads ?? undefined,
         }
-      : socialAccountsRecord
-        ? {
-            ...socialAccountsRecord,
-            threads: threads ?? undefined,
-          }
-        : null,
+      : null,
   }
 }
 
@@ -469,6 +455,22 @@ async function createAuthRequestError(response: Response) {
 export function clearAuthSession() {
   setStoredAuthToken(undefined)
   authStateCache = null
+}
+
+export function invalidateAuthStateCache() {
+  authStateCache = null
+}
+
+export type ThreadsConnectionStatus = 'connected' | 'needs_reconnect' | 'disconnected'
+
+export function getThreadsConnectionStatus(
+  account?: ThreadsSocialAccountState | null,
+): ThreadsConnectionStatus {
+  const status = account?.status?.toLowerCase()
+  if (status === 'needs_reconnect' || account?.needsReconnect) return 'needs_reconnect'
+  if (status === 'disconnected') return 'disconnected'
+  if (status === 'connected' || account?.connected) return 'connected'
+  return 'disconnected'
 }
 
 export async function login(payload: AuthCredentials) {
