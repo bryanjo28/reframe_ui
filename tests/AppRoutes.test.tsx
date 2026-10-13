@@ -22,8 +22,10 @@ describe('public auth routes', () => {
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: 'Generate viral threads dalam 10 detik' })).toBeInTheDocument()
-    expect(screen.getByText('Free demo')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Ubah satu ide menjadi thread yang siap posting.' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Demo gratis')).toBeInTheDocument()
   })
 
   it('renders the privacy policy without requiring authentication', () => {
@@ -33,7 +35,7 @@ describe('public auth routes', () => {
 
     expect(screen.getByRole('heading', { name: 'Kebijakan Privasi' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Penghapusan data' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Ketentuan Layanan' })).toHaveAttribute('href', '/terms-of-service')
+    expect(screen.getByRole('link', { name: 'Syarat & Ketentuan' })).toHaveAttribute('href', '/terms-of-service')
   })
 
   it('renders the terms of service without requiring authentication', () => {
@@ -41,13 +43,14 @@ describe('public auth routes', () => {
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: 'Ketentuan Layanan' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Penggunaan layanan' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Syarat & Ketentuan' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '1. Ruang lingkup layanan' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '5. Harga, langganan, dan pembayaran' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Kebijakan Privasi' })).toHaveAttribute('href', '/privacy-policy')
   })
 
   it('renders check-email with the stored registration email', () => {
-    localStorage.setItem('reframe.pendingVerificationEmail', 'user@example.com')
+    localStorage.setItem('alurin.pendingVerificationEmail', 'user@example.com')
     window.history.replaceState({}, '', '/check-email')
 
     render(<App />)

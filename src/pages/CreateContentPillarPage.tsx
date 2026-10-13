@@ -501,7 +501,7 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
         <article className="panel persona-form-panel" data-tour-step={isInitialSetup ? 3 : undefined}>
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Reframe Pillar Builder</p>
+              <p className="eyebrow">alurin Pillar Builder</p>
               <h2>{hasExistingRecord ? 'Update content pillar' : 'Buat content pillar'}</h2>
             </div>
             <span className={`pill${hasExistingRecord ? ' subtle' : ''}`}>

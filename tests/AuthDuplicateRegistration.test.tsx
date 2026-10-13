@@ -17,7 +17,7 @@ async function submitRegistration(error: { code: string; message: string }) {
   await user.type(screen.getByRole('textbox', { name: 'Username' }), 'used-name')
   await user.type(screen.getByLabelText('Password'), 'Password1')
   await user.type(screen.getByLabelText('Konfirmasi Password'), 'Password1')
-  await user.click(screen.getByRole('button', { name: 'Daftar' }))
+  await user.click(screen.getByRole('button', { name: 'Register' }))
 }
 
 it('clearly identifies an email that is already registered', async () => {

@@ -14,7 +14,7 @@
 
 - The frontend must never read, store, or expose a Threads access or refresh token.
 - The application login token remains supported and continues to authorize backend API requests.
-- Only application-authentication error codes may dispatch `reframe:session-expired`.
+- Only application-authentication error codes may dispatch `alurin:session-expired`.
 - Existing backend camelCase and snake_case response variants remain accepted.
 - Reconnect uses the existing Threads authorization flow.
 

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppIcon } from './AppIcon'
+import { BrandLogo } from './BrandLogo'
 import type { MenuItem, NavKey } from '../types/navigation'
 import type { AuthUser } from '../services/authService'
 import { getCurrentSubscription, listSubscriptionPlans } from '../services/subscriptionPlans'
 import { getMyUsage, USAGE_UPDATED_EVENT } from '../services/usage'
 import type { UiLanguage } from '../utils/uiLanguage'
+import { withCurrentBrand } from '../utils/brand'
 
 type SidebarProps = {
   activePage: NavKey
@@ -36,7 +38,7 @@ const settingsMenu: SidebarMenuItem[] = [
   { key: 'personalize', label: 'Content Brain', icon: 'user' },
   { key: 'connecting-apps', label: 'Connected Accounts', icon: 'link' },
   { key: 'subscription-plans', label: 'Subscription', icon: 'calendar' },
-  { key: 'payments', label: 'Pembayaran', icon: 'sparkles' },
+  { key: 'ai-credits', label: 'AI Credits', icon: 'sparkles' },
   { key: 'settings', label: 'Settings', icon: 'menu' },
 ]
 
@@ -118,12 +120,13 @@ export function Sidebar({
   const [tokenLimit, setTokenLimit] = useState<number | null>(null)
   const [planName, setPlanName] = useState('Current plan')
 
-  const displayName =
+  const displayName = withCurrentBrand(
     currentUser?.accountName ||
     currentUser?.fullName ||
     currentUser?.name ||
     currentUser?.email ||
-    'User'
+    'User',
+  )
 
   useEffect(() => {
     let isMounted = true
@@ -225,10 +228,10 @@ export function Sidebar({
         </div>
 
         <div className="brand">
-          <div className="brand-mark">R</div>
+          <BrandLogo compact />
           {!isCollapsed ? (
             <div>
-              <p className="eyebrow">Reframe</p>
+              <p className="eyebrow">alurin</p>
               <strong>{displayName}</strong>
             </div>
           ) : null}

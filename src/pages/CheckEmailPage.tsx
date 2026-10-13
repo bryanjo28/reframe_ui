@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { resendVerification } from '../services/authService'
+import { BrandLogo } from '../components/BrandLogo'
 
 type CheckEmailPageProps = {
   email?: string
@@ -38,6 +39,7 @@ export function CheckEmailPage({ email, onBackToLogin }: CheckEmailPageProps) {
   return (
     <div className="bootstrap-shell">
       <section className="panel bootstrap-card">
+        <BrandLogo className="auth-brand-logo" />
         <p className="eyebrow">Check Email</p>
         <h1>Cek email kamu dulu</h1>
         <p className="page-description">

@@ -41,7 +41,7 @@ export function DashboardPage({ userId, onNavigate, threadsStatus }: { activePag
   }, [userId])
 
   const nextAction = useMemo(() => {
-    if (pillarCount === 0) return { title: 'Tambahkan Content Pillar', copy: 'Lengkapi Content Brain agar Reframe punya arah topik yang jelas.', label: 'Lanjut Setup', page: 'content-pillar' as NavKey }
+    if (pillarCount === 0) return { title: 'Tambahkan Content Pillar', copy: 'Lengkapi Content Brain agar alurin punya arah topik yang jelas.', label: 'Lanjut Setup', page: 'content-pillar' as NavKey }
     if (pipeline.approved > 0 && threadsStatus === 'needs_reconnect') return { title: 'Koneksi Threads perlu diperbarui.', copy: 'Koneksi Threads telah kedaluwarsa. Hubungkan kembali akun Anda.', label: 'Hubungkan Ulang Threads', page: 'connecting-apps' as NavKey }
     if (pipeline.approved > 0 && threadsStatus !== 'connected') return { title: 'Konten kamu sudah siap.', copy: 'Hubungkan Threads supaya konten bisa dijadwalkan.', label: 'Hubungkan Threads', page: 'connecting-apps' as NavKey }
     if (pipeline.approved > 0) return { title: `${pipeline.approved} posts are ready to schedule`, copy: 'Pick a time and keep your publishing queue moving.', label: 'Schedule Posts', page: 'auto-post' as NavKey }

@@ -68,7 +68,7 @@ function formatPlanCount(value: number | null) {
 function getPlanTone(plan: NormalizedSubscriptionPlan) {
   const key = plan.key.toLowerCase()
 
-  if (key.includes('business')) {
+  if (key.includes('creator')) {
     return 'business'
   }
 
@@ -86,13 +86,15 @@ function getPlanPriority(plan: NormalizedSubscriptionPlan) {
     return 0
   }
 
-  if (key.includes('pro')) {
+  if (key.includes('starter')) {
     return 1
   }
 
-  if (key.includes('business')) {
+  if (key.includes('creator')) {
     return 2
   }
+
+  if (key.includes('pro')) return 3
 
   return 99
 }
@@ -124,7 +126,14 @@ function getPlanFeatures(plan: NormalizedSubscriptionPlan) {
       .filter(Boolean)
   }
 
-  return []
+  const maxThreads = readRawNumber(raw, ['max_threads_accounts', 'maxThreadsAccounts']) ?? 0
+  const canSchedule = raw.can_schedule === true || raw.canSchedule === true
+  return [
+    'Generate Topic, Content, dan Regenerate AI',
+    'Edit Content, Content List, dan Calendar',
+    maxThreads > 0 ? 'Connect Threads: 1 akun' : 'Connect Threads tidak tersedia',
+    canSchedule ? 'Schedule Post tanpa kuota bulanan' : 'Schedule Post tidak tersedia',
+  ]
 }
 
 function getPlanDetails(plan: NormalizedSubscriptionPlan) {
@@ -135,20 +144,16 @@ function getPlanDetails(plan: NormalizedSubscriptionPlan) {
       value: formatPlanCount(readRawNumber(raw, ['max_personas', 'maxPersonas'])),
     },
     {
-      label: 'Monthly AI credits',
+      label: 'Max content pillars',
+      value: formatPlanCount(readRawNumber(raw, ['max_content_pillars', 'maxContentPillars'])),
+    },
+    {
+      label: plan.key.toLowerCase().includes('free') ? 'AI credits sekali daftar' : 'AI credits per bulan',
       value: formatPlanCount(readRawNumber(raw, ['monthly_ai_credits', 'monthlyAiCredits'])),
     },
     {
-      label: 'Daily topic gens',
-      value: formatPlanCount(
-        readRawNumber(raw, ['daily_topic_generations', 'dailyTopicGenerations']),
-      ),
-    },
-    {
-      label: 'Daily content gens',
-      value: formatPlanCount(
-        readRawNumber(raw, ['daily_content_generations', 'dailyContentGenerations']),
-      ),
+      label: 'Token allowance',
+      value: formatPlanCount(readRawNumber(raw, ['token_allowance', 'tokenAllowance']) ?? ((plan.monthlyAiCredits || 0) * 5000)),
     },
   ]
 
@@ -180,7 +185,8 @@ function SubscriptionPlanCard({
   const details = getPlanDetails(plan)
 
   return (
-    <article className={`subscription-card tone-${tone}${isOwned ? ' owned' : ''}`}>
+    <article className={`subscription-card tone-${tone}${isOwned ? ' owned' : ''}${plan.key.toLowerCase().includes('creator') ? ' recommended' : ''}`}>
+      {plan.key.toLowerCase().includes('creator') ? <span className="subscription-recommended">Paling direkomendasikan</span> : null}
       <div className="subscription-card-head">
         <div>
           <span className="subscription-badge">{plan.key.toUpperCase()}</span>
@@ -241,6 +247,45 @@ function SubscriptionPlanCard({
   )
 }
 
+const customPlanContactUrl =
+  import.meta.env.VITE_CUSTOM_PLAN_CONTACT_URL?.trim() ||
+  'mailto:hello@alurin.id?subject=Custom%20Plan%20alurin&body=Halo%20tim%20alurin%2C%20saya%20ingin%20mendiskusikan%20kebutuhan%20Custom%20Plan.'
+
+function CustomPlanCard() {
+  return (
+    <article className="subscription-card tone-custom custom-plan-card">
+      <div className="subscription-card-head">
+        <div>
+          <span className="subscription-badge">CUSTOM</span>
+          <h3>Custom Plan</h3>
+        </div>
+        <div className="subscription-price custom-plan-price">
+          <strong>Sesuai kebutuhan</strong>
+          <span>Fleksibel</span>
+        </div>
+      </div>
+
+      <p className="subscription-description">
+        Untuk tim atau bisnis yang membutuhkan kapasitas lebih besar dari paket Max.
+      </p>
+
+      <ul className="subscription-feature-list custom-plan-features">
+        <li><AppIcon name="check" /><span>AI Credits dalam jumlah khusus</span></li>
+        <li><AppIcon name="check" /><span>Volume konten dan workspace lebih besar</span></li>
+        <li><AppIcon name="check" /><span>Skema harga yang disesuaikan</span></li>
+        <li><AppIcon name="check" /><span>Bantuan onboarding dan prioritas support</span></li>
+      </ul>
+
+      <div className="subscription-card-footer">
+        <span className="pill subtle">Untuk kebutuhan besar</span>
+        <a className="primary-button subscription-action custom-plan-action" href={customPlanContactUrl}>
+          Contact Us
+        </a>
+      </div>
+    </article>
+  )
+}
+
 export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
   const [plans, setPlans] = useState<NormalizedSubscriptionPlan[]>([])
   const [currentSubscription, setCurrentSubscription] = useState<NormalizedCurrentSubscription | null>(null)
@@ -263,7 +308,8 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
           return
         }
 
-        const sortedPlans = [...nextPlans].sort((left, right) => {
+        const sellablePlanCodes = new Set(['free', 'starter', 'creator', 'pro'])
+        const sortedPlans = nextPlans.filter((plan) => sellablePlanCodes.has(plan.key.toLowerCase())).sort((left, right) => {
           const priorityDiff = getPlanPriority(left) - getPlanPriority(right)
 
           if (priorityDiff !== 0) {
@@ -366,6 +412,7 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
             </div>
           </div>
         )}
+        {!isLoading ? <CustomPlanCard /> : null}
       </div>
     </section>
   )

@@ -20,7 +20,7 @@ describe('AuthPage', () => {
     await user.type(screen.getByRole('textbox', { name: 'Email' }), '  BryanJo2324@GMAIL.COM  ')
     await user.type(screen.getByLabelText('Password'), 'Password123')
     await user.type(screen.getByLabelText('Konfirmasi Password'), 'Password123')
-    await user.click(screen.getByRole('button', { name: 'Daftar' }))
+    await user.click(screen.getByRole('button', { name: 'Register' }))
 
     expect(registerSpy).toHaveBeenCalledWith({
       fullName: 'Bryan Jonathan',
@@ -44,7 +44,7 @@ describe('AuthPage', () => {
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'user@example.com')
     await user.type(screen.getByLabelText('Password'), 'Password1')
     await user.type(screen.getByLabelText('Konfirmasi Password'), 'Password2')
-    await user.click(screen.getByRole('button', { name: 'Daftar' }))
+    await user.click(screen.getByRole('button', { name: 'Register' }))
 
     expect(screen.getByText('Konfirmasi password tidak sama.')).toBeInTheDocument()
     expect(registerSpy).not.toHaveBeenCalled()

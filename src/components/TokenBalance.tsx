@@ -3,7 +3,7 @@ import { getMyUsage, USAGE_UPDATED_EVENT, type UsageUpdatedDetail } from '../ser
 import { AppIcon } from './AppIcon'
 import { useToast } from './useToast'
 
-export function TokenBalance({ onTopUp }: { onTopUp: () => void }) {
+export function TokenBalance({ onOpenCredits, onTopUp }: { onOpenCredits: () => void; onTopUp: () => void }) {
   const { info } = useToast()
   const [remaining, setRemaining] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -24,7 +24,7 @@ export function TokenBalance({ onTopUp }: { onTopUp: () => void }) {
     function handleUsage(event: Event) {
       const creditsUsed = (event as CustomEvent<UsageUpdatedDetail>).detail?.creditsUsed
       if (creditsUsed && creditsUsed > 0) {
-        info('AI selesai digunakan', `${creditsUsed.toLocaleString('id-ID')} token digunakan.`)
+        info('AI selesai digunakan', `${creditsUsed.toLocaleString('id-ID')} AI Credits digunakan.`)
       }
       window.setTimeout(() => void refresh(true), 350)
     }
@@ -32,8 +32,8 @@ export function TokenBalance({ onTopUp }: { onTopUp: () => void }) {
     return () => window.removeEventListener(USAGE_UPDATED_EVENT, handleUsage)
   }, [info, refresh])
 
-  return <div className="workspace-token-bar" aria-label="Saldo token AI">
-    <div className="workspace-token-balance"><AppIcon name="sparkles" /><span>Token</span><strong>{loading ? '—' : remaining === null ? '∞' : remaining.toLocaleString('id-ID')}</strong></div>
+  return <div className="workspace-token-bar" aria-label="Saldo AI Credits">
+    <button className="workspace-token-balance" type="button" onClick={onOpenCredits}><AppIcon name="sparkles" /><span>AI Credits</span><strong>{loading ? '—' : remaining === null ? '—' : remaining.toLocaleString('id-ID')}</strong></button>
     <button type="button" onClick={onTopUp}>Top Up</button>
   </div>
 }

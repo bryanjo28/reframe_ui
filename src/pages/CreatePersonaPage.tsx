@@ -382,11 +382,11 @@ export function CreatePersonaPage({
     <section className={`persona-page${isInitialSetup ? ' persona-page-initial' : ''}`}>
       <header className={`page-header${isInitialSetup ? ' persona-page-header-initial' : ''}`}>
         <p className="eyebrow">{isInitialSetup ? 'Content Brain · 1 of 2' : 'Content Brain'}</p>
-        <h1>{isInitialSetup ? 'Biar Reframe kenal kamu dulu 👋' : 'Persona'}</h1>
+        <h1>{isInitialSetup ? 'Biar alurin kenal kamu dulu 👋' : 'Persona'}</h1>
         <p className="page-description">
           {isInitialSetup
             ? 'Ceritakan sedikit tentang kamu, audiensmu, dan bagaimana kamu ingin terdengar.'
-            : 'Atur cara Reframe memahami suara, audiens, dan tujuan kontenmu.'}
+            : 'Atur cara alurin memahami suara, audiens, dan tujuan kontenmu.'}
         </p>
       </header>
 
@@ -400,7 +400,7 @@ export function CreatePersonaPage({
         <article className="panel persona-form-panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Reframe Persona Builder</p>
+              <p className="eyebrow">alurin Persona Builder</p>
               <h2>{hasExistingConfig ? 'Update persona utama' : 'Buat persona utama'}</h2>
             </div>
             <span className={`pill${hasExistingConfig ? ' subtle' : ''}`}>

@@ -263,7 +263,7 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
     <section className={`generate-page manual-topic-flow${embedded ? ' embedded' : ''}`}>
       {!embedded ? <header className="page-header generate-hero">
         <div>
-          <p className="eyebrow">Reframe Content Engine</p>
+          <p className="eyebrow">alurin Content Engine</p>
           <h1>Buat variant dari satu topic</h1>
           <p className="page-description">
             Pilih satu topic lalu buat hingga lima angle konten yang berbeda.

@@ -190,7 +190,7 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
   return (
     <section className="connecting-page">
       <header className="page-header">
-        <p className="eyebrow">Reframe Account</p>
+        <p className="eyebrow">alurin Account</p>
         <h1>Connected Accounts</h1>
         <p className="page-description">
           Hubungkan akun media sosial Anda untuk memulai automasi.

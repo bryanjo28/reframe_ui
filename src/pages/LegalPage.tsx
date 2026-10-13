@@ -1,117 +1,49 @@
-type LegalPageProps = {
-  document: 'privacy' | 'terms'
-}
+type LegalPageProps = { document: 'privacy' | 'terms' }
 
 const LAST_UPDATED = '13 Oktober 2026'
+const SUPPORT_EMAIL = 'hello@alurin.id'
 
 function LegalHeader({ title, description }: { title: string; description: string }) {
-  return (
-    <header className="legal-header">
-      <a className="legal-brand" href="/" aria-label="Sociora beranda">Sociora</a>
-      <p className="eyebrow">Dokumen legal</p>
-      <h1>{title}</h1>
-      <p>{description}</p>
-      <small>Terakhir diperbarui: {LAST_UPDATED}</small>
-    </header>
-  )
+  return <header className="legal-header">
+    <a className="legal-brand" href="/" aria-label="Beranda alurin"><img src="/alurin-wordmark.png" alt="alurin" /></a>
+    <p className="eyebrow">Dokumen legal</p><h1>{title}</h1><p>{description}</p>
+    <small>Berlaku dan terakhir diperbarui: {LAST_UPDATED}</small>
+  </header>
 }
 
 function PrivacyPolicy() {
-  return (
-    <>
-      <LegalHeader title="Kebijakan Privasi" description="Kebijakan ini menjelaskan bagaimana Sociora mengumpulkan, menggunakan, menyimpan, dan melindungi data saat kamu memakai layanan kami." />
-      <section>
-        <h2>Tentang Sociora</h2>
-        <p>Sociora menyediakan alat bantu berbasis AI untuk menyusun ide, membuat dan mengelola konten, menjadwalkan publikasi, serta menghubungkan akun media sosial seperti Threads.</p>
-      </section>
-      <section>
-        <h2>Data yang kami proses</h2>
-        <ul>
-          <li>Data akun, seperti nama, alamat email, dan informasi profil.</li>
-          <li>Data yang kamu masukkan, termasuk persona, pilar konten, ide, draf, dan jadwal publikasi.</li>
-          <li>Informasi akun media sosial yang kamu hubungkan serta token akses yang diperlukan untuk menjalankan fitur yang kamu pilih.</li>
-          <li>Data teknis dan penggunaan, seperti log kesalahan, perangkat, alamat IP, dan aktivitas fitur untuk menjaga keamanan serta meningkatkan layanan.</li>
-          <li>Informasi langganan dan transaksi. Detail kartu pembayaran diproses oleh penyedia pembayaran dan tidak kami simpan secara langsung.</li>
-        </ul>
-      </section>
-      <section>
-        <h2>Cara kami menggunakan data</h2>
-        <p>Kami menggunakan data untuk menyediakan dan mengamankan layanan, menghasilkan konten sesuai instruksi kamu, memublikasikan konten yang kamu setujui, mengelola akun dan langganan, memberi dukungan, mencegah penyalahgunaan, serta memperbaiki kualitas produk.</p>
-      </section>
-      <section>
-        <h2>Pembagian dan penyimpanan data</h2>
-        <p>Data hanya dibagikan seperlunya kepada penyedia infrastruktur, autentikasi, AI, pembayaran, analitik, dan platform media sosial yang kamu hubungkan. Kami tidak menjual data pribadimu. Masa penyimpanan disesuaikan dengan kebutuhan layanan, kewajiban hukum, keamanan, dan penyelesaian sengketa.</p>
-      </section>
-      <section>
-        <h2>Penghapusan data</h2>
-        <p>Kamu dapat memutuskan koneksi Threads dari pengaturan aplikasi untuk menghentikan akses berikutnya. Untuk menghapus akun dan data terkait, ajukan permintaan melalui kanal dukungan resmi Sociora dengan menggunakan email yang terdaftar. Kami akan memverifikasi kepemilikan akun, menghapus atau menganonimkan data yang tidak wajib disimpan, dan memberi konfirmasi setelah proses selesai.</p>
-        <p>Salinan tertentu dapat dipertahankan sementara jika diwajibkan oleh hukum, diperlukan untuk keamanan, atau masih berada dalam siklus pencadangan terbatas.</p>
-      </section>
-      <section>
-        <h2>Hak dan pilihan kamu</h2>
-        <p>Kamu dapat meminta akses, koreksi, atau penghapusan data, mencabut koneksi layanan pihak ketiga, serta berhenti menggunakan layanan. Mencabut izin dapat membuat beberapa fitur tidak lagi berfungsi.</p>
-      </section>
-      <section>
-        <h2>Keamanan dan perubahan kebijakan</h2>
-        <p>Kami menerapkan perlindungan teknis dan organisasi yang wajar, tetapi tidak ada sistem internet yang sepenuhnya bebas risiko. Jika kebijakan ini berubah secara material, tanggal pembaruan di halaman ini akan disesuaikan.</p>
-      </section>
-    </>
-  )
+  return <>
+    <LegalHeader title="Kebijakan Privasi" description="Kebijakan ini menjelaskan bagaimana alurin mengumpulkan, menggunakan, menyimpan, dan melindungi data saat kamu memakai layanan kami." />
+    <section><h2>Tentang alurin</h2><p>alurin menyediakan alat bantu berbasis AI untuk menyusun ide, membuat dan mengelola konten, menjadwalkan publikasi, serta menghubungkan akun media sosial seperti Threads.</p></section>
+    <section><h2>Data yang kami proses</h2><ul><li>Data akun, seperti nama, alamat email, dan informasi profil.</li><li>Data yang kamu masukkan, termasuk persona, pilar konten, ide, draf, dan jadwal publikasi.</li><li>Informasi akun media sosial yang kamu hubungkan serta token akses yang diperlukan untuk menjalankan fitur yang kamu pilih.</li><li>Data teknis dan penggunaan, seperti log kesalahan, perangkat, alamat IP, dan aktivitas fitur.</li><li>Informasi langganan dan transaksi. Detail kartu atau rekening diproses oleh penyedia pembayaran dan tidak kami simpan secara langsung.</li></ul></section>
+    <section><h2>Cara kami menggunakan data</h2><p>Kami menggunakan data untuk menyediakan dan mengamankan layanan, menghasilkan konten sesuai instruksi kamu, memublikasikan konten yang kamu setujui, mengelola akun dan langganan, memberi dukungan, mencegah penyalahgunaan, serta memperbaiki kualitas produk.</p></section>
+    <section><h2>Pembagian dan penyimpanan data</h2><p>Data hanya dibagikan seperlunya kepada penyedia infrastruktur, autentikasi, AI, pembayaran, analitik, dan platform media sosial yang kamu hubungkan. Kami tidak menjual data pribadimu. Masa penyimpanan disesuaikan dengan kebutuhan layanan, kewajiban hukum, keamanan, dan penyelesaian sengketa.</p></section>
+    <section><h2>Penghapusan data</h2><p>Kamu dapat memutuskan koneksi Threads dari pengaturan aplikasi. Untuk menghapus akun dan data terkait, kirim permintaan dari email terdaftar ke <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Kami akan memverifikasi kepemilikan akun, menghapus atau menganonimkan data yang tidak wajib disimpan, dan memberi konfirmasi setelah proses selesai.</p><p>Salinan tertentu dapat dipertahankan sementara jika diwajibkan oleh hukum, diperlukan untuk keamanan, atau masih berada dalam siklus pencadangan terbatas.</p></section>
+    <section><h2>Hak dan pilihan kamu</h2><p>Kamu dapat meminta akses, koreksi, atau penghapusan data, mencabut koneksi layanan pihak ketiga, serta berhenti menggunakan layanan. Mencabut izin dapat membuat beberapa fitur tidak lagi berfungsi.</p></section>
+    <section><h2>Keamanan dan perubahan kebijakan</h2><p>Kami menerapkan perlindungan teknis dan organisasi yang wajar, tetapi tidak ada sistem internet yang sepenuhnya bebas risiko. Jika kebijakan ini berubah secara material, tanggal pembaruan di halaman ini akan disesuaikan.</p></section>
+  </>
 }
 
 function TermsOfService() {
-  return (
-    <>
-      <LegalHeader title="Ketentuan Layanan" description="Ketentuan ini mengatur penggunaan Sociora. Dengan membuat akun atau memakai layanan, kamu menyetujui ketentuan berikut." />
-      <section>
-        <h2>Penggunaan layanan</h2>
-        <p>Kamu harus memberikan informasi akun yang akurat, menjaga keamanan kredensial, dan hanya menggunakan layanan sesuai hukum. Kamu bertanggung jawab atas instruksi, konten, jadwal, dan tindakan publikasi yang dilakukan melalui akunmu.</p>
-      </section>
-      <section>
-        <h2>Konten dan AI</h2>
-        <p>Kamu tetap memiliki hak atas konten asli yang kamu masukkan. Kamu memberi Sociora izin terbatas untuk memproses konten tersebut hanya guna menjalankan layanan. Hasil AI dapat tidak akurat, mirip dengan konten lain, atau memerlukan penyuntingan; kamu wajib meninjau hasil sebelum menggunakan atau memublikasikannya.</p>
-      </section>
-      <section>
-        <h2>Layanan pihak ketiga</h2>
-        <p>Fitur tertentu bergantung pada layanan pihak ketiga, termasuk Threads, penyedia AI, autentikasi, dan pembayaran. Penggunaan fitur tersebut juga tunduk pada ketentuan pihak terkait. Perubahan atau gangguan pada layanan pihak ketiga dapat memengaruhi fungsi Sociora.</p>
-      </section>
-      <section>
-        <h2>Larangan penggunaan</h2>
-        <p>Kamu tidak boleh memakai Sociora untuk melanggar hukum atau hak pihak lain, menyebarkan malware, melakukan spam, mencoba mengakses sistem tanpa izin, menghindari batas penggunaan, atau menghasilkan dan menyebarkan konten yang berbahaya maupun menipu.</p>
-      </section>
-      <section>
-        <h2>Langganan dan pembayaran</h2>
-        <p>Harga, kuota, periode tagihan, dan fitur paket ditampilkan sebelum pembelian. Biaya yang telah dibayarkan tidak dapat dikembalikan kecuali diwajibkan oleh hukum atau dinyatakan lain pada saat transaksi. Kami dapat mengubah paket dengan pemberitahuan yang wajar.</p>
-      </section>
-      <section>
-        <h2>Penangguhan dan penghentian</h2>
-        <p>Kamu dapat berhenti menggunakan layanan kapan saja. Kami dapat membatasi atau menghentikan akses jika terjadi pelanggaran ketentuan, risiko keamanan, kewajiban hukum, atau penggunaan yang merugikan pengguna maupun sistem lain.</p>
-      </section>
-      <section>
-        <h2>Batasan tanggung jawab</h2>
-        <p>Layanan diberikan sebagaimana tersedia. Sejauh diizinkan hukum, Sociora tidak menjamin hasil AI, jangkauan konten, atau ketersediaan tanpa gangguan dan tidak bertanggung jawab atas kerugian tidak langsung akibat penggunaan layanan.</p>
-      </section>
-      <section>
-        <h2>Perubahan ketentuan</h2>
-        <p>Kami dapat memperbarui ketentuan ini untuk mencerminkan perubahan produk, hukum, atau keamanan. Penggunaan layanan setelah ketentuan baru berlaku berarti kamu menerima versi terbaru.</p>
-      </section>
-    </>
-  )
+  return <>
+    <LegalHeader title="Syarat & Ketentuan" description="Syarat dan Ketentuan ini mengatur penggunaan website, aplikasi, langganan, dan AI Credits alurin. Dengan membuat akun, memakai layanan, atau menyelesaikan pembayaran, kamu menyetujuinya." />
+    <nav className="legal-toc" aria-label="Daftar isi Syarat dan Ketentuan"><strong>Isi dokumen</strong><a href="#layanan">Layanan</a><a href="#akun">Akun</a><a href="#ai">Konten & AI</a><a href="#credits">AI Credits</a><a href="#pembayaran">Pembayaran</a><a href="#refund">Pembatalan & refund</a><a href="#larangan">Larangan</a><a href="#tanggung-jawab">Tanggung jawab</a></nav>
+    <section id="layanan"><h2>1. Ruang lingkup layanan</h2><p>alurin menyediakan perangkat lunak berbasis AI untuk membantu perencanaan, pembuatan, pengelolaan, penjadwalan, dan publikasi konten. Fitur, kuota, harga, dan ketersediaan dapat berbeda menurut paket. Kami dapat memperbaiki, mengubah, menambah, atau menghentikan fitur dengan pemberitahuan yang wajar jika perubahan berdampak material kepada pengguna.</p></section>
+    <section id="akun"><h2>2. Akun dan keamanan</h2><p>Kamu harus memberikan informasi yang akurat, menjaga kerahasiaan kredensial, dan segera memberi tahu kami jika akun diduga disalahgunakan. Aktivitas melalui akunmu dianggap dilakukan atas persetujuanmu sampai kami menerima laporan dan mengambil tindakan pengamanan.</p></section>
+    <section id="ai"><h2>3. Konten pengguna dan hasil AI</h2><p>Kamu tetap memiliki hak atas konten asli yang kamu masukkan dan memberi alurin izin terbatas untuk memprosesnya hanya guna menyediakan layanan. Kamu bertanggung jawab memastikan bahwa materi masukan dan publikasi tidak melanggar hukum atau hak pihak lain.</p><p>Hasil AI dapat mengandung kesalahan, informasi yang tidak mutakhir, kemiripan dengan keluaran lain, atau materi yang memerlukan penyuntingan. Kamu wajib meninjau fakta, hak penggunaan, nada, dan kelayakan hasil sebelum digunakan atau dipublikasikan. alurin tidak menjamin performa, jangkauan, atau hasil bisnis tertentu.</p></section>
+    <section id="credits"><h2>4. AI Credits dan batas penggunaan</h2><p>AI Credits adalah satuan penggunaan fitur AI di alurin, bukan uang elektronik, alat pembayaran, atau aset yang dapat diuangkan dan dipindahtangankan. Jumlah credits yang terpakai bergantung pada fitur dan beban pemrosesan yang dijelaskan di aplikasi.</p><p>Credits dari langganan mengikuti siklus dan ketentuan paket. Credits hasil top up berlaku selama 12 bulan sejak berhasil ditambahkan ke akun. Saat ada lebih dari satu saldo, sistem dapat menentukan urutan pemakaian untuk mengoptimalkan masa berlaku. Credits yang kedaluwarsa atau diberikan sebagai bonus tidak dapat diuangkan.</p></section>
+    <section id="pembayaran"><h2>5. Harga, langganan, dan pembayaran</h2><p>Seluruh harga ditampilkan dalam Rupiah (IDR). Rincian paket, kuota, periode tagihan, pajak atau biaya yang berlaku, serta jumlah akhir ditampilkan sebelum pembayaran. Kamu bertanggung jawab memeriksa detail transaksi sebelum melanjutkan.</p><p>Pembayaran diproses oleh Midtrans dan mitra kanal pembayarannya. alurin tidak menyimpan detail kartu, PIN, atau kredensial perbankanmu. Pembayaran dianggap berhasil setelah statusnya diverifikasi oleh sistem kami dari penyedia pembayaran. Instruksi, batas waktu, dan ketentuan kanal pembayaran yang kamu pilih tetap berlaku.</p><p>Untuk langganan berulang, biaya akan ditagihkan sesuai periode yang ditampilkan saat pembelian sampai dibatalkan. Perubahan harga untuk periode berikutnya akan diberitahukan terlebih dahulu. Kegagalan pembayaran dapat menyebabkan penundaan aktivasi, penghentian perpanjangan, atau penurunan akses.</p></section>
+    <section id="refund"><h2>6. Pembatalan, refund, dan transaksi bermasalah</h2><p>Kamu dapat membatalkan perpanjangan langganan untuk periode berikutnya. Akses paket tetap tersedia sampai akhir periode yang sudah dibayar, kecuali dinyatakan lain pada saat pembelian.</p><p>Pembelian produk digital yang telah aktif atau AI Credits yang telah ditambahkan pada umumnya tidak dapat dibatalkan atau dikembalikan, kecuali diwajibkan oleh hukum, terjadi pembayaran ganda, atau layanan gagal diberikan karena kesalahan sistem kami. Permintaan terkait transaksi harus dikirim ke <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> dengan email akun, ID transaksi, dan bukti pendukung. Persetujuan dan waktu pengembalian mengikuti hasil verifikasi serta proses kanal pembayaran.</p></section>
+    <section><h2>7. Layanan pihak ketiga</h2><p>Fitur tertentu bergantung pada layanan pihak ketiga, termasuk Threads atau Meta, penyedia AI, autentikasi, infrastruktur, dan Midtrans. Penggunaan fitur tersebut juga tunduk pada ketentuan masing-masing penyedia. Perubahan, pembatasan, atau gangguan pihak ketiga dapat memengaruhi fungsi alurin.</p></section>
+    <section id="larangan"><h2>8. Penggunaan yang dilarang</h2><p>Kamu tidak boleh memakai alurin untuk melanggar hukum atau hak pihak lain, melakukan penipuan, spam, manipulasi, ujaran kebencian, eksploitasi seksual, perjudian ilegal, distribusi malware, akses tanpa izin, penghindaran batas penggunaan, atau kegiatan lain yang berbahaya. Kamu juga tidak boleh menjual kembali akses, merekayasa balik, mengganggu sistem, atau menggunakan pembayaran alurin untuk memproses transaksi pihak lain tanpa izin tertulis.</p></section>
+    <section><h2>9. Hak kekayaan intelektual</h2><p>Perangkat lunak, desain, merek, dokumentasi, dan materi milik alurin dilindungi oleh hak kekayaan intelektual. Kami memberi kamu hak terbatas, non-eksklusif, tidak dapat dialihkan, dan dapat dicabut untuk menggunakan layanan sesuai paket dan Syarat dan Ketentuan ini.</p></section>
+    <section><h2>10. Penangguhan dan penghentian</h2><p>Kami dapat membatasi atau menghentikan akses jika terjadi pelanggaran, risiko keamanan, indikasi penipuan, kewajiban hukum, tunggakan, atau penggunaan yang merugikan pengguna maupun sistem lain. Jika memungkinkan, kami akan memberi pemberitahuan dan kesempatan yang wajar untuk memperbaiki pelanggaran.</p></section>
+    <section id="tanggung-jawab"><h2>11. Ketersediaan dan batasan tanggung jawab</h2><p>Layanan diberikan sebagaimana tersedia. Kami berupaya menjaga layanan tetap aman dan berfungsi, namun tidak menjamin layanan selalu bebas gangguan atau kesalahan. Sejauh diizinkan hukum, alurin tidak bertanggung jawab atas kerugian tidak langsung, kehilangan peluang, atau dampak yang timbul dari keputusan pengguna berdasarkan hasil AI atau gangguan layanan pihak ketiga.</p></section>
+    <section><h2>12. Hukum yang berlaku dan perubahan</h2><p>Syarat dan Ketentuan ini diatur oleh hukum Republik Indonesia. Perselisihan terlebih dahulu akan diupayakan selesai melalui musyawarah. Kami dapat memperbarui dokumen ini untuk mencerminkan perubahan produk, keamanan, pembayaran, atau kewajiban hukum dan akan memperbarui tanggal berlaku di halaman ini.</p></section>
+    <section><h2>13. Kontak</h2><p>Pertanyaan, keluhan, dan permintaan terkait akun atau transaksi dapat dikirim ke <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Sertakan informasi yang cukup agar kami dapat melakukan verifikasi tanpa mengirimkan kata sandi, PIN, atau OTP.</p></section>
+  </>
 }
 
 export function LegalPage({ document }: LegalPageProps) {
-  return (
-    <main className="legal-page">
-      <article className="legal-document">
-        {document === 'privacy' ? <PrivacyPolicy /> : <TermsOfService />}
-        <footer className="legal-footer">
-          <nav aria-label="Tautan legal">
-            <a href="/privacy-policy">Kebijakan Privasi</a>
-            <a href="/terms-of-service">Ketentuan Layanan</a>
-          </nav>
-          <p>© {new Date().getFullYear()} Sociora</p>
-        </footer>
-      </article>
-    </main>
-  )
+  return <main className="legal-page"><article className="legal-document">{document === 'privacy' ? <PrivacyPolicy /> : <TermsOfService />}<footer className="legal-footer"><nav aria-label="Tautan legal"><a href="/privacy-policy">Kebijakan Privasi</a><a href="/terms-of-service">Syarat & Ketentuan</a></nav><p>© {new Date().getFullYear()} alurin</p></footer></article></main>
 }

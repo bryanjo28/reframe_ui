@@ -31,7 +31,7 @@ it('refreshes the visible token balance after usage changes', async () => {
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
 
-  render(createElement(ToastProvider, null, createElement(TokenBalance, { onTopUp: vi.fn() })))
+  render(createElement(ToastProvider, null, createElement(TokenBalance, { onOpenCredits: vi.fn(), onTopUp: vi.fn() })))
   expect(await screen.findByText('100')).toBeInTheDocument()
 
   notifyUsageChanged({ usage: { total_tokens: 10 } })

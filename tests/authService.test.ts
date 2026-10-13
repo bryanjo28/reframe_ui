@@ -9,7 +9,7 @@ import {
   resendVerification,
 } from '../src/services/authService'
 
-const AUTH_TOKEN_STORAGE_KEY = 'reframe.authToken'
+const AUTH_TOKEN_STORAGE_KEY = 'alurin.authToken'
 
 describe('authService verification flow', () => {
   beforeEach(() => {

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { BrandLogo } from '../components/BrandLogo'
 
 import { API_BASE_URL } from '../config/api'
 import { requestForgotPassword } from '../services/passwordRecovery'
@@ -33,6 +34,7 @@ export function ForgotPasswordPage() {
     <div className="auth-shell">
       <section className="auth-card auth-recovery-card panel">
         <div className="auth-hero">
+          <BrandLogo className="auth-brand-logo" />
           <p className="eyebrow">Password Recovery</p>
           <h1>Forgot password?</h1>
           <p className="page-description">

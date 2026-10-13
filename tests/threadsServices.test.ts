@@ -4,7 +4,7 @@ import { retryContentOutputPost } from '../src/services/contentOutputs'
 import { deleteThreadsConnection } from '../src/services/threadsAuth'
 import { scheduleThreadsAutoPost } from '../src/services/threadsAutoPost'
 
-const AUTH_TOKEN_STORAGE_KEY = 'reframe.authToken'
+const AUTH_TOKEN_STORAGE_KEY = 'alurin.authToken'
 
 describe('Threads service errors', () => {
   beforeEach(() => {

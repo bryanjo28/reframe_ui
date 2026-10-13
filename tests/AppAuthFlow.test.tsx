@@ -74,7 +74,7 @@ it('uses auth me onboarding state to route a new user to first setup after login
   expect(loginPassword).toHaveAttribute('type', 'password')
   await user.click(screen.getAllByRole('button', { name: 'Login' }).at(-1)!)
 
-  expect(await screen.findByRole('heading', { name: 'Biar Reframe kenal kamu dulu 👋' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Biar alurin kenal kamu dulu 👋' })).toBeInTheDocument()
   await waitFor(() => expect(window.location.pathname).toBe('/first-setup'))
   expect(authMeRequests).toBe(2)
 })
@@ -103,7 +103,7 @@ it('routes a registration requiring confirmation to check email without opening 
   )
 
   render(<App />)
-  expect(await screen.findByRole('heading', { name: 'Buat akun Reframe' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Register alurin' })).toBeInTheDocument()
 
   await user.type(screen.getByRole('textbox', { name: 'Email' }), 'user@example.com')
   await user.type(screen.getByRole('textbox', { name: 'Full Name' }), 'New User')
@@ -112,17 +112,17 @@ it('routes a registration requiring confirmation to check email without opening 
   await user.type(screen.getByLabelText('Konfirmasi Password'), 'Password1')
   await user.click(screen.getAllByRole('button', { name: 'Show password' })[1])
   expect(screen.getByLabelText('Konfirmasi Password')).toHaveAttribute('type', 'text')
-  await user.click(screen.getByRole('button', { name: 'Daftar' }))
+  await user.click(screen.getByRole('button', { name: 'Register' }))
 
   expect(await screen.findByRole('heading', { name: 'Cek email kamu dulu' })).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Lengkapi Persona Pertama' })).not.toBeInTheDocument()
   expect(window.location.pathname).toBe('/check-email')
-  expect(localStorage.getItem('reframe.authToken')).toBeNull()
+  expect(localStorage.getItem('alurin.authToken')).toBeNull()
 })
 
 it('routes an authenticated user with a persona, locks Schedule, and handles an expired session', async () => {
   const user = userEvent.setup()
-  localStorage.setItem('reframe.authToken', 'access-token')
+  localStorage.setItem('alurin.authToken', 'access-token')
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string | URL | Request) => {
@@ -186,5 +186,5 @@ it('routes an authenticated user with a persona, locks Schedule, and handles an 
   await user.click(screen.getAllByRole('button', { name: 'Login' }).at(-1)!)
 
   expect(await screen.findByRole('heading', { name: 'Kontenmu dalam satu tampilan' })).toBeInTheDocument()
-  expect(sessionStorage.getItem('reframe.authHelperMessage')).toBeNull()
+  expect(sessionStorage.getItem('alurin.authHelperMessage')).toBeNull()
 })

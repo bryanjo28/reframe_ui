@@ -2,6 +2,7 @@ import { AppIcon } from './AppIcon'
 import type { NavKey } from '../types/navigation'
 import type { AuthUser } from '../services/authService'
 import { dismissModal } from '../utils/modalAnimation'
+import { withCurrentBrand } from '../utils/brand'
 
 type Props = {
   activePage: NavKey
@@ -23,12 +24,13 @@ const secondary: Array<{ key: NavKey; label: string; icon: string }> = [
   { key: 'personalize', label: 'Persona & Pillar', icon: 'user' },
   { key: 'connecting-apps', label: 'Connected Accounts', icon: 'link' },
   { key: 'subscription-plans', label: 'Subscription', icon: 'calendar' },
+  { key: 'ai-credits', label: 'AI Credits', icon: 'sparkles' },
 ]
 
 const createFlowPages: NavKey[] = ['create', 'generate-topic', 'content-engine', 'manual-post']
 
 export function MobileNavigation(props: Props) {
-  const name = props.currentUser?.fullName || props.currentUser?.accountName || props.currentUser?.name || props.currentUser?.username || 'Pengguna Reframe'
+  const name = withCurrentBrand(props.currentUser?.fullName || props.currentUser?.accountName || props.currentUser?.name || props.currentUser?.username || 'Pengguna alurin')
   return (
     <>
       {props.isMoreOpen ? (

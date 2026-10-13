@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { AppIcon } from '../components/AppIcon'
+import { BrandLogo } from '../components/BrandLogo'
 
 import { API_BASE_URL } from '../config/api'
 import {
@@ -58,6 +59,7 @@ export function ResetPasswordPage({ onSuccess = finishPasswordReset }: ResetPass
     <div className="auth-shell">
       <section className="auth-card auth-recovery-card panel">
         <div className="auth-hero">
+          <BrandLogo className="auth-brand-logo" />
           <p className="eyebrow">Password Recovery</p>
           <h1>Buat password baru</h1>
           <p className="page-description">Gunakan minimal 8 karakter untuk password barumu.</p>

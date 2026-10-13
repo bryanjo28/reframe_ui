@@ -3,7 +3,7 @@ import { getCurrentAuthToken } from './authService'
 
 type UsageApiRecord = Record<string, unknown>
 const USAGE_CACHE_TTL_MS = 30_000
-export const USAGE_UPDATED_EVENT = 'reframe:usage-updated'
+export const USAGE_UPDATED_EVENT = 'alurin:usage-updated'
 
 export type UsageSummary = {
   used: number

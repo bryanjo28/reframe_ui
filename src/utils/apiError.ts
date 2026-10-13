@@ -19,10 +19,18 @@ export class ApiResponseError extends Error {
 const DEFAULT_API_ERROR: ApiError = {
   status: 500,
   code: 'UNKNOWN_ERROR',
-  message: 'Reframe sedang mengalami kendala. Coba lagi beberapa saat.',
+  message: 'alurin sedang mengalami kendala. Coba lagi beberapa saat.',
 }
 
-export const SESSION_EXPIRED_EVENT = 'reframe:session-expired'
+export const SESSION_EXPIRED_EVENT = 'alurin:session-expired'
+export const UPGRADE_PLAN_REQUIRED_EVENT = 'alurin:upgrade-plan-required'
+
+const UPGRADE_PLAN_ERROR_CODES = new Set([
+  'PERSONA_LIMIT_EXCEEDED',
+  'CONTENT_PILLAR_LIMIT_EXCEEDED',
+  'THREADS_PLAN_REQUIRED',
+  'SCHEDULE_PLAN_REQUIRED',
+])
 
 export function isApplicationAuthError(error: ApiError) {
   return error.status === 401 && (
@@ -43,7 +51,7 @@ export function getUserFacingError(error: unknown, fallback = DEFAULT_API_ERROR.
   if (apiError.status === 429 || value.includes('rate limit')) return 'Terlalu banyak permintaan dalam waktu singkat. Tunggu sebentar lalu coba lagi.'
   if (value.includes('timeout') || value.includes('timed out')) return 'Prosesnya memakan waktu lebih lama dari biasanya. Coba lagi dalam beberapa saat.'
   if (apiError.code === 'INVALID_CREDENTIALS' || value.includes('invalid credentials')) return 'Email atau password yang kamu masukkan belum benar.'
-  if (apiError.status >= 500) return 'Reframe sedang mengalami kendala. Coba lagi beberapa saat.'
+  if (apiError.status >= 500) return 'alurin sedang mengalami kendala. Coba lagi beberapa saat.'
   const vague = /^(error|failed|request failed|internal error|terjadi kesalahan)[.!]?$/i.test(apiError.message.trim())
   return vague ? fallback : apiError.message || fallback
 }
@@ -53,7 +61,7 @@ export function reportError(
   error: unknown,
   fallback = DEFAULT_API_ERROR.message,
 ) {
-  console.error(`[Reframe] ${context}`, error)
+  console.error(`[alurin] ${context}`, error)
   return getUserFacingError(error, fallback)
 }
 
@@ -102,6 +110,11 @@ export function createApiResponseError(status: number, data: unknown) {
     })
   if (typeof window !== 'undefined' && isApplicationAuthError(apiError)) {
     window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
+  }
+  if (typeof window !== 'undefined' && UPGRADE_PLAN_ERROR_CODES.has(apiError.code)) {
+    window.dispatchEvent(new CustomEvent(UPGRADE_PLAN_REQUIRED_EVENT, {
+      detail: { message: apiError.message },
+    }))
   }
   return new ApiResponseError(apiError)
 }

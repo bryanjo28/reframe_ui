@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import './App.css'
 import { AuthPage } from './pages/AuthPage'
 import { Sidebar } from './components/Sidebar'
+import { AppIcon } from './components/AppIcon'
 import { ManualPostPage } from './pages/ManualPostPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { AutoPostPage } from './pages/AutoPostPage'
@@ -25,11 +26,12 @@ import { MobileNavigation } from './components/MobileNavigation'
 import { CreateHubPage } from './pages/CreateHubPage'
 import { TokenBalance } from './components/TokenBalance'
 import { PaymentsPage } from './pages/PaymentsPage'
+import { AiCreditsPage } from './pages/AiCreditsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { OnboardingTutorial } from './components/OnboardingTutorial'
 import { LegalPage } from './pages/LegalPage'
 import { watchLanguage, type UiLanguage } from './utils/uiLanguage'
-import { reportError, SESSION_EXPIRED_EVENT } from './utils/apiError'
+import { reportError, SESSION_EXPIRED_EVENT, UPGRADE_PLAN_REQUIRED_EVENT } from './utils/apiError'
 import {
   clearAuthSession,
   getCurrentAuthToken,
@@ -71,12 +73,12 @@ function getJwtExpiryTime(token?: string) {
 }
 type PersonaStatus = 'idle' | 'loading' | 'ready'
 type UnauthenticatedView = 'login' | 'check-email'
-const ACTIVE_PAGE_STORAGE_KEY = 'reframe.activePage'
-const PENDING_VERIFICATION_EMAIL_STORAGE_KEY = 'reframe.pendingVerificationEmail'
-const APP_THEME_STORAGE_KEY = 'reframe.appTheme'
-const TUTORIAL_STORAGE_KEY = 'reframe:onboarding:tutorialCompleted'
-const LANGUAGE_STORAGE_KEY = 'reframe.uiLanguage'
-const AUTH_HELPER_STORAGE_KEY = 'reframe.authHelperMessage'
+const ACTIVE_PAGE_STORAGE_KEY = 'alurin.activePage'
+const PENDING_VERIFICATION_EMAIL_STORAGE_KEY = 'alurin.pendingVerificationEmail'
+const APP_THEME_STORAGE_KEY = 'alurin.appTheme'
+const TUTORIAL_STORAGE_KEY = 'alurin:onboarding:tutorialCompleted'
+const LANGUAGE_STORAGE_KEY = 'alurin.uiLanguage'
+const AUTH_HELPER_STORAGE_KEY = 'alurin.authHelperMessage'
 
 function takeStoredAuthHelperMessage() {
   if (typeof sessionStorage === 'undefined') return ''
@@ -145,6 +147,7 @@ function getStoredActivePage(): NavKey {
     value === 'manual-post' ||
     value === 'auto-post' ||
     value === 'subscription-plans' ||
+    value === 'ai-credits' ||
     value === 'payments' ||
     value === 'connecting-apps'
   ) {
@@ -206,6 +209,7 @@ function AppShell() {
   const [contentOutputsRefreshKey, setContentOutputsRefreshKey] = useState(0)
   const [showTutorial, setShowTutorial] = useState(() => localStorage.getItem(TUTORIAL_STORAGE_KEY) !== 'true')
   const [language, setLanguage] = useState<UiLanguage>(() => localStorage.getItem(LANGUAGE_STORAGE_KEY) === 'en' ? 'en' : 'id')
+  const [upgradePrompt, setUpgradePrompt] = useState('')
   const bootstrapRunIdRef = useRef(0)
 
   const completeTutorial = useCallback(() => { localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true'); setShowTutorial(false) }, [])
@@ -225,6 +229,15 @@ function AppShell() {
     }
     window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired)
+  }, [])
+
+  useEffect(() => {
+    const handleUpgradeRequired = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail
+      setUpgradePrompt(detail?.message || 'Fitur ini membutuhkan paket berlangganan. Upgrade paket untuk melanjutkan.')
+    }
+    window.addEventListener(UPGRADE_PLAN_REQUIRED_EVENT, handleUpgradeRequired)
+    return () => window.removeEventListener(UPGRADE_PLAN_REQUIRED_EVENT, handleUpgradeRequired)
   }, [])
 
   useEffect(() => {
@@ -678,7 +691,7 @@ function AppShell() {
 	        /> : null}
 
         <main className="content-area">
-          <TokenBalance onTopUp={() => handleNavigate('payments')} />
+          <TokenBalance onOpenCredits={() => handleNavigate('ai-credits')} onTopUp={() => handleNavigate('payments')} />
           <div key={activePage} className="page-transition">
             {activePage === 'create' ? (
               <CreateHubPage onNavigate={handleNavigate} />
@@ -722,8 +735,10 @@ function AppShell() {
               />
             ) : activePage === 'subscription-plans' ? (
               <SubscriptionPlansPage userId={currentUser?.id || ''} />
+            ) : activePage === 'ai-credits' ? (
+              <AiCreditsPage onTopUp={() => handleNavigate('payments')} onViewPlans={() => handleNavigate('subscription-plans')} />
             ) : activePage === 'payments' ? (
-              <PaymentsPage />
+              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage onStatusChange={(status) => {
                 setThreadsStatus(status)
@@ -752,7 +767,33 @@ function AppShell() {
     )
   }
 
-  return <ToastProvider>{content}{showTutorial && authStatus === 'authenticated' && personaStatus === 'ready' ? <OnboardingTutorial onComplete={completeTutorial} /> : null}</ToastProvider>
+  return (
+    <ToastProvider>
+      {content}
+      {showTutorial && authStatus === 'authenticated' && personaStatus === 'ready' ? <OnboardingTutorial onComplete={completeTutorial} /> : null}
+      {upgradePrompt ? (
+        <div className="content-bank-dialog-backdrop" role="presentation" onMouseDown={() => setUpgradePrompt('')}>
+          <section className="content-bank-dialog idea-upgrade-dialog" role="dialog" aria-modal="true" aria-labelledby="upgrade-plan-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <p className="eyebrow">Upgrade paket</p>
+                <h2 id="upgrade-plan-title">Buka fitur ini di alurin</h2>
+              </div>
+              <button type="button" aria-label="Tutup" onClick={() => setUpgradePrompt('')}>×</button>
+            </header>
+            <div className="idea-upgrade-body">
+              <div className="idea-upgrade-icon"><AppIcon name="sparkles" /></div>
+              <p>{upgradePrompt}</p>
+              <div className="idea-upgrade-actions">
+                <button className="ghost-button" type="button" onClick={() => setUpgradePrompt('')}>Nanti</button>
+                <button className="primary-button" type="button" onClick={() => { setUpgradePrompt(''); handleNavigate('subscription-plans') }}>Upgrade Plan</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </ToastProvider>
+  )
 }
 
 function App() {

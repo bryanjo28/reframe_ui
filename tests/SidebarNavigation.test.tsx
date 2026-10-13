@@ -31,7 +31,7 @@ test('keeps theme selection in Settings and places Settings after Payments', () 
 
   expect(screen.queryByRole('button', { name: 'Toggle light mode' })).not.toBeInTheDocument()
 
-  const payments = screen.getByRole('button', { name: 'Pembayaran' })
+  const payments = screen.getByRole('button', { name: 'AI Credits' })
     const settings = screen.getByRole('button', { name: 'Settings' })
 
   expect(payments.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()

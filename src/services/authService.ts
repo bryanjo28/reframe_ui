@@ -1,7 +1,7 @@
 import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getApiError, SESSION_EXPIRED_EVENT } from '../utils/apiError'
 
-const AUTH_TOKEN_STORAGE_KEY = 'reframe.authToken'
+const AUTH_TOKEN_STORAGE_KEY = 'alurin.authToken'
 const AUTH_STATE_CACHE_TTL_MS = 10_000
 export type AuthCredentials = {
   email: string

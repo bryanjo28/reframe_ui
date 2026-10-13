@@ -11,7 +11,7 @@ describe('user-facing API errors', () => {
     expect(getUserFacingError(new TypeError('Failed to fetch'))).toContain('Koneksi internet bermasalah')
     expect(getUserFacingError({ status: 408, message: 'request timeout' })).toContain('lebih lama dari biasanya')
     expect(getUserFacingError({ status: 429, message: 'rate limit' })).toContain('Terlalu banyak permintaan')
-    expect(getUserFacingError({ status: 503, message: 'Internal error' })).toContain('Reframe sedang mengalami kendala')
+    expect(getUserFacingError({ status: 503, message: 'Internal error' })).toContain('alurin sedang mengalami kendala')
   })
 
   it('signals only application authentication failures', () => {

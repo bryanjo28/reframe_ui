@@ -21,10 +21,10 @@ export function PersonalizePage({ personaConfig, onPersonaSaved, onPillarSaved, 
   useEffect(() => { if (personaConfig) void listContentPillars().then(setPillars).catch(() => setPillars([])) }, [personaConfig])
 
   if (isInitialSetup) return <CreatePersonaPage personaConfig={personaConfig} isInitialSetup onSaved={(config) => onPersonaSaved?.(config)} />
-  if (brainReady) return <section className="brain-ready-wrap"><section className="brain-ready panel"><span className="brain-ready-icon"><AppIcon name="check" /></span><p className="eyebrow">Content Brain</p><h1>Content Brain kamu sudah siap ✓</h1><p>Reframe sekarang sudah punya dasar untuk membantu membuat ide dan kontenmu.</p><button className="primary-button" data-tour-step={tourStep === 4 ? 4 : undefined} type="button" onClick={() => onNavigate?.('generate-topic')}>Cari Ide Pertama</button></section></section>
+  if (brainReady) return <section className="brain-ready-wrap"><section className="brain-ready panel"><span className="brain-ready-icon"><AppIcon name="check" /></span><p className="eyebrow">Content Brain</p><h1>Content Brain kamu sudah siap ✓</h1><p>alurin sekarang sudah punya dasar untuk membantu membuat ide dan kontenmu.</p><button className="primary-button" data-tour-step={tourStep === 4 ? 4 : undefined} type="button" onClick={() => onNavigate?.('generate-topic')}>Cari Ide Pertama</button></section></section>
 
   return <section className="persona-page">
-    {!isPillarSetup ? <header className="page-header outcome-header"><p className="eyebrow">Content Brain</p><h1>Content Brain 🧠</h1><p className="page-description">Ini yang Reframe gunakan untuk memahami kamu dan membuat konten yang lebih sesuai.</p></header> : null}
+    {!isPillarSetup ? <header className="page-header outcome-header"><p className="eyebrow">Content Brain</p><h1>Content Brain 🧠</h1><p className="page-description">Ini yang alurin gunakan untuk memahami kamu dan membuat konten yang lebih sesuai.</p></header> : null}
     {!activeTab ? <>
       <section className="content-brain-flow" aria-label="Content Brain flow"><span>Persona</span><b>+</b><span>Content Pillars</span><AppIcon name="chevron-right" /><span>Ideas</span><AppIcon name="chevron-right" /><span>Content</span></section>
       <div className="content-brain-grid">

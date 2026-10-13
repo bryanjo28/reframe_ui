@@ -4,7 +4,7 @@ import { listPublishedPosts } from './contentOutputs'
 describe('listPublishedPosts', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    localStorage.setItem('reframe.authToken', 'test-token')
+    localStorage.setItem('alurin.authToken', 'test-token')
   })
 
   it('requests posts by content output and normalizes API data', async () => {

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { buildThreadsCallbackRedirect } from '../utils/threadsCallback'
 
-const ACTIVE_PAGE_STORAGE_KEY = 'reframe.activePage'
+const ACTIVE_PAGE_STORAGE_KEY = 'alurin.activePage'
 
 export function ThreadsCallbackPage() {
   useEffect(() => {

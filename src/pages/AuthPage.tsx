@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { login, register, type AuthSession } from '../services/authService'
 import { getApiError, getUserFacingError, reportError } from '../utils/apiError'
 import { AppIcon } from '../components/AppIcon'
+import { BrandLogo } from '../components/BrandLogo'
 
 type AuthMode = 'login' | 'register'
 type AuthField = 'email' | 'fullName' | 'accountName' | 'password' | 'confirmPassword'
@@ -213,11 +214,12 @@ export function AuthPage({
         ) : null}
 
         <div className="auth-hero">
-          <p className="eyebrow">Reframe Access</p>
-          <h1>{isLogin ? 'Login ke workspace kamu' : 'Buat akun Reframe'}</h1>
+          <BrandLogo className="auth-brand-logo" />
+          <p className="eyebrow">alurin Access</p>
+          <h1>{isLogin ? 'Login ke workspace kamu' : 'Register alurin'}</h1>
           <p className="page-description">
             {isLogin
-              ? 'Masuk dengan email kamu untuk melanjutkan.'
+              ? 'Login dengan email kamu untuk melanjutkan.'
               : 'Mulai perjalanan konten kamu.'}
           </p>
         </div>
@@ -390,7 +392,7 @@ export function AuthPage({
 
           <div className="auth-actions">
             <button className="primary-button" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Memproses...' : isLogin ? 'Login' : 'Daftar'}
+              {isSubmitting ? 'Memproses...' : isLogin ? 'Login' : 'Register'}
             </button>
           </div>
         </form>
@@ -398,7 +400,7 @@ export function AuthPage({
           <p className="auth-mode-switch">
             {isLogin ? 'Belum punya akun? ' : 'Sudah punya akun? '}
             <button type="button" onClick={() => switchMode(isLogin ? 'register' : 'login')}>
-              {isLogin ? 'Daftar' : 'Login'}
+              {isLogin ? 'Register' : 'Login'}
             </button>
           </p>
         ) : null}

@@ -11,6 +11,7 @@ export type NavKey =
   | 'manual-post'
   | 'auto-post'
   | 'subscription-plans'
+  | 'ai-credits'
   | 'payments'
   | 'connecting-apps'
   | 'settings'
