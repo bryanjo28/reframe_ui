@@ -12,12 +12,10 @@ export function buildThreadsCallbackRedirect(search: string) {
   const connected = callbackParams.get('connected')
   const error = callbackParams.get('error')
 
-  if (connected === 'true') {
-    safeParams.set('connected', connected)
-  }
-
   if (error) {
     safeParams.set('error', error)
+  } else if (connected === 'true') {
+    safeParams.set('connected', connected)
   }
 
   const safeSearch = safeParams.toString()

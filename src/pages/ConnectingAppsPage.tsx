@@ -3,6 +3,8 @@ import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import {
   getCurrentAuthState,
+  getThreadsConnectionStatus,
+  invalidateAuthStateCache,
   type ThreadsSocialAccountState,
 } from '../services/authService'
 import {
@@ -74,7 +76,7 @@ export function ConnectingAppsPage() {
       return
     }
 
-    if (connected === 'true') {
+    if (connected === 'true' && !error) {
       toastSuccess(
         'Threads connected',
         'Akun Threads berhasil terhubung dan status koneksi sudah diperbarui.',
@@ -157,7 +159,10 @@ export function ConnectingAppsPage() {
       setIsDeletingThreads(true)
 
       await deleteThreadsConnection()
-      setThreadsConnection(null)
+      setThreadsConnection({ status: 'disconnected', connected: false, needsReconnect: false })
+      invalidateAuthStateCache()
+      const authState = await getCurrentAuthState()
+      setThreadsConnection(toThreadsConnectionView(authState?.socialAccounts?.threads ?? null))
       setIsDisconnectModalOpen(false)
       toastSuccess('Threads unlinked', 'Koneksi akun Threads berhasil dihapus.')
     } catch (error) {
@@ -193,18 +198,15 @@ export function ConnectingAppsPage() {
       <div className="integration-list">
         {appConnections.map((app) => {
           const isThreads = app.provider === 'threads'
-          const canUseThreads = Boolean(
-            threadsConnection?.connected && !threadsConnection?.needsReconnect,
-          )
-          const needsReconnect = Boolean(
-            threadsConnection?.connected && threadsConnection?.needsReconnect,
-          )
+          const connectionStatus = getThreadsConnectionStatus(threadsConnection)
+          const canUseThreads = connectionStatus === 'connected'
+          const needsReconnect = connectionStatus === 'needs_reconnect'
           const isConnected = canUseThreads
           const handle = isThreads
             ? isConnected
               ? `Terhubung${threadsConnection?.username ? ` sebagai ${threadsConnection.username}` : ''}`
               : needsReconnect
-                ? 'Perlu reconnect'
+                ? 'Perlu dihubungkan ulang'
                 : isLoadingThreadsStatus
                   ? 'Memeriksa status koneksi...'
                   : 'Belum terhubung'
@@ -212,7 +214,7 @@ export function ConnectingAppsPage() {
           const statusText = isConnected
             ? 'Terhubung'
             : needsReconnect
-              ? 'Perlu reconnect'
+              ? 'Perlu dihubungkan ulang'
               : null
 
           return (
@@ -252,7 +254,7 @@ export function ConnectingAppsPage() {
                     disabled={isConnectingThreads || isLoadingThreadsStatus}
                   >
                     <AppIcon name={isConnectingThreads ? 'link' : 'plus'} />
-                    {isConnectingThreads ? 'Menghubungkan...' : 'Reconnect Threads'}
+                    {isConnectingThreads ? 'Menghubungkan...' : 'Hubungkan Ulang Threads'}
                   </button>
                   <button
                     className="ghost-button integration-unlink-button"

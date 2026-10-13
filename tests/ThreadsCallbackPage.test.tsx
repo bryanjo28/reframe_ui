@@ -22,6 +22,11 @@ describe('ThreadsCallbackPage', () => {
     ).toBe('/connecting-apps?connected=true')
   })
 
+  it('gives an error priority over a conflicting success flag', () => {
+    expect(buildThreadsCallbackRedirect('?connected=true&error=THREADS_RECONNECT_REQUIRED'))
+      .toBe('/connecting-apps?error=THREADS_RECONNECT_REQUIRED')
+  })
+
   it('does not accept non-success connected values', () => {
     expect(buildThreadsCallbackRedirect('?connected=false')).toBe('/connecting-apps')
   })
