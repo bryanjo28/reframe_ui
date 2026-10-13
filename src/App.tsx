@@ -732,11 +732,14 @@ function AppShell() {
             ) : activePage === 'payments' ? (
               <PaymentsPage />
             ) : activePage === 'connecting-apps' ? (
-              <ConnectingAppsPage />
+              <ConnectingAppsPage onStatusChange={(status) => {
+                setThreadsStatus(status)
+                setIsThreadsConnected(status === 'connected')
+              }} />
             ) : activePage === 'settings' ? (
               <SettingsPage user={currentUser} language={language} onLanguageChange={setLanguage} theme={theme} onThemeChange={setTheme} onReplayTutorial={() => setShowTutorial(true)} onLogout={handleLogout} />
               ) : (
-                <DashboardPage activePage={activePage} userId={currentUser?.id || ''} onNavigate={handleNavigate} isThreadsConnected={isThreadsConnected} />
+                <DashboardPage activePage={activePage} userId={currentUser?.id || ''} onNavigate={handleNavigate} threadsStatus={threadsStatus} />
               )}
           </div>
         </main>

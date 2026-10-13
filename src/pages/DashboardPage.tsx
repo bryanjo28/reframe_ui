@@ -4,21 +4,24 @@ import { listContentOutputs, type ContentOutputRecord } from '../services/conten
 import { listContentTopics } from '../services/contentTopics'
 import { listContentPillars } from '../services/contentPillars'
 import type { NavKey } from '../types/navigation'
+import type { ThreadsConnectionStatus } from '../services/authService'
 
 type Pipeline = { ideas: number; drafts: number; approved: number; scheduled: number; published: number }
 const emptyPipeline: Pipeline = { ideas: 0, drafts: 0, approved: 0, scheduled: 0, published: 0 }
 const statusOf = (record: ContentOutputRecord) => String(record.status || '').trim().toLowerCase()
 
-export function DashboardPage({ userId, onNavigate, isThreadsConnected }: { activePage: NavKey; userId: string; onNavigate: (page: NavKey) => void; isThreadsConnected: boolean }) {
+export function DashboardPage({ userId, onNavigate, threadsStatus }: { activePage: NavKey; userId: string; onNavigate: (page: NavKey) => void; threadsStatus: ThreadsConnectionStatus }) {
   const [pipeline, setPipeline] = useState<Pipeline>(emptyPipeline)
   const [recent, setRecent] = useState<ContentOutputRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [pillarCount, setPillarCount] = useState(0)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     let mounted = true
     async function load() {
       setIsLoading(true)
+      setLoadError('')
       try {
         const [outputs, topics, pillars] = await Promise.all([listContentOutputs(userId || undefined), listContentTopics(), listContentPillars()])
         if (!mounted) return
@@ -26,7 +29,12 @@ export function DashboardPage({ userId, onNavigate, isThreadsConnected }: { acti
         setPipeline({ ideas: topics.length, drafts: count(['draft', 'generated']), approved: count(['approved', 'ready']), scheduled: count(['scheduled', 'queued']), published: count(['published', 'posted']) })
         setRecent(outputs.slice(0, 4))
         setPillarCount(pillars.length)
-      } catch { if (mounted) setPipeline(emptyPipeline) } finally { if (mounted) setIsLoading(false) }
+      } catch {
+        if (mounted) {
+          setPipeline(emptyPipeline); setRecent([]); setPillarCount(0)
+          setLoadError('Dashboard belum dapat dimuat. Silakan coba kembali.')
+        }
+      } finally { if (mounted) setIsLoading(false) }
     }
     void load()
     return () => { mounted = false }
@@ -34,15 +42,17 @@ export function DashboardPage({ userId, onNavigate, isThreadsConnected }: { acti
 
   const nextAction = useMemo(() => {
     if (pillarCount === 0) return { title: 'Tambahkan Content Pillar', copy: 'Lengkapi Content Brain agar Reframe punya arah topik yang jelas.', label: 'Lanjut Setup', page: 'content-pillar' as NavKey }
-    if (pipeline.approved > 0 && !isThreadsConnected) return { title: 'Konten kamu sudah siap.', copy: 'Hubungkan Threads supaya konten bisa dijadwalkan.', label: 'Hubungkan Threads', page: 'connecting-apps' as NavKey }
+    if (pipeline.approved > 0 && threadsStatus === 'needs_reconnect') return { title: 'Koneksi Threads perlu diperbarui.', copy: 'Koneksi Threads telah kedaluwarsa. Hubungkan kembali akun Anda.', label: 'Hubungkan Ulang Threads', page: 'connecting-apps' as NavKey }
+    if (pipeline.approved > 0 && threadsStatus !== 'connected') return { title: 'Konten kamu sudah siap.', copy: 'Hubungkan Threads supaya konten bisa dijadwalkan.', label: 'Hubungkan Threads', page: 'connecting-apps' as NavKey }
     if (pipeline.approved > 0) return { title: `${pipeline.approved} posts are ready to schedule`, copy: 'Pick a time and keep your publishing queue moving.', label: 'Schedule Posts', page: 'auto-post' as NavKey }
     if (pipeline.drafts > 0) return { title: `${pipeline.drafts} drafts are waiting for review`, copy: 'Review and approve your content before scheduling.', label: 'Review Content', page: 'content-bank' as NavKey }
     if (pipeline.ideas > 0) return { title: 'Your ideas are ready', copy: 'Turn an idea into content your audience will want to read.', label: 'Create Content', page: 'content-engine' as NavKey }
     return { title: "Let's find your next idea", copy: 'Generate ideas from your persona and content pillars.', label: 'Find Ideas', page: 'generate-topic' as NavKey }
-  }, [isThreadsConnected, pillarCount, pipeline])
+  }, [threadsStatus, pillarCount, pipeline])
 
   return <section className="home-page">
     <header className="page-header outcome-header"><p className="eyebrow">Home</p><h1>Your content, at a glance</h1><p className="page-description">Pick up the most useful next step.</p></header>
+    {loadError ? <div className="integration-note integration-note-error" role="alert"><AppIcon name="info" /><p>{loadError}</p></div> : null}
     <section className="home-next-action"><div className="home-next-icon"><AppIcon name="sparkles" /></div><div><span>Next action</span><h2>{isLoading ? 'Loading your workspace…' : nextAction.title}</h2><p>{nextAction.copy}</p></div><button className="primary-button" type="button" onClick={() => onNavigate(nextAction.page)} disabled={isLoading}>{nextAction.label}</button></section>
     <section className="pipeline-grid" aria-label="Content pipeline">{Object.entries(pipeline).map(([label, value]) => <article key={label}><span>{label}</span><strong>{isLoading ? '—' : value}</strong></article>)}</section>
     <div className="home-detail-grid">

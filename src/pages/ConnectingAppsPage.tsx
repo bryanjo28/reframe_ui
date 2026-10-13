@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import {
   getCurrentAuthState,
   getThreadsConnectionStatus,
   invalidateAuthStateCache,
+  type ThreadsConnectionStatus,
   type ThreadsSocialAccountState,
 } from '../services/authService'
 import {
@@ -58,7 +59,7 @@ function toThreadsConnectionView(
   }
 }
 
-export function ConnectingAppsPage() {
+export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (status: ThreadsConnectionStatus) => void }) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [isConnectingThreads, setIsConnectingThreads] = useState(false)
   const [isDeletingThreads, setIsDeletingThreads] = useState(false)
@@ -66,6 +67,11 @@ export function ConnectingAppsPage() {
   const [connectionError, setConnectionError] = useState('')
   const [threadsConnection, setThreadsConnection] = useState<ThreadsConnectionView | null>(null)
   const [isDisconnectModalOpen, setIsDisconnectModalOpen] = useState(false)
+  const onStatusChangeRef = useRef(onStatusChange)
+
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange
+  }, [onStatusChange])
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -111,6 +117,7 @@ export function ConnectingAppsPage() {
         }
 
         setThreadsConnection(nextThreads)
+        onStatusChangeRef.current?.(getThreadsConnectionStatus(nextThreads))
         setConnectionError('')
       } catch (error) {
         if (cancelled) {
@@ -163,6 +170,7 @@ export function ConnectingAppsPage() {
       invalidateAuthStateCache()
       const authState = await getCurrentAuthState()
       setThreadsConnection(toThreadsConnectionView(authState?.socialAccounts?.threads ?? null))
+      onStatusChangeRef.current?.(getThreadsConnectionStatus(authState?.socialAccounts?.threads))
       setIsDisconnectModalOpen(false)
       toastSuccess('Threads unlinked', 'Koneksi akun Threads berhasil dihapus.')
     } catch (error) {

@@ -14,8 +14,8 @@ vi.mock('../src/services/authService', async (original) => {
   return { ...actual, getCurrentAuthState: vi.fn(), invalidateAuthStateCache: vi.fn() }
 })
 
-function renderPage() {
-  return render(<ToastProvider><ConnectingAppsPage /></ToastProvider>)
+function renderPage(onStatusChange?: (status: 'connected' | 'needs_reconnect' | 'disconnected') => void) {
+  return render(<ToastProvider><ConnectingAppsPage onStatusChange={onStatusChange} /></ToastProvider>)
 }
 
 describe('ConnectingAppsPage', () => {
@@ -35,15 +35,17 @@ describe('ConnectingAppsPage', () => {
   })
 
   it('invalidates and refetches account state after disconnect', async () => {
+    const onStatusChange = vi.fn()
     vi.mocked(getCurrentAuthState)
       .mockResolvedValueOnce({ user: { id: 'user-1' }, onboarding: null, socialAccounts: { threads: { connected: true, status: 'connected' } } })
       .mockResolvedValueOnce({ user: { id: 'user-1' }, onboarding: null, socialAccounts: { threads: { connected: false, status: 'disconnected' } } })
     vi.mocked(deleteThreadsConnection).mockResolvedValue(undefined)
-    renderPage()
+    renderPage(onStatusChange)
     fireEvent.click(await screen.findByRole('button', { name: /disconnect/i }))
     fireEvent.click(screen.getByRole('dialog').querySelector('.connect-button') as HTMLButtonElement)
     await waitFor(() => expect(invalidateAuthStateCache).toHaveBeenCalledOnce())
     await waitFor(() => expect(getCurrentAuthState).toHaveBeenCalledTimes(2))
+    expect(onStatusChange).toHaveBeenLastCalledWith('disconnected')
     expect(await screen.findByRole('button', { name: /^connect threads$/i })).toBeInTheDocument()
   })
 })
