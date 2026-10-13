@@ -36,6 +36,8 @@ export function getUserFacingError(error: unknown, fallback = DEFAULT_API_ERROR.
   if (error instanceof TypeError) return 'Koneksi internet bermasalah. Periksa koneksi kamu lalu coba lagi.'
   const apiError = getApiError(error)
   const value = `${apiError.code} ${apiError.message}`.toLowerCase()
+  const technicalDetail = /(supabase|database|postgres|environment|env\b|api[_ -]?key|secret|not configured|configuration|econn|enotfound|fetch failed|stack trace|internal server)/i
+  if (technicalDetail.test(value)) return fallback
   if (value.includes('quota') || value.includes('usage limit') || value.includes('token limit') || value.includes('insufficient credit')) return 'Token penggunaan kamu sudah habis. Lihat paket untuk melanjutkan.'
   if (value.includes('credit') && (value.includes('exceeded') || value.includes('habis'))) return 'Token penggunaan kamu sudah habis. Lihat paket untuk melanjutkan.'
   if (apiError.status === 429 || value.includes('rate limit')) return 'Terlalu banyak permintaan dalam waktu singkat. Tunggu sebentar lalu coba lagi.'
@@ -44,6 +46,15 @@ export function getUserFacingError(error: unknown, fallback = DEFAULT_API_ERROR.
   if (apiError.status >= 500) return 'Reframe sedang mengalami kendala. Coba lagi beberapa saat.'
   const vague = /^(error|failed|request failed|internal error|terjadi kesalahan)[.!]?$/i.test(apiError.message.trim())
   return vague ? fallback : apiError.message || fallback
+}
+
+export function reportError(
+  context: string,
+  error: unknown,
+  fallback = DEFAULT_API_ERROR.message,
+) {
+  console.error(`[Reframe] ${context}`, error)
+  return getUserFacingError(error, fallback)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

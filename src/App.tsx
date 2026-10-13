@@ -28,7 +28,7 @@ import { PaymentsPage } from './pages/PaymentsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { OnboardingTutorial } from './components/OnboardingTutorial'
 import { watchLanguage, type UiLanguage } from './utils/uiLanguage'
-import { SESSION_EXPIRED_EVENT } from './utils/apiError'
+import { reportError, SESSION_EXPIRED_EVENT } from './utils/apiError'
 import {
   clearAuthSession,
   getCurrentAuthToken,
@@ -417,7 +417,7 @@ function AppShell() {
 
       clearAuthSession()
       resetWorkspaceState()
-      setAuthError(error instanceof Error ? error.message : 'Gagal memuat session auth.')
+      setAuthError(reportError('Memuat session auth', error, 'Session belum bisa dimuat. Coba lagi.'))
       setAuthStatus('error')
     }
   }, [loadPersonaConfig])
@@ -550,7 +550,7 @@ function AppShell() {
     } catch (error) {
       clearAuthSession()
       resetWorkspaceState()
-      setAuthError(error instanceof Error ? error.message : 'Gagal memuat session login.')
+      setAuthError(reportError('Memuat session setelah login', error, 'Session login belum bisa dimuat. Coba lagi.'))
       setAuthStatus('error')
     }
   }, [loadPersonaConfig])
@@ -692,6 +692,7 @@ function AppShell() {
               <GenerateTopicPage
                 userId={currentUser?.id || ''}
                 onContinueToContent={() => handleNavigate('content-engine')}
+                onUpgrade={() => handleNavigate('subscription-plans')}
               />
             ) : activePage === 'content-engine' ? (
               <ContentEnginePage

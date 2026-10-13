@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { login, register, type AuthSession } from '../services/authService'
-import { getApiError } from '../utils/apiError'
+import { getApiError, getUserFacingError, reportError } from '../utils/apiError'
 import { AppIcon } from '../components/AppIcon'
 
 type AuthMode = 'login' | 'register'
@@ -176,10 +176,10 @@ export function AuthPage({
           setFieldErrors({ accountName: 'Username ini sudah dipakai. Coba gunakan username lain.' })
           return
         case 'INVALID_CREDENTIALS':
-          setErrorMessage(apiError.message)
+          setErrorMessage(getUserFacingError(error))
           return
         default:
-          setErrorMessage(apiError.message)
+          setErrorMessage(reportError('Autentikasi', error, 'Login belum berhasil. Coba lagi.'))
       }
     } finally {
       setIsSubmitting(false)

@@ -3,8 +3,11 @@ import { AppIcon } from '../components/AppIcon'
 import { ContentGenerationProgress } from '../components/ContentGenerationProgress'
 import { useToast } from '../components/useToast'
 import { getUserFacingError } from '../utils/apiError'
+import { dismissModal } from '../utils/modalAnimation'
 import { createContentTopic, generateContentTopics } from '../services/contentTopics'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
+import { listPersonaConfigs, type PersonaConfigRecord } from '../services/personaConfigs'
+import { getCurrentSubscription } from '../services/subscriptionPlans'
 
 type GenerateTopicPageProps = {
   userId: string
@@ -12,6 +15,7 @@ type GenerateTopicPageProps = {
   tourStep?: number | null
   onTopicsGenerated?: () => void
   onTopicSaved?: () => void
+  onUpgrade?: () => void
 }
 
 type GeneratedTopic = string | Record<string, unknown>
@@ -84,6 +88,23 @@ function getPillarDescription(record: ContentPillarRecord) {
     getRecordValue(record, ['keyMessage', 'key_message']) ||
     'Belum ada deskripsi ringkas untuk pillar ini.'
   )
+}
+
+function getPillarPersonaId(record: ContentPillarRecord | null) {
+  return getRecordValue(record, ['personaConfigId', 'persona_config_id'])
+}
+
+function getPersonaValue(record: PersonaConfigRecord | null, keys: string[]) {
+  if (!record) return ''
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+function getPersonaTitle(record: PersonaConfigRecord) {
+  return getPersonaValue(record, ['persona', 'personaName', 'persona_name']) || 'Persona utama'
 }
 
 function shortenText(text: string, limit = 120) {
@@ -211,31 +232,38 @@ function normalizeGeneratedTopic(topic: GeneratedTopic, index = 0): NormalizedGe
 function PillarCard({
   pillar,
   selected,
+  locked,
   onClick,
 }: {
   pillar: ContentPillarRecord
   selected: boolean
+  locked: boolean
   onClick: (id: string) => void
 }) {
   return (
     <button
       type="button"
-      className={`generate-card pillar-card${selected ? ' selected' : ''}`}
+      className={`idea-persona-option idea-pillar-option${selected ? ' selected' : ''}`}
       onClick={() => pillar.id && onClick(pillar.id)}
       disabled={!pillar.id}
     >
-      <div className="generate-card-topline">
-        <span className="generate-card-chip accent">Topik utama</span>
-      </div>
-      <strong>{getPillarTitle(pillar)}</strong>
-      <p>{shortenText(getPillarDescription(pillar), 140)}</p>
+      <span className="idea-persona-avatar"><AppIcon name="layers" /></span>
+      <span>
+        <strong>{getPillarTitle(pillar)}</strong>
+        <small>{shortenText(getPillarDescription(pillar), 100)}</small>
+      </span>
+      {selected ? <span className="pill subtle">Aktif</span> : <AppIcon name={locked ? 'lock' : 'chevron-right'} />}
     </button>
   )
 }
 
-export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopicPageProps) {
+export function GenerateTopicPage({ userId, onContinueToContent, onUpgrade }: GenerateTopicPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
+  const [personas, setPersonas] = useState<PersonaConfigRecord[]>([])
+  const [selectedPersonaId, setSelectedPersonaId] = useState('')
+  const [isFreePlan, setIsFreePlan] = useState(true)
+  const [upgradePrompt, setUpgradePrompt] = useState<'persona' | 'pillar' | null>(null)
   const [selectedContentPillarId, setSelectedContentPillarId] = useState('')
   const [jumlahTopics, setJumlahTopics] = useState(5)
   const [statusMessage, setStatusMessage] = useState('')
@@ -257,7 +285,11 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
       setIsLoadingPillars(true)
 
       try {
-        const pillars = await listContentPillars()
+        const [pillars, personaRecords, subscription] = await Promise.all([
+          listContentPillars(),
+          listPersonaConfigs().catch(() => []),
+          getCurrentSubscription().catch(() => null),
+        ])
 
         if (!isMounted) {
           return
@@ -271,7 +303,12 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
           : pillars
 
         setContentPillars(ownedPillars)
-        setSelectedContentPillarId((current) => current || ownedPillars[0]?.id || '')
+        setPersonas(personaRecords)
+        setIsFreePlan(!subscription || `${subscription.planKey} ${subscription.planName}`.toLowerCase().includes('free'))
+        const initialPillar = ownedPillars[0] || null
+        const initialPersonaId = getPillarPersonaId(initialPillar) || personaRecords[0]?.id || ''
+        setSelectedPersonaId((current) => current || initialPersonaId)
+        setSelectedContentPillarId((current) => current || initialPillar?.id || '')
       } catch (error) {
         if (!isMounted) {
           return
@@ -302,7 +339,37 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
     () => responseTopics.map((topic, index) => normalizeGeneratedTopic(topic, index)),
     [responseTopics],
   )
-  const filteredPillars = contentPillars
+  const selectedPersona = useMemo(
+    () => personas.find((persona) => persona.id === selectedPersonaId) || personas[0] || null,
+    [personas, selectedPersonaId],
+  )
+  const filteredPillars = useMemo(() => {
+    if (!selectedPersonaId) return contentPillars
+    const matching = contentPillars.filter((pillar) => getPillarPersonaId(pillar) === selectedPersonaId)
+    return matching.length ? matching : contentPillars
+  }, [contentPillars, selectedPersonaId])
+
+  function handlePersonaSelection(id: string) {
+    if (!id || id === selectedPersonaId) return
+    if (isFreePlan) {
+      setUpgradePrompt('persona')
+      return
+    }
+    setSelectedPersonaId(id)
+    const firstMatchingPillar = contentPillars.find((pillar) => getPillarPersonaId(pillar) === id)
+    setSelectedContentPillarId(firstMatchingPillar?.id || '')
+    resetResponseState()
+  }
+
+  function handlePillarSelection(id: string) {
+    if (!id || id === selectedContentPillarId) return
+    if (isFreePlan) {
+      setUpgradePrompt('pillar')
+      return
+    }
+    setSelectedContentPillarId(id)
+    resetResponseState()
+  }
 
   useEffect(() => {
     setTopicDrafts(normalizedResponseTopics)
@@ -473,7 +540,7 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
       <header className="page-header generate-hero">
         <div>
           <h1>Cari ide konten</h1>
-          <p className="page-description">Pilih topik utama dan tentukan berapa ide yang ingin kamu dapatkan.</p>
+          <p className="page-description">Pilih persona dan pillar, lalu tentukan berapa ide yang ingin kamu dapatkan.</p>
         </div>
 
         {/* <div className="generate-hero-metrics" style={{paddingTop:"15px"}}>
@@ -504,13 +571,46 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
 
       <section className="generate-layout">
         <div className="generate-main-column">
-          <article className="panel generate-panel">
+          <article className="panel generate-panel idea-persona-panel">
             <div className="panel-heading">
               <div>
-                <h2>Pilih topik utama</h2>
+                <p className="eyebrow">Persona</p>
+                <h2>Pilih Persona</h2>
+                <p className="page-description">Persona menentukan sudut pandang, audiens, dan gaya ide yang dibuat.</p>
+              </div>
+              {isFreePlan ? <span className="pill subtle">Free · terkunci</span> : null}
+            </div>
+            <div className="idea-persona-list">
+              {personas.length ? personas.map((persona) => (
+                <button
+                  key={persona.id || getPersonaTitle(persona)}
+                  type="button"
+                  className={`idea-persona-option${persona.id === selectedPersonaId ? ' selected' : ''}`}
+                  onClick={() => persona.id && handlePersonaSelection(persona.id)}
+                >
+                  <span className="idea-persona-avatar"><AppIcon name="user" /></span>
+                  <span>
+                    <strong>{getPersonaTitle(persona)}</strong>
+                    <small>{getPersonaValue(persona, ['targetAudience', 'target_audience']) || 'Audiens belum diatur'}</small>
+                  </span>
+                  {persona.id === selectedPersonaId ? <span className="pill subtle">Aktif</span> : <AppIcon name={isFreePlan ? 'lock' : 'chevron-right'} />}
+                </button>
+              )) : (
+                <div className="generate-empty-state"><AppIcon name="user" /><div><strong>Persona belum tersedia</strong></div></div>
+              )}
+            </div>
+            {selectedPersona ? <p className="idea-selection-context">Tone: <strong>{getPersonaValue(selectedPersona, ['tone']) || 'Belum diatur'}</strong> · Fokus: <strong>{getPersonaValue(selectedPersona, ['nicheTopicFocus', 'niche_topic_focus']) || 'Belum diatur'}</strong></p> : null}
+          </article>
+
+          <article className="panel generate-panel idea-pillar-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>Pilih Pillar</h2>
+                <p className="page-description">Pillar adalah tema utama yang menjadi arah ide kontenmu.</p>
               </div>
               <div className="pillars-panel-meta">
-                <span className="pill subtle">{filteredPillars.length} topik</span>
+                {isFreePlan ? <span className="pill subtle">Free · terkunci</span> : null}
+                <span className="pill subtle">{filteredPillars.length} pillar</span>
                 {filteredPillars.length > 2 ? (
                   <div className="pillars-carousel-actions">
                     <button
@@ -538,7 +638,7 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
               <div className="generate-empty-state">
                 <AppIcon name="info" />
                 <div>
-                  <strong>Memuat topik utama...</strong>
+                  <strong>Memuat pillar...</strong>
                 </div>
               </div>
 	            ) : filteredPillars.length ? (
@@ -549,7 +649,8 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
                         key={pillar.id || getPillarTitle(pillar)}
                         pillar={pillar}
                         selected={pillar.id === selectedContentPillarId}
-                        onClick={(id) => setSelectedContentPillarId(id)}
+                        locked={isFreePlan}
+                        onClick={handlePillarSelection}
                       />
                     ))}
                   </div>
@@ -558,14 +659,14 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
               <div className="generate-empty-state">
                 <AppIcon name="layers" />
                 <div>
-                  <strong>Belum ada topik utama</strong>
+                  <strong>Belum ada pillar</strong>
                   <p>Lengkapi Content Brain untuk mulai mencari ide.</p>
                 </div>
               </div>
             )}
           </article>
 
-          <article className="panel generate-panel">
+          {responseTopics.length ? <article className="panel generate-panel generate-results-modal" role="dialog" aria-modal="true" aria-label="Hasil ide">
             <div className="panel-heading compact">
               <div>
                 <h2>{responseTopics.length ? 'Ide untuk kamu' : 'Hasil ide'}</h2>
@@ -577,6 +678,7 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
               </div>
               <div className="generate-response-meta">
                 {responseTopics.length ? <span className="pill subtle">{responseTopics.length} ide</span> : null}
+                <button className="generate-results-close" type="button" onClick={(event) => dismissModal(resetResponseState, event.currentTarget)} aria-label="Tutup hasil ide">×</button>
               </div>
             </div>
 
@@ -677,7 +779,7 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
                         >
                           Simpan untuk nanti
                         </button>
-                        <button className="text-button" type="button" onClick={resetResponseState}>
+                        <button className="text-button" type="button" onClick={(event) => dismissModal(resetResponseState, event.currentTarget)}>
                           Cari ide lainnya
                         </button>
                       </div>
@@ -694,7 +796,7 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
                 </div>
               </div>
             )}
-          </article>
+          </article> : null}
         </div>
 
         {!responseTopics.length ? <aside className="generate-side-column">
@@ -710,7 +812,7 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
 
             <div className="generate-summary">
               <div className="generate-summary-item">
-                <span>Topik utama</span>
+                <span>Pillar</span>
                 <strong>
                   {selectedContentPillar ? getPillarTitle(selectedContentPillar) : 'Belum dipilih'}
                 </strong>
@@ -766,6 +868,30 @@ export function GenerateTopicPage({ userId, onContinueToContent }: GenerateTopic
           </form>
         </aside> : null}
       </section>
+
+      {upgradePrompt ? (
+        <div className="content-bank-dialog-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) dismissModal(() => setUpgradePrompt(null), event.currentTarget)
+        }}>
+          <section className="content-bank-dialog idea-upgrade-dialog" role="dialog" aria-modal="true" aria-labelledby="idea-upgrade-title">
+            <header>
+              <div>
+                <p className="eyebrow">Fitur premium</p>
+                <h2 id="idea-upgrade-title">Upgrade untuk mengganti {upgradePrompt === 'persona' ? 'persona' : 'pillar'}</h2>
+              </div>
+              <button type="button" onClick={(event) => dismissModal(() => setUpgradePrompt(null), event.currentTarget)} aria-label="Tutup">×</button>
+            </header>
+            <div className="idea-upgrade-body">
+              <span className="idea-upgrade-icon"><AppIcon name="lock" /></span>
+              <p>Akun Free menggunakan persona dan pillar utama. Upgrade paket untuk memilih konfigurasi lain saat mencari ide.</p>
+              <div className="idea-upgrade-actions">
+                <button className="ghost-button" type="button" onClick={(event) => dismissModal(() => setUpgradePrompt(null), event.currentTarget)}>Nanti</button>
+                <button className="primary-button" type="button" onClick={() => { setUpgradePrompt(null); onUpgrade?.() }}>Lihat Paket</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
+import { dismissModal } from '../utils/modalAnimation'
 import { getCurrentAuthToken } from '../services/authService'
 import { createContentOutput } from '../services/contentOutputs'
 import {
@@ -40,23 +41,6 @@ function getTopicCategory(record: ContentTopicRecord) {
   return getTopicValue(record, ['category', 'categoryType', 'category_type']) || 'Uncategorized'
 }
 
-function formatDate(value: string) {
-  if (!value) {
-    return 'Belum tersedia'
-  }
-
-  const parsed = Date.parse(value)
-
-  if (Number.isNaN(parsed)) {
-    return value
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(parsed)
-}
-
 function getRecordTimestamp(record: ContentTopicRecord) {
   const raw = getTopicValue(record, ['createdAt', 'created_at'])
   const parsed = raw ? Date.parse(raw) : Number.NaN
@@ -94,6 +78,7 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
   const [variantCount, setVariantCount] = useState(1)
+  const [threadType, setThreadType] = useState<'short' | 'long'>('short')
   const [additionalPrompt, setAdditionalPrompt] = useState('')
   const generationLockRef = useRef(false)
 
@@ -238,6 +223,7 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
       await createContentOutput({
         topicId: selectedTopic.id,
         variantCount,
+        threadType,
         additionalPrompt: additionalPrompt.trim(),
       })
       setStatusTone('success')
@@ -283,16 +269,7 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
             Pilih satu topic lalu buat hingga lima angle konten yang berbeda.
           </p>
         </div>
-      </header> : (
-        <div className="topic-variant-intro">
-          <div>
-            <p className="eyebrow">From Topic</p>
-            <h2>Buat variant dari satu topic</h2>
-            <p>Pilih ide yang paling kuat, lalu tentukan jumlah angle yang ingin dibuat.</p>
-          </div>
-          <span className="pill subtle">Maks. 5 variant</span>
-        </div>
-      )}
+      </header> : null}
 
       {!embedded ? <div className="generate-mode-switcher">
         <span className="pill subtle">Manual mode</span>
@@ -311,17 +288,6 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
           <p>{statusMessage}</p>
         </div>
       ) : null}
-
-      <div className="mobile-selected-topic">
-        <div>
-          <span>Topic terpilih</span>
-          <strong>{selectedTopic ? getTopicTitle(selectedTopic) : 'Belum ada topic dipilih'}</strong>
-          {selectedTopic ? <small>{getTopicCategory(selectedTopic)} · {formatDate(getTopicValue(selectedTopic, ['createdAt', 'created_at']))}</small> : null}
-        </div>
-        <button className="ghost-button" type="button" onClick={() => setIsTopicPickerOpen(true)}>
-          {selectedTopic ? 'Ganti Topic' : 'Pilih Topic'}
-        </button>
-      </div>
 
       <section className="auto-post-layout">
         <div className="auto-post-main-column">
@@ -371,13 +337,12 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
                 <tr>
                   <th>Topic</th>
                   <th>Category</th>
-                  <th>Created At</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={3} className="table-empty-cell">
+                    <td colSpan={2} className="table-empty-cell">
                       <div className="generate-empty-state">
                         <AppIcon name="info" />
                         <div>
@@ -405,13 +370,12 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
                         <td>
                           <span className="status-badge draft">{getTopicCategory(topic)}</span>
                         </td>
-                        <td>{formatDate(getTopicValue(topic, ['createdAt', 'created_at']))}</td>
                       </tr>
                     )
                   })
                 ) : (
                   <tr>
-                    <td colSpan={3} className="table-empty-cell">
+                    <td colSpan={2} className="table-empty-cell">
                       <div className="generate-empty-state">
                         <AppIcon name="layers" />
                         <div>
@@ -454,33 +418,29 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
 
         <aside className="auto-post-side-column">
           <article className="panel auto-post-detail-panel">
-            <div className="panel-heading compact">
+            <div className="panel-heading compact auto-post-detail-heading">
               <div>
-                <p className="eyebrow">Topic Detail</p>
-                <h2>{selectedTopic ? getTopicTitle(selectedTopic) : 'Pilih topic dulu'}</h2>
+                <p className="eyebrow">Buat Konten</p>
+                <h2>Atur hasil Threads</h2>
+                <p>Sesuaikan format sebelum konten dibuat.</p>
               </div>
-              <span className={`pill${selectedTopic ? ' subtle' : ''}`}>
-                {selectedTopic ? 'Selected' : 'Empty'}
-              </span>
+              <button className="topic-detail-change" type="button" onClick={() => setIsTopicPickerOpen(true)}>
+                <AppIcon name="layers" />
+                {selectedTopic ? 'Ganti topic' : 'Pilih topic'}
+              </button>
             </div>
 
             {selectedTopic ? (
               <div className="auto-post-detail-stack">
-                <div className="auto-post-detail-card">
-                  <span>Category</span>
-                  <strong>{getTopicCategory(selectedTopic)}</strong>
-                </div>
-                <div className="auto-post-detail-card">
-                  <span>Topic Text</span>
+                <div className="selected-topic-summary">
+                  <div className="selected-topic-summary-label">
+                    <span>Topic terpilih</span>
+                    <strong>{getTopicCategory(selectedTopic)}</strong>
+                  </div>
                   <p>{getTopicTitle(selectedTopic)}</p>
                 </div>
-                <div className="auto-post-detail-card">
-                  <span>Created At</span>
-                  <p>{formatDate(getTopicValue(selectedTopic, ['createdAt', 'created_at']))}</p>
-                </div>
-
-                <label className="persona-field full-width">
-                  <span>Jumlah variant</span>
+                <label className="persona-field full-width variant-count-field">
+                  <span>Jumlah varian</span>
                   <div className="topic-stepper">
                     <button
                       className="stepper-button"
@@ -502,8 +462,23 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
                       <AppIcon name="plus" />
                     </button>
                   </div>
-                  <small className="field-hint">Maksimal lima angle berbeda dari satu topic.</small>
+                  <small className="field-hint">Buat hingga 5 versi dengan angle yang berbeda.</small>
                 </label>
+
+                <fieldset className="thread-length-field" disabled={isGeneratingOutput}>
+                  <legend>Panjang konten</legend>
+                  <div className="thread-length-options">
+                    <button type="button" className={threadType === 'short' ? 'selected' : ''} onClick={() => setThreadType('short')} aria-pressed={threadType === 'short'}>
+                      <span className="thread-length-radio" aria-hidden="true"><i /></span>
+                      <span><strong>Pendek</strong><small>1 post ringkas</small></span>
+                    </button>
+                    <button type="button" className={threadType === 'long' ? 'selected' : ''} onClick={() => setThreadType('long')} aria-pressed={threadType === 'long'}>
+                      <span className="thread-length-radio" aria-hidden="true"><i /></span>
+                      <span><strong>Panjang</strong><small>Post utama + reply</small></span>
+                    </button>
+                  </div>
+                  <small className="field-hint">{threadType === 'short' ? 'Cocok untuk pesan yang langsung dan cepat dibaca.' : 'Cocok untuk pembahasan bertahap yang lebih mendalam.'}</small>
+                </fieldset>
 
                 <label className="persona-field full-width">
                   <span>Instruksi tambahan <small>(opsional)</small></span>
@@ -518,7 +493,7 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
                 <div className="auto-post-note">
                   <AppIcon name="info" />
                   <p>
-                    Setiap variant memakai angle berbeda agar hasil tidak repetitif.
+                    Setiap varian memakai angle berbeda agar hasil tidak repetitif.
                   </p>
                 </div>
 
@@ -528,7 +503,7 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
                   onClick={() => void handleGenerateContentOutput()}
                   disabled={!selectedTopic?.id || isGeneratingOutput || !accessToken}
                 >
-                  {isGeneratingOutput ? 'Sedang membuat variant...' : `Generate ${variantCount} Variant${variantCount > 1 ? 's' : ''}`}
+                  {isGeneratingOutput ? 'Sedang membuat varian...' : `Buat ${variantCount} Varian`}
                 </button>
               </div>
             ) : (
@@ -545,14 +520,15 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
       </section>
 
       {isTopicPickerOpen ? (
-        <div className="topic-picker-backdrop" onClick={() => setIsTopicPickerOpen(false)}>
+        <div className="topic-picker-backdrop" onClick={(event) => dismissModal(() => setIsTopicPickerOpen(false), event.currentTarget)}>
           <section className="topic-picker-sheet" role="dialog" aria-modal="true" aria-label="Pilih topic" onClick={(event) => event.stopPropagation()}>
             <header>
               <div>
                 <p className="eyebrow">Topic Library</p>
                 <h2>Pilih satu topic</h2>
+                <p className="topic-picker-description">Topic adalah ide utama yang ingin kamu jadikan konten.</p>
               </div>
-              <button type="button" aria-label="Tutup pemilih topic" onClick={() => setIsTopicPickerOpen(false)}>×</button>
+              <button type="button" aria-label="Tutup pemilih topic" onClick={(event) => dismissModal(() => setIsTopicPickerOpen(false), event.currentTarget)}>×</button>
             </header>
             <label className="auto-post-search">
               <span>Cari topic</span>
@@ -570,7 +546,6 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
                 <button key={topic.id || getTopicTitle(topic)} type="button" className={topic.id === selectedTopicId ? 'selected' : ''} aria-label={`Pilih ${getTopicTitle(topic)}`} onClick={() => topic.id && selectTopicFromTable(topic.id)}>
                   <span className="status-badge draft">{getTopicCategory(topic)}</span>
                   <strong>{getTopicTitle(topic)}</strong>
-                  <small>{formatDate(getTopicValue(topic, ['createdAt', 'created_at']))}</small>
                 </button>
               ))}
             </div>
@@ -589,7 +564,7 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
         <div className="topic-variant-loading" role="status" aria-live="polite">
           <span className="topic-variant-spinner" aria-hidden="true" />
           <div>
-            <strong>Sedang membuat {variantCount} variant</strong>
+            <strong>Sedang membuat {variantCount} varian</strong>
             <span>Jangan tutup halaman ini. Hasil akan muncul otomatis.</span>
           </div>
         </div>

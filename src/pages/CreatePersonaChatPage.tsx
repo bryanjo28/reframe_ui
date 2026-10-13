@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useToast } from '../components/useToast'
+import { reportError } from '../utils/apiError'
 import {
   createPersonaConfig,
   updatePersonaConfig,
@@ -263,7 +264,7 @@ export function CreatePersonaChatPage({
       onSaved?.(nextRecord)
     } catch (error) {
       setStatusTone('error')
-      const errorMessage = `Persona belum berhasil disimpan. ${error instanceof Error ? error.message : 'Periksa jawaban lalu coba lagi.'}`
+      const errorMessage = reportError('Menyimpan persona lewat chat', error, 'Persona belum berhasil disimpan. Coba lagi.')
       setStatusMessage(errorMessage)
       toastError('Persona belum berhasil disimpan', errorMessage)
     } finally {

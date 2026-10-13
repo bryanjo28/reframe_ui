@@ -1,6 +1,7 @@
 import { AppIcon } from './AppIcon'
 import type { NavKey } from '../types/navigation'
 import type { AuthUser } from '../services/authService'
+import { dismissModal } from '../utils/modalAnimation'
 
 type Props = {
   activePage: NavKey
@@ -19,7 +20,7 @@ const primary: Array<{ key: NavKey; label: string; icon: string }> = [
 ]
 
 const secondary: Array<{ key: NavKey; label: string; icon: string }> = [
-  { key: 'personalize', label: 'Content Brain', icon: 'user' },
+  { key: 'personalize', label: 'Persona & Pillar', icon: 'user' },
   { key: 'connecting-apps', label: 'Connected Accounts', icon: 'link' },
   { key: 'subscription-plans', label: 'Subscription', icon: 'calendar' },
 ]
@@ -31,12 +32,11 @@ export function MobileNavigation(props: Props) {
   return (
     <>
       {props.isMoreOpen ? (
-        <div className="mobile-more-backdrop" role="presentation" onClick={props.onCloseMore}>
+        <div className="mobile-more-backdrop" role="presentation" onClick={(event) => dismissModal(props.onCloseMore, event.currentTarget)}>
           <section className="mobile-more-sheet" role="dialog" aria-modal="true" aria-label="More navigation" onClick={(event) => event.stopPropagation()}>
             <div className="mobile-sheet-handle" />
             <div className="mobile-sheet-heading">
               <div><p className="eyebrow">Lainnya</p><h2>Akun & workspace</h2></div>
-              <button type="button" className="icon-button" onClick={props.onCloseMore} aria-label="Close"><AppIcon name="close" /></button>
             </div>
             <button className="mobile-account-summary" type="button" onClick={() => props.onNavigate('settings')}><span>{name.charAt(0).toUpperCase()}</span><div><strong>{name}</strong><small>{props.currentUser?.email || 'Lihat detail akun'}</small><em>Lihat profil & pengaturan</em></div><AppIcon name="chevron-right" /></button>
             <nav className="mobile-more-list">

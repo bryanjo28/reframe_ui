@@ -10,6 +10,7 @@ import {
 } from '../services/contentPillars'
 import { listPersonaConfigs, type PersonaConfigRecord } from '../services/personaConfigs'
 import { useToast } from '../components/useToast'
+import { reportError } from '../utils/apiError'
 
 type PillarFieldKey = keyof ContentPillarPayload
 
@@ -292,7 +293,7 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
         }
 
       setStatusTone('error')
-      setStatusMessage(error instanceof Error ? error.message : 'Gagal memuat workspace content pillar.')
+      setStatusMessage(reportError('Memuat workspace content pillar', error, 'Workspace belum bisa dimuat. Coba lagi.'))
       setPersonaConfigs([])
       setSavedPillars([])
       setSelectedPillar(null)
@@ -324,7 +325,7 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
       setSelectedPersonaConfigId(record.personaConfigId || '')
     } catch (error) {
       setStatusTone('error')
-      setStatusMessage(error instanceof Error ? error.message : 'Gagal memuat content pillar.')
+      setStatusMessage(reportError('Memuat content pillar', error, 'Content pillar belum bisa dimuat. Coba lagi.'))
     } finally {
       setIsLoadingDetail(false)
     }
@@ -364,7 +365,7 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
       setSelectedPillar(null)
       setFormValues({ ...emptyPillarForm, personaConfigId })
       setStatusTone('error')
-      setStatusMessage(error instanceof Error ? error.message : 'Gagal memuat content pillar.')
+      setStatusMessage(reportError('Memuat content pillar', error, 'Content pillar belum bisa dimuat. Coba lagi.'))
     } finally {
       setIsLoadingDetail(false)
     }
@@ -420,7 +421,7 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
       onSaved?.(nextRecord)
     } catch (error) {
       setStatusTone('error')
-      const errorMessage = `Content Pillar belum berhasil disimpan. ${error instanceof Error ? error.message : 'Periksa data lalu coba lagi.'}`
+      const errorMessage = reportError('Menyimpan content pillar', error, 'Content pillar belum berhasil disimpan. Coba lagi.')
       setStatusMessage(errorMessage)
       toastError('Content Pillar belum berhasil disimpan', errorMessage)
     } finally {
@@ -461,7 +462,7 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
     } catch (error) {
       setStatusTone('error')
       const errorMessage =
-        error instanceof Error ? error.message : 'Gagal menghapus content pillar.'
+        reportError('Menghapus content pillar', error, 'Content pillar belum berhasil dihapus. Coba lagi.')
       setStatusMessage(errorMessage)
       toastError('Content pillar delete failed', errorMessage)
     } finally {

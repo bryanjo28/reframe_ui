@@ -11,6 +11,7 @@ const REQUEST_TIMEOUT_MS = 25000
 export type CreateContentOutputPayload = {
   topicId: string
   variantCount?: number
+  threadType?: 'short' | 'long'
   additionalPrompt: string
 }
 
@@ -152,6 +153,7 @@ export async function createContentOutput(payload: CreateContentOutputPayload) {
   const requestBody: Record<string, unknown> = {
     topicId: payload.topicId,
     variantCount: payload.variantCount ?? 1,
+    threadType: payload.threadType ?? 'short',
     additionalPrompt: payload.additionalPrompt,
   }
 
@@ -370,20 +372,37 @@ function normalizeContentOutputRecord(record: ContentOutputRecord) {
 }
 
 export async function listContentOutputs(userId?: string) {
-  const response = await fetchWithTimeout(buildApiUrl(CONTENT_OUTPUTS_LIST_ENDPOINT), {
-    method: 'GET',
-    headers: buildHeaders(),
-  })
+  const pageSize = 100
+  const records: ContentOutputRecord[] = []
+  let page = 1
+  let hasNextPage = true
 
-  const data = await readResponseBodyWithTimeout(response)
+  while (hasNextPage) {
+    const url = buildApiUrl(CONTENT_OUTPUTS_LIST_ENDPOINT)
+    url.searchParams.set('page', String(page))
+    url.searchParams.set('limit', String(pageSize))
 
-  if (!response.ok) {
-    const errorMessage = typeof data === 'string' ? data : 'Gagal mengambil content outputs.'
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: buildHeaders(),
+    })
 
-    throw new Error(errorMessage || 'Gagal mengambil content outputs.')
+    const data = await readResponseBodyWithTimeout(response)
+
+    if (!response.ok) {
+      const errorMessage = typeof data === 'string' ? data : 'Gagal mengambil content outputs.'
+      throw new Error(errorMessage || 'Gagal mengambil content outputs.')
+    }
+
+    const currentPage = unwrapContentOutputListResponse(data)
+    records.push(...currentPage)
+
+    const pagination = isRecord(data) && isRecord(data.pagination) ? data.pagination : null
+    hasNextPage = pagination?.hasNextPage === true
+    page += 1
   }
 
-  const normalized = unwrapContentOutputListResponse(data).map(normalizeContentOutputRecord)
+  const normalized = records.map(normalizeContentOutputRecord)
 
   if (!userId) {
     return normalized

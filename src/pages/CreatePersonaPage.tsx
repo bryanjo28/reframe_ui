@@ -7,6 +7,7 @@ import {
   updatePersonaConfig,
 } from '../services/personaConfigs'
 import { useToast } from '../components/useToast'
+import { reportError } from '../utils/apiError'
 
 type PersonaFieldKey = keyof PersonaConfigPayload
 
@@ -308,7 +309,7 @@ export function CreatePersonaPage({
       setFormValues(createFormValuesFromConfig(record))
     } catch (error) {
       setStatusTone('error')
-      const errorMessage = error instanceof Error ? error.message : 'Gagal memuat persona config.'
+      const errorMessage = reportError('Memuat persona config', error, 'Persona belum bisa dimuat. Coba lagi.')
       setStatusMessage(errorMessage)
       toastError('Persona load failed', errorMessage)
     } finally {
@@ -359,7 +360,7 @@ export function CreatePersonaPage({
       onSaved?.(nextRecord)
     } catch (error) {
       setStatusTone('error')
-      const errorMessage = `Persona belum berhasil disimpan. ${error instanceof Error ? error.message : 'Periksa data lalu coba lagi.'}`
+      const errorMessage = reportError('Menyimpan persona', error, 'Persona belum berhasil disimpan. Coba lagi.')
       setStatusMessage(errorMessage)
       toastError('Persona belum berhasil disimpan', errorMessage)
     } finally {

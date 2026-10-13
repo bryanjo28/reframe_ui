@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
+import { dismissModal } from '../utils/modalAnimation'
 import { useToast } from '../components/useToast'
 import {
   getCurrentAuthState,
@@ -298,9 +299,9 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
       {isDisconnectModalOpen ? (
         <div
           className="auth-overlay threads-disconnect-modal-overlay"
-          onClick={() => {
+          onClick={(event) => {
             if (!isDeletingThreads) {
-              setIsDisconnectModalOpen(false)
+              dismissModal(() => setIsDisconnectModalOpen(false), event.currentTarget)
             }
           }}
         >
@@ -322,7 +323,7 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
               <button
                 className="ghost-button"
                 type="button"
-                onClick={() => setIsDisconnectModalOpen(false)}
+                onClick={(event) => dismissModal(() => setIsDisconnectModalOpen(false), event.currentTarget)}
                 disabled={isDeletingThreads}
               >
                 Batal

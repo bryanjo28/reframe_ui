@@ -45,18 +45,6 @@ function formatInterval(interval: string) {
   return normalized
 }
 
-function readRawString(raw: NormalizedSubscriptionPlan['raw'], keys: string[]) {
-  for (const key of keys) {
-    const value = raw[key]
-
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim()
-    }
-  }
-
-  return ''
-}
-
 function readRawNumber(raw: NormalizedSubscriptionPlan['raw'], keys: string[]) {
   for (const key of keys) {
     const value = raw[key]
@@ -75,23 +63,6 @@ function formatPlanCount(value: number | null) {
   }
 
   return value.toLocaleString('id-ID')
-}
-
-function formatCreatedAt(value: string) {
-  if (!value) {
-    return ''
-  }
-
-  const parsed = Date.parse(value)
-
-  if (!Number.isFinite(parsed)) {
-    return value
-  }
-
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(parsed)
 }
 
 function getPlanTone(plan: NormalizedSubscriptionPlan) {
@@ -180,15 +151,6 @@ function getPlanDetails(plan: NormalizedSubscriptionPlan) {
       ),
     },
   ]
-
-  const createdAt = readRawString(raw, ['created_at', 'createdAt'])
-
-  if (createdAt) {
-    details.push({
-      label: 'Created',
-      value: formatCreatedAt(createdAt),
-    })
-  }
 
   return details
 }
