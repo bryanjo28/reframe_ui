@@ -27,13 +27,13 @@ describe('public auth routes', () => {
     expect(screen.getAllByRole('link', { name: 'Login' })[0]).toHaveAttribute('href', '/login')
   })
 
-  it('keeps the public content demo available at /demo', () => {
+  it('does not expose the content demo at /demo', () => {
     window.history.replaceState({}, '', '/demo')
 
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: 'Ubah satu ide menjadi thread yang siap posting.' })).toBeInTheDocument()
-    expect(screen.getByText('Demo gratis')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Ubah satu ide menjadi thread yang siap posting.' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Demo gratis')).not.toBeInTheDocument()
   })
 
   it('renders the privacy policy without requiring authentication', () => {

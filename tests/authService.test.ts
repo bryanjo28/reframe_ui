@@ -8,10 +8,47 @@ import {
   register,
   resendVerification,
 } from '../src/services/authService'
+import { SESSION_EXPIRED_EVENT } from '../src/utils/apiError'
 
 const AUTH_TOKEN_STORAGE_KEY = 'alurin.authToken'
 
 describe('authService verification flow', () => {
+  it('skips session requests without a token', async () => {
+    clearAuthSession()
+    const request = vi.fn()
+    vi.stubGlobal('fetch', request)
+    expect(await getCurrentAuthState()).toBeNull()
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it.each([401, 200])('ignores old session response %s after a new login', async (status) => {
+    clearAuthSession()
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, 'old-token')
+    let resolveOld!: (response: Response) => void
+    const expired = vi.fn()
+    window.addEventListener(SESSION_EXPIRED_EVENT, expired)
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      if (new URL(input.toString()).pathname === '/api/auth/login') {
+        return new Response(JSON.stringify({ data: { user: { id: 'new-user' }, accessToken: 'new-token' } }))
+      }
+      if ((init?.headers as Record<string, string>).Authorization === 'Bearer old-token') {
+        return new Promise<Response>((resolve) => { resolveOld = resolve })
+      }
+      return new Response(JSON.stringify({ data: { user: { id: 'new-user' } } }))
+    }))
+    try {
+      const oldRequest = getCurrentAuthState()
+      await login({ email: 'user@example.com', password: 'password' })
+      expect((await getCurrentAuthState())?.user.id).toBe('new-user')
+      resolveOld(new Response(status === 200 ? JSON.stringify({ data: { user: { id: 'old-user' } } }) : null, { status }))
+      expect(await oldRequest).toBeNull()
+      expect(expired).not.toHaveBeenCalled()
+      expect(localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)).toBe('new-token')
+      expect((await getCurrentAuthState())?.user.id).toBe('new-user')
+    } finally {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, expired)
+    }
+  })
   beforeEach(() => {
     vi.restoreAllMocks()
     clearAuthSession()

@@ -8,6 +8,9 @@ import {
 } from '../services/personaConfigs'
 import { useToast } from '../components/useToast'
 import { reportError } from '../utils/apiError'
+import { AppIcon } from '../components/AppIcon'
+import { getCurrentSubscription, listSubscriptionPlans } from '../services/subscriptionPlans'
+import { UPGRADE_PLAN_REQUIRED_EVENT } from '../utils/apiError'
 
 type PersonaFieldKey = keyof PersonaConfigPayload
 
@@ -115,13 +118,6 @@ function createFormValuesFromConfig(record: PersonaConfigRecord | null): Persona
   }
 }
 
-function formatUpdatedAt(record: PersonaConfigRecord | null) {
-  return (
-    getRecordValue(record, ['updatedAt', 'updated_at', 'createdAt', 'created_at']) ||
-    'Belum disimpan ke database'
-  )
-}
-
 function getRecordTimestamp(record: PersonaConfigRecord | null) {
   const rawTimestamp = getRecordValue(record, ['updatedAt', 'updated_at', 'createdAt', 'created_at'])
   const parsedTimestamp = rawTimestamp ? Date.parse(rawTimestamp) : Number.NaN
@@ -131,32 +127,6 @@ function getRecordTimestamp(record: PersonaConfigRecord | null) {
 
 function sortPersonaConfigsDescending(configs: PersonaConfigRecord[]) {
   return [...configs].sort((left, right) => getRecordTimestamp(right) - getRecordTimestamp(left))
-}
-
-function PersonaVersionCard({
-  persona,
-  isSelected,
-  onClick,
-  disabled = false,
-}: {
-  persona: PersonaConfigRecord
-  isSelected: boolean
-  onClick: (id: string) => void
-  disabled?: boolean
-}) {
-  return (
-    <button
-      className={`persona-preview-block persona-version-card${isSelected ? ' selected' : ''}`}
-      type="button"
-      onClick={() => persona.id && onClick(persona.id)}
-      disabled={!persona.id || disabled}
-      data-persona-id={persona.id || ''}
-    >
-      <span>{getRecordValue(persona, ['persona']) || 'Untitled persona'}</span>
-      <strong>{formatUpdatedAt(persona)}</strong>
-      <p>{getRecordValue(persona, ['goal']) || 'Klik untuk memuat versi ini ke form edit.'}</p>
-    </button>
-  )
 }
 
 function FieldRenderer({
@@ -250,6 +220,23 @@ export function CreatePersonaPage({
   const [savedPersonas, setSavedPersonas] = useState<PersonaConfigRecord[]>([])
   const [isLoadingList, setIsLoadingList] = useState(true)
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+  const [personaLimit, setPersonaLimit] = useState<number | null>(null)
+  const [limitLoading, setLimitLoading] = useState(!isInitialSetup)
+  const [tipsOpen, setTipsOpen] = useState(false)
+
+  useEffect(() => {
+    if (isInitialSetup) return
+    let active = true
+    void Promise.all([getCurrentSubscription(), listSubscriptionPlans()]).then(([subscription, plans]) => {
+      const plan = plans.find((item) => subscription
+        ? item.id === subscription.planId || item.key.toLowerCase() === subscription.planKey.toLowerCase()
+        : item.key.toLowerCase() === 'free')
+      const raw = plan?.raw.maxPersonas ?? plan?.raw.max_personas
+      const limit = Number(raw)
+      if (active) setPersonaLimit(raw !== undefined && Number.isFinite(limit) ? limit : null)
+    }).catch(() => { if (active) setPersonaLimit(null) }).finally(() => { if (active) setLimitLoading(false) })
+    return () => { active = false }
+  }, [isInitialSetup])
 
   useEffect(() => {
     let isMounted = true
@@ -318,6 +305,11 @@ export function CreatePersonaPage({
   }
 
   function handleCreateNew() {
+    const ids = new Set([...savedPersonas.map((item) => item.id), personaConfig?.id].filter(Boolean))
+    if (personaLimit !== null && ids.size >= personaLimit) {
+      window.dispatchEvent(new CustomEvent(UPGRADE_PLAN_REQUIRED_EVENT, { detail: { message: `Paket kamu mendukung maksimal ${personaLimit} persona. Upgrade paket untuk menambah persona.` } }))
+      return
+    }
     setSavedRecord(null)
     setFormValues(createFormValuesFromConfig(null))
     setStatusMessage('Mode create aktif. Form sudah dikosongkan.')
@@ -376,11 +368,11 @@ export function CreatePersonaPage({
   }
 
   const hasExistingConfig = Boolean(savedRecord?.id)
-  const visiblePersonas = sortPersonaConfigsDescending(savedPersonas)
+  const visiblePersonas = sortPersonaConfigsDescending(personaConfig && !savedPersonas.some((item) => item.id === personaConfig.id) ? [personaConfig, ...savedPersonas] : savedPersonas)
 
   return (
-    <section className={`persona-page${isInitialSetup ? ' persona-page-initial' : ''}`}>
-      <header className={`page-header${isInitialSetup ? ' persona-page-header-initial' : ''}`}>
+    <section className={`persona-page persona-config-page${isInitialSetup ? ' persona-page-initial' : ''}`}>
+      {isInitialSetup ? <header className="page-header persona-page-header-initial">
         <p className="eyebrow">{isInitialSetup ? 'Content Brain · 1 of 2' : 'Content Brain'}</p>
         <h1>{isInitialSetup ? 'Biar alurin kenal kamu dulu 👋' : 'Persona'}</h1>
         <p className="page-description">
@@ -388,7 +380,7 @@ export function CreatePersonaPage({
             ? 'Ceritakan sedikit tentang kamu, audiensmu, dan bagaimana kamu ingin terdengar.'
             : 'Atur cara alurin memahami suara, audiens, dan tujuan kontenmu.'}
         </p>
-      </header>
+      </header> : null}
 
       {statusMessage ? (
         <div className={`integration-note ${statusTone === 'error' ? 'integration-note-error' : ''}`}>
@@ -396,19 +388,18 @@ export function CreatePersonaPage({
         </div>
       ) : null}
 
-      <section className={`persona-layout${isInitialSetup ? ' persona-layout-initial' : ''}`}>
+      <section className={`persona-layout persona-simple-layout${isInitialSetup ? ' persona-layout-initial' : ''}`}>
         <article className="panel persona-form-panel">
           <div className="panel-heading">
             <div>
               <p className="eyebrow">alurin Persona Builder</p>
               <h2>{hasExistingConfig ? 'Update persona utama' : 'Buat persona utama'}</h2>
             </div>
-            <span className={`pill${hasExistingConfig ? ' subtle' : ''}`}>
-              {hasExistingConfig ? 'Synced record' : 'First setup'}
-            </span>
+            <button className="builder-tips-button ghost-button" type="button" onClick={() => setTipsOpen(true)} aria-label="Buka tips persona">Tips <AppIcon name="info" /></button>
           </div>
 
           <form className="persona-form" data-tour-step={isInitialSetup ? 2 : undefined} onSubmit={handleSubmit}>
+            {!isInitialSetup ? <label className="persona-field full-width"><span>Pilih Persona</span><select value={savedRecord?.id || ''} disabled={isLoadingList || isLoadingDetail || isSaving} onChange={(event) => { if (event.target.value) void handleSelectPersona(event.target.value) }}><option value="" disabled>{isLoadingList ? 'Memuat persona...' : 'Persona baru'}</option>{visiblePersonas.map((item) => <option key={item.id} value={item.id}>{getRecordValue(item, ['persona', 'persona_name', 'personaName']) || 'Persona'}</option>)}</select></label> : null}
             {personaFields.map((field) => (
               <FieldRenderer
                 key={field.key}
@@ -420,7 +411,7 @@ export function CreatePersonaPage({
 
             <div className="persona-actions">
               {!isInitialSetup ? (
-                <button className="ghost-button" type="button" onClick={handleCreateNew} disabled={isSaving}>
+                <button className="ghost-button" type="button" onClick={handleCreateNew} disabled={isSaving || isLoadingList || isLoadingDetail || limitLoading}>
                   New Persona
                 </button>
               ) : null}
@@ -437,66 +428,8 @@ export function CreatePersonaPage({
           </form>
         </article>
 
-        <aside className="persona-side-column">
-          {!isInitialSetup ? (
-            <article className="panel persona-db-card">
-              <div className="panel-heading compact">
-                <div>
-                  <p className="eyebrow">Persona Config</p>
-                  <h2>{hasExistingConfig ? 'Saved Versions' : 'Belum ada record'}</h2>
-                </div>
-                <span className={`status-badge ${hasExistingConfig ? 'ready' : 'draft'}`}>
-                  {hasExistingConfig ? 'Synced' : 'Empty'}
-                </span>
-              </div>
-
-              <div className="pillar-rail-toolbar">
-                <p className="persona-db-time">
-                  {visiblePersonas.length
-                    ? `${visiblePersonas.length} version tersimpan`
-                    : 'Belum ada version tersimpan'}
-                </p>
-              </div>
-
-              {isLoadingList ? (
-                <div className="persona-preview-block">
-                  <p>Memuat daftar persona...</p>
-                </div>
-              ) : visiblePersonas.length ? (
-                <div className="pillar-version-list">
-                  {visiblePersonas.map((persona) => (
-                    <PersonaVersionCard
-                      key={persona.id || getRecordValue(persona, ['persona'])}
-                      persona={persona}
-                      isSelected={persona.id === savedRecord?.id}
-                      onClick={handleSelectPersona}
-                      disabled={isLoadingDetail}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="persona-preview-block">
-                  <p>Belum ada persona lain untuk dipilih. Klik New Persona untuk mulai dari kosong.</p>
-                </div>
-              )}
-
-              {isLoadingDetail ? (
-                <p className="persona-db-time">Memuat persona yang dipilih...</p>
-              ) : null}
-            </article>
-          ) : null}
-
-          <article className="panel persona-guidance-card">
-            <p className="eyebrow">Tips</p>
-            <h2>Biar hasil config lebih kuat</h2>
-            <ul className="persona-tip-list">
-              <li>Isi target audience dan niche dengan contoh yang konkret.</li>
-              <li>Pilih tone dan platform yang paling sering dipakai di workflow kontenmu.</li>
-              <li>Kalau belum yakin, mulai dari versi sederhana dulu lalu refine setelah save.</li>
-            </ul>
-          </article>
-        </aside>
       </section>
+      {tipsOpen ? <div className="content-bank-dialog-backdrop" onClick={() => setTipsOpen(false)}><section className="content-bank-dialog idea-upgrade-dialog" role="dialog" aria-modal="true" aria-labelledby="persona-tips-title" onClick={(event) => event.stopPropagation()}><header><h2 id="persona-tips-title">Tips persona</h2><button type="button" aria-label="Tutup tips" onClick={() => setTipsOpen(false)}><AppIcon name="close" /></button></header><ul className="persona-tip-list"><li>Isi target audience dan niche dengan contoh yang konkret.</li><li>Pilih tone yang sesuai dengan gaya kontenmu.</li><li>Mulai dari versi sederhana, lalu perbaiki setelah disimpan.</li></ul></section></div> : null}
     </section>
   )
 }

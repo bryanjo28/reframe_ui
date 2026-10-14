@@ -116,8 +116,8 @@ export function Sidebar({
   language,
   onLanguageChange,
 }: SidebarProps) {
-  const [usedTokens, setUsedTokens] = useState(0)
-  const [tokenLimit, setTokenLimit] = useState<number | null>(null)
+  const [usedCredits, setUsedCredits] = useState<number | null>(null)
+  const [creditLimit, setCreditLimit] = useState<number | null>(null)
   const [planName, setPlanName] = useState('Current plan')
 
   const displayName = withCurrentBrand(
@@ -138,9 +138,7 @@ export function Sidebar({
 
         if (!includePlan) {
           if (isMounted) {
-            setUsedTokens(summary?.used ?? 0)
-            setTokenLimit((current) => summary?.limit ?? current)
-            setPlanName((current) => summary?.planName || current)
+            setUsedCredits(summary?.credits.usedThisMonth ?? null)
           }
           return
         }
@@ -164,16 +162,16 @@ export function Sidebar({
             })
           : null
 
-        setUsedTokens(summary?.used ?? 0)
-        setTokenLimit(activePlan?.monthlyAiCredits ?? summary?.limit ?? null)
-        setPlanName(currentSubscription?.planName || activePlan?.name || summary?.planName || 'Current plan')
+        setUsedCredits(summary?.credits.usedThisMonth ?? null)
+        setCreditLimit(activePlan?.monthlyAiCredits ?? null)
+        setPlanName(currentSubscription?.planName || activePlan?.name || 'Current plan')
       } catch {
         if (!isMounted) {
           return
         }
 
-        setUsedTokens(0)
-        setTokenLimit(null)
+        setUsedCredits(null)
+        setCreditLimit(null)
         setPlanName('Current plan')
       }
     }
@@ -199,15 +197,15 @@ export function Sidebar({
   }, [])
 
   const usagePercent = useMemo(() => {
-    if (!tokenLimit || tokenLimit <= 0) {
+    if (usedCredits === null || !creditLimit || creditLimit <= 0) {
       return 0
     }
 
-    return Math.min(100, Math.max(0, (usedTokens / tokenLimit) * 100))
-  }, [tokenLimit, usedTokens])
+    return Math.min(100, Math.max(0, (usedCredits / creditLimit) * 100))
+  }, [creditLimit, usedCredits])
 
-  const tokenLimitLabel = tokenLimit !== null && tokenLimit > 0
-    ? tokenLimit.toLocaleString('id-ID')
+  const creditLimitLabel = creditLimit !== null && creditLimit > 0
+    ? creditLimit.toLocaleString('id-ID')
     : '-'
 
   return (
@@ -260,9 +258,9 @@ export function Sidebar({
       <div className="sidebar-bottom">
         {!isCollapsed ? (
           <div className="sidebar-card token-card">
-            <p className="sidebar-card-label">Token Usage</p>
+            <p className="sidebar-card-label">AI Credit Usage</p>
             <strong>
-              {usedTokens.toLocaleString('id-ID')} / {tokenLimitLabel}
+              {usedCredits === null ? '-' : usedCredits.toLocaleString('id-ID')} / {creditLimitLabel}
             </strong>
             <span>{planName} dipakai sebagai batas usage saat ini.</span>
             <div className="token-track" aria-hidden="true">

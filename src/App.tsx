@@ -18,7 +18,8 @@ import { CheckEmailPage } from './pages/CheckEmailPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { EmailConfirmedPage } from './pages/EmailConfirmedPage'
-import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
+// Public /demo is temporarily disabled. Keep the page source available for later reuse.
+// import { CreateContentDemoPage } from './pages/CreateContentDemoPage'
 import type { AppTheme, NavKey } from './types/navigation'
 import { ToastProvider } from './components/Toast'
 import { ContentGenerationProgress } from './components/ContentGenerationProgress'
@@ -536,7 +537,8 @@ function AppShell() {
     try {
       const authState = await getCurrentAuthState()
 
-      if (!authState || runId !== bootstrapRunIdRef.current) {
+      if (runId !== bootstrapRunIdRef.current) return
+      if (!authState) {
         throw new Error('Session login tidak tersedia.')
       }
 
@@ -563,6 +565,7 @@ function AppShell() {
         replaceAppPath(config ? '/dashboard' : '/first-setup')
       }
     } catch (error) {
+      if (runId !== bootstrapRunIdRef.current) return
       clearAuthSession()
       resetWorkspaceState()
       setAuthError(reportError('Memuat session setelah login', error, 'Session login belum bisa dimuat. Coba lagi.'))
@@ -821,18 +824,19 @@ function App() {
     return <LandingPage />
   }
 
-  if (window.location.pathname === '/demo') {
-    return (
-      <ToastProvider>
-        <CreateContentDemoPage
-          isAuthenticated={false}
-          onRequestAuth={(mode) => {
-            window.location.href = mode === 'login' ? '/login' : '/register'
-          }}
-        />
-      </ToastProvider>
-    )
-  }
+  // Public content demo is temporarily disabled.
+  // if (window.location.pathname === '/demo') {
+  //   return (
+  //     <ToastProvider>
+  //       <CreateContentDemoPage
+  //         isAuthenticated={false}
+  //         onRequestAuth={(mode) => {
+  //           window.location.href = mode === 'login' ? '/login' : '/register'
+  //         }}
+  //       />
+  //     </ToastProvider>
+  //   )
+  // }
 
   if (window.location.pathname === '/check-email') {
     return <CheckEmailPage email={getStoredPendingVerificationEmail()} />

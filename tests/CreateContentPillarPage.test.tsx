@@ -74,6 +74,7 @@ test('clears the content pillar form when the selected persona has no saved pill
     { id: 'pillar-1', personaConfigId: 'persona-1', name: 'Founder pillar' },
     { id: 'pillar-2', personaConfigId: 'persona-1', name: 'Founder pillar two' },
   ])
+  vi.mocked(getContentPillarById).mockResolvedValue({ id: 'pillar-1', personaConfigId: 'persona-1', name: 'Founder pillar' })
 
   render(<ToastProvider><CreateContentPillarPage /></ToastProvider>)
 

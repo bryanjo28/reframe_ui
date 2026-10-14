@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getMyUsage, USAGE_UPDATED_EVENT, type UsageUpdatedDetail } from '../services/usage'
 import { AppIcon } from './AppIcon'
 import { useToast } from './useToast'
+import { NotificationBell } from './NotificationBell'
 
 export function TokenBalance({ onOpenCredits, onTopUp }: { onOpenCredits: () => void; onTopUp: () => void }) {
   const { info } = useToast()
@@ -11,7 +12,7 @@ export function TokenBalance({ onOpenCredits, onTopUp }: { onOpenCredits: () => 
   const refresh = useCallback(async (force = false) => {
     try {
       const usage = await getMyUsage({ force })
-      setRemaining(usage?.remaining ?? null)
+      setRemaining(usage?.credits.total ?? null)
     } catch {
       setRemaining(null)
     } finally {
@@ -35,5 +36,6 @@ export function TokenBalance({ onOpenCredits, onTopUp }: { onOpenCredits: () => 
   return <div className="workspace-token-bar" aria-label="Saldo AI Credits">
     <button className="workspace-token-balance" type="button" onClick={onOpenCredits}><AppIcon name="sparkles" /><span>AI Credits</span><strong>{loading ? '—' : remaining === null ? '—' : remaining.toLocaleString('id-ID')}</strong></button>
     <button type="button" onClick={onTopUp}>Top Up</button>
+    <NotificationBell />
   </div>
 }

@@ -11,6 +11,7 @@ import {
 import { listPersonaConfigs, type PersonaConfigRecord } from '../services/personaConfigs'
 import { useToast } from '../components/useToast'
 import { reportError } from '../utils/apiError'
+import { AppIcon } from '../components/AppIcon'
 
 type PillarFieldKey = keyof ContentPillarPayload
 
@@ -120,13 +121,6 @@ function createFormValuesFromRecord(record: ContentPillarRecord | null): Content
   }
 }
 
-function formatUpdatedAt(record: ContentPillarRecord | null) {
-  return (
-    getRecordValue(record, ['updatedAt', 'updated_at', 'createdAt', 'created_at']) ||
-    'Belum disimpan ke database'
-  )
-}
-
 function getRecordTimestamp(record: ContentPillarRecord | null) {
   const rawTimestamp = getRecordValue(record, ['updatedAt', 'updated_at', 'createdAt', 'created_at'])
   const parsedTimestamp = rawTimestamp ? Date.parse(rawTimestamp) : Number.NaN
@@ -202,29 +196,6 @@ function PillarFieldRenderer({
   )
 }
 
-function PillarVersionCard({
-  pillar,
-  isSelected,
-  onClick,
-}: {
-  pillar: ContentPillarRecord
-  isSelected: boolean
-  onClick: (id: string) => void
-}) {
-  return (
-    <button
-      className={`persona-preview-block pillar-version-card${isSelected ? ' selected' : ''}`}
-      type="button"
-      onClick={() => pillar.id && onClick(pillar.id)}
-      disabled={!pillar.id}
-      data-pillar-id={pillar.id || ''}
-    >
-      <span>{pillar.name || 'Untitled pillar'}</span>
-      <strong>{formatUpdatedAt(pillar)}</strong>
-      <p>{pillar.name || 'Klik untuk memuat versi ini ke form edit.'}</p>
-    </button>
-  )
-}
 
 export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { isInitialSetup?: boolean; onSaved?: (pillar: ContentPillarRecord) => void }) {
   const { success: toastSuccess, error: toastError } = useToast()
@@ -240,6 +211,7 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
   const [isDeleting, setIsDeleting] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle')
+  const [tipsOpen, setTipsOpen] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -259,17 +231,19 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
         }
 
         setPersonaConfigs(personas)
-        setSavedPillars(sortContentPillarsDescending(pillars))
+        const sortedPillars = sortContentPillarsDescending(pillars)
+        setSavedPillars(sortedPillars)
 
         const defaultPersonaId =
-          personas.length === 1 ? getRecordValue(personas[0], ['id']) : ''
+          getRecordValue(personas[0] || null, ['id'])
 
         if (defaultPersonaId) {
           setSelectedPersonaConfigId(defaultPersonaId)
         }
 
-        if (pillars.length === 1 && pillars[0].id) {
-          const record = await getContentPillarById(pillars[0].id)
+        const firstPillar = sortedPillars[0]
+        if (firstPillar?.id) {
+          const record = await getContentPillarById(firstPillar.id)
 
           if (!isMounted) {
             return
@@ -474,7 +448,6 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
   const hasExistingRecord = Boolean(selectedPillar?.id)
   const isBusy = isLoadingList || isLoadingDetail || isLoadingPersonas
   const isFormLocked = isBusy || isSaving || isDeleting
-  const selectedPersona = personaConfigs.find((persona) => getRecordValue(persona, ['id']) === selectedPersonaConfigId)
   const visiblePillars = sortContentPillarsDescending(
     selectedPersonaConfigId
       ? savedPillars.filter((pillar) => pillar.personaConfigId === selectedPersonaConfigId)
@@ -482,14 +455,14 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
   )
 
   return (
-    <section className="persona-page">
-      <header className="page-header">
+    <section className="persona-page persona-config-page">
+      {isInitialSetup ? <header className="page-header">
         <p className="eyebrow">{isInitialSetup ? 'Content Brain · 2 of 2' : 'Content Brain'}</p>
         <h1>{isInitialSetup ? 'Kamu mau dikenal bahas apa?' : 'Content Pillars'}</h1>
         <p className="page-description">
           {isInitialSetup ? 'Tentukan topik utama yang akan menjadi arah kontenmu.' : 'Topik utama yang menjadi arah ide dan kontenmu.'}
         </p>
-      </header>
+      </header> : null}
 
       {statusMessage ? (
         <div className={`integration-note ${statusTone === 'error' ? 'integration-note-error' : ''}`}>
@@ -497,16 +470,14 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
         </div>
       ) : null}
 
-      <section className="persona-layout">
+      <section className="persona-layout pillar-simple-layout">
         <article className="panel persona-form-panel" data-tour-step={isInitialSetup ? 3 : undefined}>
           <div className="panel-heading">
             <div>
               <p className="eyebrow">alurin Pillar Builder</p>
               <h2>{hasExistingRecord ? 'Update content pillar' : 'Buat content pillar'}</h2>
             </div>
-            <span className={`pill${hasExistingRecord ? ' subtle' : ''}`}>
-              {hasExistingRecord ? 'Synced record' : 'First setup'}
-            </span>
+            <button className="builder-tips-button ghost-button" type="button" onClick={() => setTipsOpen(true)} aria-label="Buka tips content pillar">Tips <AppIcon name="info" /></button>
           </div>
 
           <label className="persona-field full-width">
@@ -531,6 +502,7 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
           </label>
 
           <form id="content-pillar-form" className="persona-form" onSubmit={handleSubmit}>
+            <label className="persona-field full-width"><span>Pilih Content Pillar</span><select value={selectedPillar?.id || ''} disabled={isFormLocked} onChange={(event) => { if (event.target.value) void handleSelectPillar(event.target.value) }}><option value="" disabled>Pillar baru</option>{visiblePillars.map((pillar) => <option key={pillar.id} value={pillar.id}>{pillar.name || 'Content Pillar'}</option>)}</select></label>
             {pillarFields.map((field) => (
               <PillarFieldRenderer
                 key={field.key}
@@ -573,81 +545,8 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
           </div>
         </article>
 
-        <aside className="persona-side-column">
-          <article className="panel persona-db-card">
-            <div className="panel-heading compact">
-              <div>
-                <p className="eyebrow">Saved Versions</p>
-                <h2>{selectedPersona ? getPersonaLabel(selectedPersona) : 'Pilih persona untuk lihat pillar'}</h2>
-              </div>
-              <span className={`status-badge ${hasExistingRecord ? 'ready' : 'draft'}`}>
-                {hasExistingRecord ? 'Synced' : 'Empty'}
-              </span>
-            </div>
-
-            <div className="pillar-rail-toolbar">
-              <p className="persona-db-time">
-                {visiblePillars.length
-                  ? `${visiblePillars.length} version tersimpan`
-                  : 'Belum ada version tersimpan'}
-              </p>
-            </div>
-
-            {!selectedPersonaConfigId ? (
-              <div className="persona-preview-block">
-                <p>Pilih persona dulu supaya form tahu pillar ini mau disimpan ke config yang mana.</p>
-              </div>
-            ) : visiblePillars.length ? (
-              <div className="pillar-version-list">
-                {visiblePillars.map((pillar) => (
-                  <PillarVersionCard
-                    key={pillar.id || pillar.name}
-                    pillar={pillar}
-                    isSelected={pillar.id === selectedPillar?.id}
-                    onClick={handleSelectPillar}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="persona-preview-block">
-                <p>
-                  {isLoadingList
-                    ? 'Memuat daftar content pillar...'
-                    : 'Belum ada content pillar untuk persona ini. Klik New Pillar untuk mulai dari kosong.'}
-                </p>
-              </div>
-            )}
-
-            <div className="persona-preview-block">
-              <span>Attached Persona</span>
-              <p>{selectedPersona ? getPersonaLabel(selectedPersona) : 'Belum dipilih'}</p>
-            </div>
-
-            <div className="persona-tag-list">
-              {/* {tags.length ? (
-                tags.map((tag) => (
-                  <span className="chip" key={tag}>
-                    {tag}
-                  </span>
-                ))
-              ) : (
-                <span className="chip">Klik versi lama atau isi field utama untuk melihat tags</span>
-              )} */}
-            </div>
-          </article>
-
-          {/* <article className="panel persona-guidance-card">
-            <p className="eyebrow">Flow</p>
-            <h2>Alur CRUD yang dipakai</h2>
-            <ul className="persona-tip-list">
-              <li>GET list dipakai untuk menampilkan semua versi content pillar.</li>
-              <li>Klik salah satu versi untuk memanggil GET by id dan mengisi form otomatis.</li>
-              <li>POST dipakai saat bikin record baru, PATCH dipakai saat edit record yang dipilih.</li>
-              <li>DELETE menghapus versi aktif dari daftar lalu form kembali kosong.</li>
-            </ul>
-          </article> */}
-        </aside>
       </section>
+      {tipsOpen ? <div className="content-bank-dialog-backdrop" onClick={() => setTipsOpen(false)}><section className="content-bank-dialog idea-upgrade-dialog" role="dialog" aria-modal="true" aria-labelledby="pillar-tips-title" onClick={(event) => event.stopPropagation()}><header><h2 id="pillar-tips-title">Tips content pillar</h2><button type="button" aria-label="Tutup tips" onClick={() => setTipsOpen(false)}><AppIcon name="close" /></button></header><ul className="persona-tip-list"><li>Pilih persona yang sesuai dengan audiens dan gaya kontenmu.</li><li>Gunakan satu tema utama yang jelas untuk setiap pillar.</li><li>Isi tujuan, audiens, dan pesan utama dengan contoh yang konkret.</li><li>Sesuaikan jenis thread dan ajakan bertindak dengan tujuan konten.</li></ul></section></div> : null}
     </section>
   )
 }

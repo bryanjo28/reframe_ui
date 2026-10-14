@@ -4,6 +4,8 @@ type AppIconProps = {
 
 export function AppIcon({ name }: AppIconProps) {
   switch (name) {
+    case 'bell':
+      return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a2 2 0 0 1 2 2v.35A6 6 0 0 1 18 10v5l2 2v1H4v-1l2-2v-5a6 6 0 0 1 4-5.65V4a2 2 0 0 1 2-2Zm0 4a4 4 0 0 0-4 4v5.8L6.8 17h10.4L16 15.8V10a4 4 0 0 0-4-4Zm-2 14h4a2 2 0 0 1-4 0Z" /></svg>
     case 'grid':
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">

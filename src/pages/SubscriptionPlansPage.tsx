@@ -99,65 +99,21 @@ function getPlanPriority(plan: NormalizedSubscriptionPlan) {
   return 99
 }
 
-function getPlanFeatures(plan: NormalizedSubscriptionPlan) {
+function getPlanHighlights(plan: NormalizedSubscriptionPlan) {
   const raw = plan.raw
-  const candidates = [
-    raw.features,
-    raw.benefits,
-    raw.included,
-    raw.includes,
-    raw.items,
-  ]
-
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate
-        .map((item) => (typeof item === 'string' ? item.trim() : ''))
-        .filter(Boolean)
-    }
-  }
-
-  const text = String(raw.features_text ?? raw.featureText ?? raw.feature_text ?? '').trim()
-
-  if (text) {
-    return text
-      .split(/\n|,/)
-      .map((item) => item.trim())
-      .filter(Boolean)
-  }
-
-  const maxThreads = readRawNumber(raw, ['max_threads_accounts', 'maxThreadsAccounts']) ?? 0
+  const personas = formatPlanCount(readRawNumber(raw, ['max_personas', 'maxPersonas']))
+  const pillars = formatPlanCount(readRawNumber(raw, ['max_content_pillars', 'maxContentPillars']))
+  const credits = formatPlanCount(readRawNumber(raw, ['monthly_ai_credits', 'monthlyAiCredits']))
+  const threads = readRawNumber(raw, ['max_threads_accounts', 'maxThreadsAccounts']) ?? 0
   const canSchedule = raw.can_schedule === true || raw.canSchedule === true
+
   return [
-    'Generate Topic, Content, dan Regenerate AI',
-    'Edit Content, Content List, dan Calendar',
-    maxThreads > 0 ? 'Connect Threads: 1 akun' : 'Connect Threads tidak tersedia',
-    canSchedule ? 'Schedule Post tanpa kuota bulanan' : 'Schedule Post tidak tersedia',
+    `${personas} Persona`,
+    `${pillars} Content Pillar`,
+    `${credits} AI Credits${plan.key.toLowerCase().includes('free') ? ' sekali daftar' : '/bulan'}`,
+    threads > 0 ? `${threads.toLocaleString('id-ID')} akun Threads` : 'Dengan koneksi Threads',
+    canSchedule ? 'Schedule Post' : 'Dengan Schedule Post',
   ]
-}
-
-function getPlanDetails(plan: NormalizedSubscriptionPlan) {
-  const raw = plan.raw
-  const details = [
-    {
-      label: 'Max personas',
-      value: formatPlanCount(readRawNumber(raw, ['max_personas', 'maxPersonas'])),
-    },
-    {
-      label: 'Max content pillars',
-      value: formatPlanCount(readRawNumber(raw, ['max_content_pillars', 'maxContentPillars'])),
-    },
-    {
-      label: plan.key.toLowerCase().includes('free') ? 'AI credits sekali daftar' : 'AI credits per bulan',
-      value: formatPlanCount(readRawNumber(raw, ['monthly_ai_credits', 'monthlyAiCredits'])),
-    },
-    {
-      label: 'Token allowance',
-      value: formatPlanCount(readRawNumber(raw, ['token_allowance', 'tokenAllowance']) ?? ((plan.monthlyAiCredits || 0) * 5000)),
-    },
-  ]
-
-  return details
 }
 
 function isCurrentPlan(plan: NormalizedSubscriptionPlan, current: NormalizedCurrentSubscription | null) {
@@ -181,8 +137,7 @@ function SubscriptionPlanCard({
 }) {
   const isOwned = isCurrentPlan(plan, currentSubscription)
   const tone = getPlanTone(plan)
-  const features = getPlanFeatures(plan)
-  const details = getPlanDetails(plan)
+  const highlights = getPlanHighlights(plan)
 
   return (
     <article className={`subscription-card tone-${tone}${isOwned ? ' owned' : ''}${plan.key.toLowerCase().includes('creator') ? ' recommended' : ''}`}>
@@ -198,47 +153,16 @@ function SubscriptionPlanCard({
         </div>
       </div>
 
-      <p className="subscription-description">
-        {plan.description || 'Paket aktif yang siap dipakai untuk workspace Anda.'}
-      </p>
-
-      <ul className="subscription-detail-list" aria-label={`Detail plan ${plan.name}`}>
-        {details.map((detail) => (
-          <li key={detail.label}>
+      <ul className="subscription-feature-list subscription-plan-highlights" aria-label={`Detail plan ${plan.name}`}>
+        {highlights.map((highlight) => (
+          <li key={highlight}>
             <AppIcon name="check" />
-            <span>
-              <strong>{detail.label}:</strong> {detail.value}
-            </span>
+            <span>{highlight}</span>
           </li>
         ))}
       </ul>
 
-      <ul className="subscription-feature-list">
-        {features.length ? (
-          features.slice(0, 4).map((feature) => (
-            <li key={feature}>
-              <AppIcon name="check" />
-              <span>{feature}</span>
-            </li>
-          ))
-        ) : (
-          <>
-            <li>
-              <AppIcon name="check" />
-              <span>Aktif untuk workspace ini</span>
-            </li>
-            <li>
-              <AppIcon name="check" />
-              <span>Dapat dipakai di dashboard</span>
-            </li>
-          </>
-        )}
-      </ul>
-
       <div className="subscription-card-footer">
-        <span className={`pill ${isOwned ? '' : 'subtle'}`}>
-          {isOwned ? 'Owned' : 'Available'}
-        </span>
         <button className="primary-button subscription-action" type="button" disabled={isOwned}>
           {isOwned ? 'Current Plan' : `Buy ${plan.name}`}
         </button>

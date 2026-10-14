@@ -76,7 +76,7 @@ it('uses auth me onboarding state to route a new user to first setup after login
 
   expect(await screen.findByRole('heading', { name: 'Biar alurin kenal kamu dulu 👋' })).toBeInTheDocument()
   await waitFor(() => expect(window.location.pathname).toBe('/first-setup'))
-  expect(authMeRequests).toBe(2)
+  expect(authMeRequests).toBe(1)
 })
 
 it('routes a registration requiring confirmation to check email without opening setup', async () => {

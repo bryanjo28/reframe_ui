@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import {
   getPaymentPage,
-  markPaymentNotificationRead,
   type PaymentPageData,
 } from '../services/payments'
 
@@ -11,10 +10,11 @@ type AiCreditsPageProps = {
   onViewPlans: () => void
 }
 
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(value),
-  )
+const formatDate = (value: string) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? 'Tanggal tidak tersedia' : new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}
+const formatAmount = (value: number | undefined) => typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('id-ID') : '—'
 
 export function AiCreditsPage({ onTopUp, onViewPlans }: AiCreditsPageProps) {
   const [data, setData] = useState<PaymentPageData | null>(null)
@@ -36,19 +36,6 @@ export function AiCreditsPage({ onTopUp, onViewPlans }: AiCreditsPageProps) {
     void load()
   }, [load])
 
-  async function readNotification(id: string) {
-    await markPaymentNotificationRead(id)
-    setData((current) =>
-      current
-        ? {
-            ...current,
-            notifications: current.notifications.map((item) =>
-              item.id === id ? { ...item, read_at: new Date().toISOString() } : item,
-            ),
-          }
-        : current,
-    )
-  }
 
   if (loading) {
     return (
@@ -61,7 +48,6 @@ export function AiCreditsPage({ onTopUp, onViewPlans }: AiCreditsPageProps) {
     )
   }
 
-  const unreadCount = data?.notifications.filter((item) => !item.read_at).length || 0
 
   return (
     <section className="payments-page ai-credits-page">
@@ -75,7 +61,7 @@ export function AiCreditsPage({ onTopUp, onViewPlans }: AiCreditsPageProps) {
         </div>
         <div className="payment-balance ai-credits-balance">
           <span>Total AI Credits</span>
-          <strong>{(data?.balance || 0).toLocaleString('id-ID')}</strong>
+          <strong>{formatAmount(data?.balance)}</strong>
           <small>
             Langganan {(data?.subscriptionBalance || 0).toLocaleString('id-ID')} · Top up{' '}
             {(data?.topUpBalance || 0).toLocaleString('id-ID')}
@@ -98,36 +84,19 @@ export function AiCreditsPage({ onTopUp, onViewPlans }: AiCreditsPageProps) {
         </button>
       </div>
 
-      <div className="payment-detail-grid">
-        <section className="payment-panel">
-          <div className="payment-panel-head"><h2>Notifikasi</h2><span>{unreadCount} baru</span></div>
-          {data?.notifications.length ? data.notifications.map((item) => (
-            <button
-              className={`payment-notification${item.read_at ? ' read' : ''}`}
-              key={item.id}
-              type="button"
-              onClick={() => void readNotification(item.id)}
-            >
-              <AppIcon name={item.type === 'payment_success' ? 'check' : 'info'} />
-              <span><strong>{item.title}</strong><small>{item.message}</small><time>{formatDate(item.created_at)}</time></span>
-            </button>
-          )) : <p className="payment-empty">Belum ada notifikasi pembayaran.</p>}
-        </section>
-
+      <div className="payment-detail-grid ai-credits-history-grid">
         <section className="payment-panel">
           <div className="payment-panel-head"><h2>Riwayat credits</h2></div>
           {data?.ledger.length ? data.ledger.map((item) => {
             const amount = item.credits_delta ?? item.amount ?? 0
             return (
               <div className="token-ledger-row" key={item.id}>
-                <div><strong>{item.description || item.transaction_type || item.kind}</strong><small>{formatDate(item.created_at)}</small></div>
+                <div><strong>{(item.description || item.transaction_type || item.kind || 'Transaksi credits').replaceAll('_', ' ')}</strong><small>{formatDate(item.created_at)}</small></div>
                 <span className={amount > 0 ? 'credit' : 'debit'}>{amount > 0 ? '+' : ''}{amount.toLocaleString('id-ID')}</span>
               </div>
             )
           }) : <p className="payment-empty">Belum ada transaksi credits.</p>}
         </section>
-      </div>
-
       <section className="payment-panel">
         <div className="payment-panel-head"><h2>Usage History</h2></div>
         {data?.usageHistory?.length ? data.usageHistory.map((item) => (
@@ -137,6 +106,7 @@ export function AiCreditsPage({ onTopUp, onViewPlans }: AiCreditsPageProps) {
           </div>
         )) : <p className="payment-empty">Belum ada penggunaan AI.</p>}
       </section>
+      </div>
     </section>
   )
 }

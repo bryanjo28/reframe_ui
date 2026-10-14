@@ -67,7 +67,8 @@ let authStateCache:
     }
   | null = null
 
-let authStateRequest: Promise<AuthMeState | null> | null = null
+let authSessionVersion = 0
+let authStateRequest: { token: string; version: number; promise: Promise<AuthMeState | null> } | null = null
 
 type ApiResponse = {
   success?: boolean
@@ -378,6 +379,9 @@ function getStoredAuthToken() {
 }
 
 function setStoredAuthToken(token?: string) {
+  authSessionVersion += 1
+  authStateCache = null
+  authStateRequest = null
   if (typeof localStorage === 'undefined') {
     return
   }
@@ -524,20 +528,24 @@ export async function getCurrentUser() {
 
 export async function getCurrentAuthState() {
   const token = getStoredAuthToken() || ''
+  if (!token) return null
+  const version = authSessionVersion
+  const isCurrentSession = () => version === authSessionVersion && token === getStoredAuthToken()
 
   if (authStateCache && authStateCache.token === token && authStateCache.expiresAt > Date.now()) {
     return authStateCache.value
   }
 
-  if (authStateRequest) {
-    return authStateRequest
+  if (authStateRequest?.token === token && authStateRequest.version === version) {
+    return authStateRequest.promise
   }
 
-  authStateRequest = (async () => {
+  const promise = (async () => {
   const response = await fetch(buildApiUrl('/api/auth/me'), {
     method: 'GET',
-    headers: buildRequestHeaders(),
+    headers: buildApiHeaders({ additionalHeaders: { Authorization: `Bearer ${token}` } }),
   })
+  if (!isCurrentSession()) return null
 
   if (response.status === 401) {
     authStateCache = {
@@ -555,6 +563,7 @@ export async function getCurrentAuthState() {
   }
 
   const data = (await response.json()) as ApiResponse
+  if (!isCurrentSession()) return null
 
   const normalizedState = normalizeAuthMeState(data)
 
@@ -565,12 +574,17 @@ export async function getCurrentAuthState() {
   }
 
   return normalizedState
-  })()
+  })().catch((error: unknown) => {
+    if (!isCurrentSession()) return null
+    throw error
+  })
+  const request = { token, version, promise }
+  authStateRequest = request
 
   try {
-    return await authStateRequest
+    return await promise
   } finally {
-    authStateRequest = null
+    if (authStateRequest === request) authStateRequest = null
   }
 }
 

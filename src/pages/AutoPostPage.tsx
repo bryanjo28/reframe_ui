@@ -138,7 +138,7 @@ export function AutoPostPage({ userId, threadsStatus, onConnectThreads, onReview
     }
   }
 
-  return <section className="generate-page auto-post-page schedule-workspace">
+  return <section className="generate-page auto-post-page schedule-workspace schedule-page">
     <header className="schedule-page-header"><div><h1>Jadwal</h1><p>Atur konten yang akan tayang dan kapan waktunya.</p></div></header>
     {!isThreadsConnected ? <div className="schedule-message error"><AppIcon name="info" /><span>{threadsStatus === 'needs_reconnect' ? 'Koneksi Threads telah kedaluwarsa. Hubungkan kembali akun Anda.' : 'Hubungkan Threads untuk membuat jadwal baru.'}</span><button className="schedule-text-button" onClick={onConnectThreads}>{threadsStatus === 'needs_reconnect' ? 'Hubungkan Ulang Threads' : 'Hubungkan Threads'}</button></div> : null}
     <nav className="schedule-main-tabs"><button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Kalender</button><button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>List <span>{scheduled.length}</span></button></nav>
