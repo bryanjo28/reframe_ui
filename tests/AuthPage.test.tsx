@@ -6,6 +6,15 @@ import { AuthPage } from '../src/pages/AuthPage'
 import * as authService from '../src/services/authService'
 
 describe('AuthPage', () => {
+  it('caps registration text fields before values can grow unexpectedly large', () => {
+    render(<AuthPage onAuthenticated={vi.fn()} initialMode="register" />)
+
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveAttribute('maxlength', '254')
+    expect(screen.getByRole('textbox', { name: 'Full Name' })).toHaveAttribute('maxlength', '100')
+    expect(screen.getByRole('textbox', { name: 'Username' })).toHaveAttribute('maxlength', '30')
+    expect(screen.getByLabelText('Password')).toHaveAttribute('maxlength', '128')
+  })
+
   it('submits full name and account name as separate registration fields', async () => {
     const user = userEvent.setup()
     const registerSpy = vi.spyOn(authService, 'register').mockResolvedValue({

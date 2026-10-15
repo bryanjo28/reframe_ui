@@ -254,6 +254,7 @@ export function Sidebar({
 
         <button type="button" className="menu-item" onClick={onReplayTutorial} title={isCollapsed ? 'Lihat Tutorial Lagi' : undefined} aria-label="Lihat Tutorial Lagi"><AppIcon name="sparkles" />{!isCollapsed ? <span>Lihat Tutorial Lagi</span> : null}</button>
         {!isCollapsed ? <label className="sidebar-language-setting"><span>Bahasa</span><select value={language} onChange={(event) => onLanguageChange(event.target.value as UiLanguage)}><option value="id">Indonesia</option><option value="en">Inggris</option></select></label> : null}
+        {currentUser?.role === 'admin' ? <button type="button" className="menu-item sidebar-admin-shortcut" onClick={() => onNavigate('admin')} title="Admin Dashboard" aria-label="Admin Dashboard"><AppIcon name="lock" />{!isCollapsed ? <span>Admin Dashboard</span> : null}</button> : null}
       </div>
 
       <div className="sidebar-bottom">

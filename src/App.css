@@ -7178,6 +7178,18 @@ body{background-color:#080609;background-image:radial-gradient(circle at 90% 0%,
   background: color-mix(in srgb, var(--brand-primary, #8d7bff) 15%, transparent);
 }
 
+.admin-logout-button {
+  margin-top: 12px;
+  border-top: 1px solid var(--border, rgba(255,255,255,.12));
+  color: #ed777e;
+}
+
+.sidebar-admin-shortcut {
+  font-size: 12px;
+  min-height: 32px;
+  padding: 7px 12px;
+}
+
 .admin-nav-item small,
 .admin-data-note-box p,
 .admin-data-note-box span,
@@ -7219,6 +7231,9 @@ body{background-color:#080609;background-image:radial-gradient(circle at 90% 0%,
 .admin-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
 .admin-table th, .admin-table td { padding: 11px 12px; border-bottom: 1px solid var(--border, rgba(255,255,255,.1)); vertical-align: top; white-space: nowrap; }
 .admin-table th { color: var(--text-secondary, #aaa8bb); font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; }
+.admin-sort-button { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.admin-sort-button span { font-size: 12px; }
+.admin-sort-button:focus-visible { outline: 2px solid var(--brand-primary, #8d7bff); outline-offset: 4px; }
 .admin-table tbody tr:last-child td { border-bottom: 0; }
 .admin-table-row-clickable { cursor: pointer; }
 .admin-table-row-clickable:hover, .admin-table-row-clickable:focus-visible { background: color-mix(in srgb, var(--brand-primary, #8d7bff) 9%, transparent); outline: none; }

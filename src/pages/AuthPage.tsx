@@ -248,6 +248,7 @@ export function AuthPage({
                 }}
                 placeholder="nama@email.com"
                 autoComplete="email"
+                maxLength={254}
                 aria-invalid={Boolean(fieldErrors.email)}
                 aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
                 required
@@ -271,6 +272,7 @@ export function AuthPage({
                   }}
                   placeholder="nama@email.com"
                   autoComplete="email"
+                  maxLength={254}
                   aria-invalid={Boolean(fieldErrors.email)}
                   aria-describedby={fieldErrors.email ? 'register-email-error' : undefined}
                   required
@@ -346,6 +348,7 @@ export function AuthPage({
                 placeholder="Masukkan password"
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
                 minLength={isLogin ? undefined : 8}
+                maxLength={128}
                 aria-invalid={Boolean(fieldErrors.password)}
                 aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                 required
@@ -375,6 +378,7 @@ export function AuthPage({
                   }}
                   placeholder="Masukkan ulang password"
                   autoComplete="new-password"
+                  maxLength={128}
                   aria-invalid={Boolean(fieldErrors.confirmPassword)}
                   aria-describedby={fieldErrors.confirmPassword ? 'confirm-password-error' : undefined}
                   required

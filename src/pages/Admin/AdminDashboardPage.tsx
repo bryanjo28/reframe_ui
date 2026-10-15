@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { AppIcon } from '../components/AppIcon'
-import { buildApiHeaders, buildApiUrl } from '../config/api'
-import { getCurrentAuthToken } from '../services/authService'
+import { AppIcon } from '../../components/AppIcon'
+import { buildApiHeaders, buildApiUrl } from '../../config/api'
+import { getCurrentAuthToken } from '../../services/authService'
 
 type AdminSection = 'overview' | 'users' | 'profitability' | 'transactions' | 'ai-usage' | 'scheduled-posts' | 'audit-logs' | 'error-logs'
 type AdminOverview = {
@@ -130,9 +130,22 @@ function value(row: AdminRow, key: string) {
   return typeof item === 'string' || typeof item === 'number' ? item : '—'
 }
 
-function AdminTable({ columns, rows, empty, onSelect }: { columns: Array<[string, string, (row: AdminRow) => ReactNode]>; rows: AdminRow[]; empty: string; onSelect?: (row: AdminRow) => void }) {
+function AdminTable({ columns, rows, empty, onSelect, sortableKeys = [] }: { columns: Array<[string, string, (row: AdminRow) => ReactNode]>; rows: AdminRow[]; empty: string; onSelect?: (row: AdminRow) => void; sortableKeys?: string[] }) {
+  const [sorting, setSorting] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null)
+  const sortedRows = sorting ? [...rows].sort((a, b) => {
+    const comparable = (row: AdminRow) => {
+      const raw = row[sorting.key]
+      if (raw == null || raw === '') return NaN
+      return sorting.key === 'estimatedCostIdr' ? Number(raw) : typeof raw === 'string' ? Date.parse(raw) : NaN
+    }
+    const left = comparable(a)
+    const right = comparable(b)
+    if (!Number.isFinite(left)) return Number.isFinite(right) ? 1 : 0
+    if (!Number.isFinite(right)) return -1
+    return (left - right) * (sorting.direction === 'ascending' ? 1 : -1)
+  }) : rows
   if (!rows.length) return <div className="panel admin-empty">{empty}</div>
-  return <div className="panel admin-table-wrap"><table className="admin-table"><thead><tr>{columns.map(([key, title]) => <th key={key} scope="col">{title}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id ?? row.requestId ?? index)} onClick={onSelect ? () => onSelect(row) : undefined} onKeyDown={onSelect ? (event) => { if (event.key === 'Enter') onSelect(row) } : undefined} tabIndex={onSelect ? 0 : undefined} className={onSelect ? 'admin-table-row-clickable' : undefined}>{columns.map(([key, , render]) => <td key={key}>{render(row)}</td>)}</tr>)}</tbody></table></div>
+  return <div className="panel admin-table-wrap"><table className="admin-table"><thead><tr>{columns.map(([key, title]) => <th key={key} scope="col" aria-sort={sortableKeys.includes(key) ? sorting?.key === key ? sorting.direction : 'none' : undefined}>{sortableKeys.includes(key) ? <button className="admin-sort-button" type="button" title="Urutkan data di halaman ini" onClick={() => setSorting((current) => ({ key, direction: current?.key === key && current.direction === 'descending' ? 'ascending' : 'descending' }))}>{title}<span aria-hidden="true">{sorting?.key === key ? sorting.direction === 'ascending' ? '↑' : '↓' : '↕'}</span></button> : title}</th>)}</tr></thead><tbody>{sortedRows.map((row, index) => <tr key={String(row.id ?? row.requestId ?? index)} onClick={onSelect ? () => onSelect(row) : undefined} onKeyDown={onSelect ? (event) => { if (event.key === 'Enter') onSelect(row) } : undefined} tabIndex={onSelect ? 0 : undefined} className={onSelect ? 'admin-table-row-clickable' : undefined}>{columns.map(([key, , render]) => <td key={key}>{render(row)}</td>)}</tr>)}</tbody></table></div>
 }
 
 function StatusBadge({ status }: { status: unknown }) {
@@ -162,7 +175,7 @@ function reportingWindow(days: number) {
   return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) }
 }
 
-export function AdminDashboardPage({ onBackToUser }: { onBackToUser: () => void }) {
+export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: () => void; onLogout: () => Promise<void> }) {
   const knownSections = sections.map(([key]) => key)
   const sectionFromPath = window.location.pathname.split('/')[2] as AdminSection | undefined
   const [section, setSection] = useState<AdminSection>(sectionFromPath && knownSections.includes(sectionFromPath) ? sectionFromPath : 'overview')
@@ -245,7 +258,8 @@ export function AdminDashboardPage({ onBackToUser }: { onBackToUser: () => void 
     ['estimated_margin_before_gateway_fees_pct', 'Est. margin*', (row) => row.estimated_margin_before_gateway_fees_pct == null ? 'N/A' : `${value(row, 'estimated_margin_before_gateway_fees_pct')}%`],
   ] : section === 'users' ? [
     ['user', 'User', (row) => <><strong>{value(row, 'name')}</strong><small>{value(row, 'accountName')}</small></>],
-    ['registeredAt', 'Registered', (row) => formatDate(row.registeredAt)],
+    ['created_at', 'Registered', (row) => formatDate(row.created_at)],
+    ['lastLoginAt', 'Last Login', (row) => formatDate(row.lastLoginAt)],
     ['plan', 'Plan', (row) => value(row, 'plan')],
     ['subscriptionStatus', 'Subscription', (row) => <StatusBadge status={row.subscriptionStatus} />],
     ['creditsAvailable', 'Credits left', (row) => formatNumber(row.creditsAvailable)],
@@ -293,6 +307,7 @@ export function AdminDashboardPage({ onBackToUser }: { onBackToUser: () => void 
       <div className="admin-layout">
         <nav className="panel admin-nav" aria-label="Admin modules">
           {sections.map(([key, label, description]) => <button key={key} type="button" className={`admin-nav-item${section === key ? ' active' : ''}`} onClick={() => setSection(key)} aria-current={section === key ? 'page' : undefined}><strong>{label}</strong><small>{description}</small></button>)}
+          <button type="button" className="admin-nav-item admin-logout-button" onClick={() => void onLogout()}><strong>Logout</strong></button>
         </nav>
         <div className="admin-main">
           <header className="admin-section-heading"><div><p className="eyebrow">Operations</p><h2>{sections.find(([key]) => key === section)?.[1]}</h2></div><button className="ghost-button" type="button" onClick={() => void load()} disabled={loading}>Muat ulang</button></header>
@@ -303,7 +318,7 @@ export function AdminDashboardPage({ onBackToUser }: { onBackToUser: () => void 
               <label><span>Paket</span><select value={plan} onChange={(event) => { setPage(1); setPlan(event.target.value) }}><option value="">Semua paket</option>{['free', 'starter', 'creator', 'pro'].map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
               <label><span>Urutkan</span><select value={sort} onChange={(event) => { setPage(1); setSort(event.target.value) }}>{[['highest_revenue','Revenue tertinggi'],['highest_ai_cost','Biaya AI tertinggi'],['highest_token_usage','Token tertinggi'],['highest_credit_usage','Kredit tertinggi'],['lowest_profit','Profit terendah'],['highest_profit','Profit tertinggi'],['negative_profit','Profit negatif']].map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
             </> : null}
-            {section !== 'users' && section !== 'profitability' ? <label><span>Status</span><select value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}><option value="">Semua status</option>{(section === 'transactions' ? ['pending', 'paid', 'failed', 'expired', 'cancelled', 'refunded'] : section === 'ai-usage' ? ['success', 'failed', 'estimated'] : section === 'error-logs' ? ['500', '502', '503', '504', '599'] : ['scheduled', 'processing', 'success', 'failed', 'uncertain', 'cancelled']).map((item) => <option key={item} value={item}>{item}</option>)}</select></label> : null}
+            {section !== 'users' && section !== 'profitability' ? <label><span>Status</span><select value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}><option value="">Semua status</option>{(section === 'transactions' ? ['pending', 'paid', 'failed', 'expired', 'cancelled', 'refunded'] : section === 'ai-usage' ? ['success', 'failed'] : section === 'error-logs' ? ['500', '502', '503', '504', '599'] : ['scheduled', 'processing', 'success', 'published', 'failed', 'uncertain', 'cancelled']).map((item) => <option key={item} value={item}>{item}</option>)}</select></label> : null}
             {section !== 'users' ? <><label><span>Dari</span><input type="date" value={from} onChange={(event) => { setPage(1); setFrom(event.target.value) }} /></label><label><span>Sampai</span><input type="date" value={to} onChange={(event) => { setPage(1); setTo(event.target.value) }} /></label></> : null}
           </div> : null}
 
@@ -318,7 +333,7 @@ export function AdminDashboardPage({ onBackToUser }: { onBackToUser: () => void 
           {section === 'profitability' && !loading && !error && list ? <p className="admin-data-note">* Kontribusi dihitung dari top-up tercatat dikurangi estimasi biaya AI IDR. Angka USD tersimpan dihitung memakai tarif internal yang belum diverifikasi terhadap tagihan provider; model SumoPod belum dikonfigurasi di environment backend saat audit. Pendapatan subscription, refund, biaya gateway, dan kurs historis tidak tersedia, jadi ini bukan profit total atau margin aktual.</p> : null}
           {!loading && !error && section === 'users' && selectedUserId && userDetail ? <UserDetailView detail={userDetail} onBack={() => { setSelectedUserId(''); setUserDetail(null) }} /> : null}
           {!loading && !error && section !== 'overview' && list && !(section === 'users' && selectedUserId) ? <>
-            <AdminTable columns={columns} rows={list.items} empty={section === 'error-logs' ? 'Belum ada error server yang tercatat.' : 'Belum ada data untuk filter ini.'} onSelect={section === 'users' ? openUser : undefined} />
+            <AdminTable key={section} columns={columns} rows={list.items} sortableKeys={section === 'users' ? ['created_at', 'lastLoginAt'] : section === 'ai-usage' ? ['estimatedCostIdr'] : section === 'scheduled-posts' ? ['scheduledAt'] : []} empty={section === 'error-logs' ? 'Belum ada error server yang tercatat.' : 'Belum ada data untuk filter ini.'} onSelect={section === 'users' ? openUser : undefined} />
             {list.truncated ? <p className="admin-data-note">Daftar users dibatasi pada 100.000 profil untuk menjaga penggunaan database.</p> : null}
             <div className="admin-pagination"><span>{formatNumber(list.total)} records</span><div><button className="ghost-button" type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>Sebelumnya</button><span>Halaman {page}</span><button className="ghost-button" type="button" onClick={() => setPage((current) => current + 1)} disabled={page * list.limit >= list.total}>Berikutnya</button></div></div>
           </> : null}

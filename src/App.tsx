@@ -32,7 +32,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { OnboardingTutorial } from './components/OnboardingTutorial'
 import { LegalPage } from './pages/LegalPage'
 import { LandingPage } from './pages/LandingPage'
-import { AdminDashboardPage } from './pages/AdminDashboardPage'
+import { AdminDashboardPage } from './pages/Admin/AdminDashboardPage'
 import { watchLanguage, type UiLanguage } from './utils/uiLanguage'
 import { reportError, SESSION_EXPIRED_EVENT, UPGRADE_PLAN_REQUIRED_EVENT } from './utils/apiError'
 import {
@@ -374,6 +374,7 @@ function AppShell() {
   }, [])
 
   function resetWorkspaceState() {
+    setShowAdminEntryChoice(false)
     setCurrentUser(null)
     setThreadsStatus('disconnected')
     setPersonaConfig(null)
@@ -562,12 +563,6 @@ function AppShell() {
       setPendingVerificationEmail('')
       clearStoredAuthHelperMessage()
       setAuthHelperMessage('')
-      if (window.location.pathname.startsWith('/admin') && authState.user.role === 'admin') {
-        setActivePage('admin')
-        setPersonaStatus('ready')
-        setShowAdminEntryChoice(false)
-        return
-      }
       const shouldOfferAdminEntry = authState.user.role === 'admin'
       setShowAdminEntryChoice(shouldOfferAdminEntry)
       if (window.location.pathname.startsWith('/admin')) {
@@ -710,7 +705,7 @@ function AppShell() {
       </main>
     )
   } else if (activePage === 'admin' && currentUser?.role === 'admin') {
-    content = <main className="content-area admin-content-area"><AdminDashboardPage onBackToUser={() => { setActivePage('dashboard'); replaceAppPath('/dashboard') }} /></main>
+    content = <main className="content-area admin-content-area"><AdminDashboardPage onBackToUser={() => { setActivePage('dashboard'); replaceAppPath('/dashboard') }} onLogout={handleLogout} /></main>
   } else if (personaStatus === 'loading' || personaStatus === 'idle') {
     content = (
       <div className="bootstrap-shell">

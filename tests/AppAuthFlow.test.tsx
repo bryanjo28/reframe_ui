@@ -13,6 +13,33 @@ beforeEach(() => {
   vi.restoreAllMocks()
 })
 
+it('offers the admin dashboard choice again after logout and login', async () => {
+  const user = userEvent.setup()
+  window.history.replaceState({}, '', '/admin')
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+    const pathname = new URL(input.toString()).pathname
+    const data = pathname === '/api/auth/login'
+      ? { user: { id: 'admin-1', role: 'admin' }, accessToken: 'admin-token' }
+      : pathname === '/api/auth/me'
+        ? { user: { id: 'admin-1', role: 'admin' }, onboarding: { hasPersona: false } }
+        : pathname === '/api/admin/overview'
+          ? { metrics: {}, generatedAt: new Date().toISOString() }
+          : []
+    return new Response(JSON.stringify({ data }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }))
+  render(<App />)
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await screen.findByRole('heading', { name: 'Login ke workspace kamu' })
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'admin@example.com')
+    await user.type(screen.getByLabelText('Password'), 'Password123')
+    await user.click(screen.getAllByRole('button', { name: 'Login' }).at(-1)!)
+    expect(await screen.findByRole('heading', { name: 'Mau masuk ke mana?' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Admin Dashboard/ }))
+    await user.click(await screen.findByRole('button', { name: 'Keluar' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+  }
+})
+
 it('uses auth me onboarding state to route a new user to first setup after login', async () => {
   const user = userEvent.setup()
   let authMeRequests = 0

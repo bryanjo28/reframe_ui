@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 import { Sidebar } from '../src/components/Sidebar'
@@ -9,6 +9,7 @@ afterEach(() => {
 })
 
 test('keeps theme selection in Settings and places Settings after Payments', () => {
+  const onNavigate = vi.fn()
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => new Response(JSON.stringify({ success: true, data: [] }), {
@@ -20,8 +21,8 @@ test('keeps theme selection in Settings and places Settings after Payments', () 
   render(
     <Sidebar
       activePage="dashboard"
-      onNavigate={vi.fn()}
-      currentUser={null}
+      onNavigate={onNavigate}
+      currentUser={{ id: 'admin-1', role: 'admin' }}
       onLogout={vi.fn()}
       isCollapsed={false}
       isMobile={false}
@@ -40,6 +41,10 @@ test('keeps theme selection in Settings and places Settings after Payments', () 
     const settings = screen.getByRole('button', { name: 'Settings' })
 
   expect(payments.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  const adminShortcut = screen.getByRole('button', { name: 'Admin Dashboard' })
+  expect(screen.getByRole('combobox', { name: 'Bahasa' }).compareDocumentPosition(adminShortcut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  fireEvent.click(adminShortcut)
+  expect(onNavigate).toHaveBeenCalledWith('admin')
 })
 
 test('shows current AI credit usage against the active plan allowance', async () => {
