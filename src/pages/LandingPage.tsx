@@ -113,6 +113,7 @@ export function LandingPage() {
         <button className="landing-menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="landing-navigation-links" aria-label={menuOpen ? 'Tutup menu' : 'Buka menu'} onClick={() => setMenuOpen((value) => !value)}><AppIcon name={menuOpen ? 'close' : 'menu'} /></button>
         <div id="landing-navigation-links" data-testid="landing-mobile-menu" data-state={menuOpen ? 'open' : 'closed'} className={`landing-nav-links${menuOpen ? ' open' : ''}`}>
           <a href="#fitur" onClick={() => setMenuOpen(false)}>Fitur</a><a href="#cara-kerja" onClick={() => setMenuOpen(false)}>Cara Kerja</a><a href="#harga" onClick={() => setMenuOpen(false)}>Harga</a><a href="#faq" onClick={() => setMenuOpen(false)}>FAQ</a>
+          <a className="landing-mobile-login" href="/login" onClick={() => setMenuOpen(false)}><AppIcon name="user" /><span>Login</span></a>
         </div>
         <div className="landing-nav-actions"><a href="/login">Login</a><MarketingButton href="/register">Mulai Gratis</MarketingButton></div>
       </nav>

@@ -6871,6 +6871,11 @@ select:not([multiple]):not([size]){appearance:none;padding-right:36px!important;
 
 /* Landing page dark mode */
 .landing-page{--landing-ink:#f8f6fa;--landing-copy:#b8afbc;--landing-soft:#0d0910;--landing-line:rgba(255,255,255,.10);color:var(--landing-ink);background:#080609}
+.landing-nav-links > .landing-mobile-login { display: none; }
+@media (max-width: 980px) {
+  .landing-nav-links > .landing-mobile-login { display: flex; align-items: center; gap: 10px; margin-top: 6px; border-top: 1px solid rgba(255,255,255,.1); }
+  .landing-mobile-login svg { width: 18px; height: 18px; fill: currentColor; }
+}
 .landing-nav{border-color:rgba(255,255,255,.08);background:rgba(8,6,9,.86)}
 .landing-page .alurin-brand-name{color:#fff}.landing-nav-links>a,.landing-nav-actions>a:first-child{color:#b8afbc}.landing-nav-links>a:hover,.landing-nav-actions>a:first-child:hover{color:#df9aff}.landing-menu-toggle svg{fill:#f8f6fa}
 .landing-button.secondary{color:#f8f6fa!important;border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.035)}.landing-button.secondary:hover{border-color:rgba(177,132,255,.45);background:rgba(177,132,255,.08)}
