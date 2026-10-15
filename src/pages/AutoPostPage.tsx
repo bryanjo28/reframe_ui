@@ -58,6 +58,7 @@ export function AutoPostPage({ userId, threadsStatus, onConnectThreads, onReview
   const [date, setDate] = useState(dateKey(today))
   const [time, setTime] = useState('18:00')
   const [saving, setSaving] = useState(false)
+  const [scheduleError, setScheduleError] = useState('')
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -78,12 +79,23 @@ export function AutoPostPage({ userId, threadsStatus, onConnectThreads, onReview
   const selectedContent = selectedContents[0] || null
 
   const isThreadsConnected = threadsStatus === 'connected'
-  function openNew(prefillDate?: string) { if (!isThreadsConnected) { onConnectThreads(); return } if (prefillDate) setDate(prefillDate); setEditing(null); setShowSchedule(true) }
-  function openEdit(record: ContentOutputRecord) { const parsed = parseDate(record); if (!parsed || isPosted(record)) return; setEditing(record); setDate(dateKey(parsed)); setTime(timeLabel(parsed)); setShowSchedule(true) }
+  function openNew(prefillDate?: string) { if (!isThreadsConnected) { onConnectThreads(); return } const next = new Date(Math.ceil((Date.now() + 5 * 60_000) / 60_000) * 60_000); setDate(prefillDate || dateKey(next)); setTime(timeLabel(next)); setScheduleError(''); setEditing(null); setShowSchedule(true) }
+  function openEdit(record: ContentOutputRecord) { const parsed = parseDate(record); if (!parsed || isPosted(record)) return; setScheduleError(''); setEditing(record); setDate(dateKey(parsed)); setTime(timeLabel(parsed)); setShowSchedule(true) }
   async function submit(event: FormEvent) {
     event.preventDefault()
+    if (saving) return
+    setScheduleError('')
     const iso = wibIso(date, time)
-    if ((!editing && !selectedContents.length) || !iso) return
+    if (!iso || !date || !time || dateKey(new Date(iso)) !== date || timeLabel(new Date(iso)) !== time) {
+      setScheduleError('Pilih tanggal dan waktu jadwal yang valid (WIB).')
+      return
+    }
+    if (new Date(iso).getTime() <= Date.now()) {
+      setScheduleError('Jadwal harus setelah waktu sekarang (WIB). Pilih waktu yang lebih akhir.')
+      return
+    }
+    if (!isThreadsConnected) { setScheduleError('Hubungkan kembali akun Threads sebelum menjadwalkan konten.'); return }
+    if (!editing && !selectedContents.length) { setScheduleError('Pilih konten yang ingin dijadwalkan.'); return }
     setSaving(true)
     try {
       if (editing) {
@@ -98,8 +110,12 @@ export function AutoPostPage({ userId, threadsStatus, onConnectThreads, onReview
         if (failedIds.length) {
           const firstFailure = results.find((result) => result.status === 'rejected')
           const action = getThreadsErrorAction(firstFailure?.status === 'rejected' ? firstFailure.reason : null)
-          error('Sebagian jadwal belum tersimpan', action.action === 'error' ? `${successCount} berhasil, ${failedIds.length} gagal. Coba lagi untuk konten yang masih terpilih.` : action.message)
+          const message = `${successCount} berhasil, ${failedIds.length} gagal. ${action.message}`
+          setScheduleError(message)
+          error('Jadwal belum tersimpan', message)
           if (action.action === 'reconnect' || action.action === 'connect') onConnectThreads()
+          await refresh()
+          return
         }
         else success(`${successCount} konten dijadwalkan`, `${time} WIB`)
       }
@@ -109,6 +125,7 @@ export function AutoPostPage({ userId, threadsStatus, onConnectThreads, onReview
       setMonth(new Date(`${date}T12:00:00`))
     } catch (cause) {
       const action = getThreadsErrorAction(cause)
+      setScheduleError(action.message)
       error('Jadwal belum tersimpan', action.message)
       if (action.action === 'reconnect' || action.action === 'connect') onConnectThreads()
     }
@@ -143,11 +160,11 @@ export function AutoPostPage({ userId, threadsStatus, onConnectThreads, onReview
     {!isThreadsConnected ? <div className="schedule-message error"><AppIcon name="info" /><span>{threadsStatus === 'needs_reconnect' ? 'Koneksi Threads telah kedaluwarsa. Hubungkan kembali akun Anda.' : 'Hubungkan Threads untuk membuat jadwal baru.'}</span><button className="schedule-text-button" onClick={onConnectThreads}>{threadsStatus === 'needs_reconnect' ? 'Hubungkan Ulang Threads' : 'Hubungkan Threads'}</button></div> : null}
     <nav className="schedule-main-tabs"><button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Kalender</button><button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>List <span>{scheduled.length}</span></button></nav>
 
-    <div className="schedule-content-workspace"><main>
+    <div className={`schedule-content-workspace${view === 'list' ? ' schedule-list-only' : ''}`}><main>
       {view === 'calendar' ? <><div className="schedule-calendar-toolbar"><div className="schedule-month-nav"><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>‹</button><h2>{monthLabel(month)}</h2><button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>›</button></div><button className="schedule-text-button" onClick={() => { setMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedDate(dateKey(today)) }}>Hari ini</button></div><div className="schedule-calendar"><div className="schedule-weekdays">{WEEKDAYS.map((day) => <span key={day}>{day}</span>)}</div><div className="schedule-month-grid">{cellsFor(month).map(({ key, date: cellDate }) => { if (!cellDate) return <span className="schedule-day blank" key={key} />; const keyDate = dateKey(cellDate); const events = grouped.get(keyDate) || []; return <button key={key} className={`schedule-day${selectedDate === keyDate ? ' selected' : ''}${dateKey(today) === keyDate ? ' today' : ''}`} onClick={() => setSelectedDate(keyDate)}><span className="day-number">{cellDate.getDate()}</span>{events.slice(0, 2).map(({ item, date: eventDate }) => <span className="calendar-event" key={outputId(item)} onClick={(event) => { event.stopPropagation(); openEdit(item) }}><b>{timeLabel(eventDate)}</b> {titleOf(item)}</span>)}{events.length > 2 ? <small>+{events.length - 2} lainnya</small> : null}{events.length ? <i className="schedule-dot" /> : null}</button> })}</div></div><section className="schedule-day-agenda"><div className="agenda-heading"><div><span>Agenda</span><h3>{dayLabel(new Date(`${selectedDate}T12:00:00`))}</h3></div></div>{selectedDay.length ? <div className="agenda-list">{selectedDay.map(({ item, date: itemDate }) => <article key={outputId(item)} onClick={() => openEdit(item)}><time>{timeLabel(itemDate)}</time><div><strong>{titleOf(item)}</strong><span>{personaFor(item)}</span></div><button className="schedule-row-menu" aria-label="Edit jadwal">•••</button></article>)}</div> : <div className="schedule-empty compact"><strong>Belum ada konten terjadwal.</strong></div>}</section></> : <div className="schedule-list-view">{scheduled.length ? scheduled.map(({ item, date: itemDate }, index) => { const heading = listGroup(itemDate, today); const previous = index ? listGroup(scheduled[index - 1].date, today) : ''; return <Fragment key={outputId(item)}>{heading !== previous ? <h3 className="schedule-list-group">{heading}</h3> : null}<article onClick={() => openEdit(item)}><time><b>{timeLabel(itemDate)}</b><span>WIB</span></time><div><strong>{titleOf(item)}</strong><span>{personaFor(item)}</span></div><button className="schedule-row-menu" aria-label="Edit jadwal">•••</button></article></Fragment> }) : <div className="schedule-empty"><strong>Belum ada konten terjadwal</strong><p>Konten yang kamu jadwalkan akan muncul di sini.</p></div>}</div>}
-    </main><aside className="schedule-unscheduled"><div className="schedule-ready-head"><div><h2>Belum dijadwalkan</h2><p>{ready.length} konten</p></div></div>{loading ? <div className="schedule-empty compact">Memuat konten...</div> : ready.length ? <div className="schedule-ready-list">{ready.map((item) => { const id = outputId(item); const active = selectedIds.includes(id); return <button className={active ? 'selected' : ''} key={id} onClick={() => setSelectedIds((current) => active ? current.filter((value) => value !== id) : [...current, id])}><span className="idea-check">{active ? '✓' : ''}</span><div><strong>{titleOf(item)}</strong><span>{personaFor(item)} · Siap</span></div></button> })}</div> : <div className="schedule-empty compact"><strong>Belum ada konten yang siap dijadwalkan</strong><p>Review dan approve konten terlebih dahulu.</p>{onReviewContent ? <button className="schedule-text-button" onClick={onReviewContent}>Review Konten</button> : null}</div>}{selectedContents.length ? <div className="schedule-ready-action"><span>{selectedContents.length} konten dipilih</span><button className="schedule-primary" onClick={() => openNew()}>Pilih waktu</button></div> : null}</aside></div>
+    </main>{view === 'calendar' ? <aside className="schedule-unscheduled"><div className="schedule-ready-head"><div><h2>Belum dijadwalkan</h2><p>{ready.length} konten</p></div></div>{loading ? <div className="schedule-empty compact">Memuat konten...</div> : ready.length ? <div className="schedule-ready-list">{ready.map((item) => { const id = outputId(item); const active = selectedIds.includes(id); return <button className={active ? 'selected' : ''} key={id} onClick={() => setSelectedIds((current) => active ? current.filter((value) => value !== id) : [...current, id])}><span className="idea-check">{active ? '✓' : ''}</span><div><strong>{titleOf(item)}</strong><span>{personaFor(item)} · Siap</span></div></button> })}</div> : <div className="schedule-empty compact"><strong>Belum ada konten yang siap dijadwalkan</strong><p>Review dan approve konten terlebih dahulu.</p>{onReviewContent ? <button className="schedule-text-button" onClick={onReviewContent}>Review Konten</button> : null}</div>}{selectedContents.length ? <div className="schedule-ready-action"><span>{selectedContents.length} konten dipilih</span><button className="schedule-primary" onClick={() => openNew()}>Pilih waktu</button></div> : null}</aside> : null}</div>
 
-    {showSchedule ? <div className="schedule-dialog-backdrop"><section className="schedule-dialog" role="dialog" aria-modal="true"><header><div><h2>{editing ? 'Edit jadwal' : 'Jadwalkan konten'}</h2><p>{editing ? titleOf(editing) : selectedContents.length > 1 ? `${selectedContents.length} konten terpilih` : titleOf(selectedContent!)}</p></div><button aria-label="Tutup" onClick={() => setShowSchedule(false)}>×</button></header><form onSubmit={submit}><div className="schedule-date-time"><label><span>Tanggal</span><input type="date" value={date} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(e) => setDate(e.target.value)} /></label><label><span>Waktu (WIB)</span><input type="time" value={time} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(e) => setTime(e.target.value)} /></label></div><div className="schedule-dialog-actions"><button className="ghost-button" type="button" onClick={() => setShowSchedule(false)}>Batal</button><button className="schedule-primary schedule-submit" disabled={saving}>{saving ? 'Menyimpan...' : editing ? 'Simpan' : `Jadwalkan ${selectedContents.length} konten`}</button></div>{editing && onReviewContent ? <button className="schedule-view-action" type="button" onClick={onReviewContent}>Lihat konten</button> : null}{editing ? <button className="schedule-cancel-action" type="button" onClick={() => { setShowSchedule(false); setCancelTarget(editing) }}>Batalkan jadwal</button> : null}</form></section></div> : null}
+    {showSchedule ? <div className="schedule-dialog-backdrop"><section className="schedule-dialog" role="dialog" aria-modal="true"><header><div><h2>{editing ? 'Edit jadwal' : 'Jadwalkan konten'}</h2><p>{editing ? titleOf(editing) : selectedContents.length > 1 ? `${selectedContents.length} konten terpilih` : titleOf(selectedContent!)}</p></div><button aria-label="Tutup" onClick={() => setShowSchedule(false)}>×</button></header><form onSubmit={submit} noValidate><div className="schedule-date-time"><label><span>Tanggal</span><input type="date" value={date} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(e) => setDate(e.target.value)} /></label><label><span>Waktu (WIB)</span><input type="time" value={time} onClick={(event) => event.currentTarget.showPicker?.()} onChange={(e) => setTime(e.target.value)} /></label></div>{scheduleError ? <p className="schedule-inline-warning" role="alert">{scheduleError}</p> : null}<div className="schedule-dialog-actions"><button className="ghost-button" type="button" onClick={() => setShowSchedule(false)}>Batal</button><button className="schedule-primary schedule-submit" disabled={saving}>{saving ? 'Menyimpan...' : editing ? 'Simpan' : `Jadwalkan ${selectedContents.length} konten`}</button></div>{editing && onReviewContent ? <button className="schedule-view-action" type="button" onClick={onReviewContent}>Lihat konten</button> : null}{editing ? <button className="schedule-cancel-action" type="button" onClick={() => { setShowSchedule(false); setCancelTarget(editing) }}>Batalkan jadwal</button> : null}</form></section></div> : null}
     {cancelTarget ? <div className="schedule-dialog-backdrop"><section className="schedule-dialog schedule-confirm" role="alertdialog"><header><div><h2>Batalkan jadwal?</h2><p>Konten tidak akan dihapus dan bisa dijadwalkan kembali.</p></div></header><div className="schedule-confirm-actions"><button className="ghost-button" onClick={() => setCancelTarget(null)}>Batal</button><button className="danger-button" disabled={saving} onClick={() => void cancelSchedule()}>{saving ? 'Membatalkan...' : 'Batalkan Jadwal'}</button></div></section></div> : null}
   </section>
 }

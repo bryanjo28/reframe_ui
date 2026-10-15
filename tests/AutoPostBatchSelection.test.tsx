@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 
@@ -49,6 +49,18 @@ test('sends one auto-post request per checked content without legacy batch field
   await user.click(screen.getByRole('button', { name: 'Pilih waktu' }))
   expect(screen.getByText('Waktu (WIB)')).toBeInTheDocument()
   expect(screen.queryByText('WIB', { selector: 'small' })).not.toBeInTheDocument()
+  const dateInput = screen.getByLabelText('Tanggal')
+  const timeInput = screen.getByLabelText('Waktu (WIB)')
+  const validDate = (dateInput as HTMLInputElement).value
+  const validTime = (timeInput as HTMLInputElement).value
+  fireEvent.change(dateInput, { target: { value: '2000-01-01' } })
+  fireEvent.change(timeInput, { target: { value: '12:00' } })
+  await user.click(screen.getByRole('button', { name: 'Jadwalkan 2 konten' }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Jadwal harus setelah waktu sekarang')
+  expect(requestBodies).toHaveLength(0)
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+  fireEvent.change(dateInput, { target: { value: validDate } })
+  fireEvent.change(timeInput, { target: { value: validTime } })
   await user.click(screen.getByRole('button', { name: 'Jadwalkan 2 konten' }))
 
   await waitFor(() => expect(requestBodies).toHaveLength(2))
