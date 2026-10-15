@@ -82,6 +82,57 @@ const APP_THEME_STORAGE_KEY = 'alurin.appTheme'
 const TUTORIAL_STORAGE_KEY = 'alurin:onboarding:tutorialCompleted'
 const LANGUAGE_STORAGE_KEY = 'alurin.uiLanguage'
 const AUTH_HELPER_STORAGE_KEY = 'alurin.authHelperMessage'
+const APP_HISTORY_MARKER = 'alurin-workspace'
+
+type AppHistoryState = {
+  app?: string
+  page?: NavKey
+  boundary?: boolean
+}
+
+function getPagePath(page: NavKey) {
+  return page === 'admin' ? '/admin' : '/dashboard'
+}
+
+function isNavKey(value: unknown): value is NavKey {
+  return typeof value === 'string' && [
+    'dashboard', 'create', 'content-bank', 'personalize', 'create-persona-chat',
+    'create-persona', 'content-pillar', 'generate-topic', 'content-engine',
+    'manual-post', 'auto-post', 'subscription-plans', 'ai-credits', 'payments',
+    'connecting-apps', 'settings', 'admin',
+  ].includes(value)
+}
+
+function establishWorkspaceHistory(page: NavKey) {
+  const currentState = window.history.state as AppHistoryState | null
+  const path = getPagePath(page)
+
+  if (currentState?.app === APP_HISTORY_MARKER) {
+    window.history.replaceState({ ...currentState, page }, document.title, path)
+    return
+  }
+
+  window.history.replaceState(
+    { app: APP_HISTORY_MARKER, page: 'dashboard', boundary: true },
+    document.title,
+    '/dashboard',
+  )
+  window.history.pushState({ app: APP_HISTORY_MARKER, page }, document.title, path)
+}
+
+function pushWorkspaceHistory(page: NavKey) {
+  const currentState = window.history.state as AppHistoryState | null
+  if (currentState?.app !== APP_HISTORY_MARKER) {
+    establishWorkspaceHistory(page)
+    return
+  }
+
+  window.history.pushState(
+    { app: APP_HISTORY_MARKER, page },
+    document.title,
+    getPagePath(page),
+  )
+}
 
 function takeStoredAuthHelperMessage() {
   if (typeof sessionStorage === 'undefined') return ''
@@ -152,7 +203,8 @@ function getStoredActivePage(): NavKey {
     value === 'subscription-plans' ||
     value === 'ai-credits' ||
     value === 'payments' ||
-    value === 'connecting-apps'
+    value === 'connecting-apps' ||
+    value === 'settings'
   ) {
     return value
   }
@@ -417,6 +469,7 @@ function AppShell() {
         if (user.role === 'admin') {
           setActivePage('admin')
           setPersonaStatus('ready')
+          establishWorkspaceHistory('admin')
           return
         }
         setActivePage('dashboard')
@@ -435,8 +488,11 @@ function AppShell() {
       if (runId === bootstrapRunIdRef.current) {
         if (!config) {
           replaceAppPath('/first-setup')
-      } else if (window.location.pathname !== '/connecting-apps' && !window.location.pathname.startsWith('/admin')) {
+        } else if (window.location.pathname !== '/connecting-apps' && !window.location.pathname.startsWith('/admin')) {
           replaceAppPath('/dashboard')
+          establishWorkspaceHistory(getStoredActivePage())
+        } else if (window.location.pathname === '/connecting-apps') {
+          establishWorkspaceHistory('connecting-apps')
         }
       }
     } catch (error) {
@@ -462,6 +518,36 @@ function AppShell() {
   useEffect(() => {
     setStoredActivePage(activePage)
   }, [activePage])
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated') {
+      return
+    }
+
+    const handleWorkspaceBack = (event: PopStateEvent) => {
+      const state = event.state as AppHistoryState | null
+
+      if (state?.app !== APP_HISTORY_MARKER) {
+        establishWorkspaceHistory('dashboard')
+        setActivePage('dashboard')
+        return
+      }
+
+      const page = isNavKey(state.page) ? state.page : 'dashboard'
+      setActivePage(page)
+
+      if (state.boundary) {
+        window.history.pushState(
+          { app: APP_HISTORY_MARKER, page: 'dashboard' },
+          document.title,
+          '/dashboard',
+        )
+      }
+    }
+
+    window.addEventListener('popstate', handleWorkspaceBack)
+    return () => window.removeEventListener('popstate', handleWorkspaceBack)
+  }, [authStatus])
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -585,6 +671,7 @@ function AppShell() {
           setPersonaStatus('ready')
         } else {
           replaceAppPath(config ? '/dashboard' : '/first-setup')
+          if (config) establishWorkspaceHistory('dashboard')
         }
       }
     } catch (error) {
@@ -614,19 +701,20 @@ function AppShell() {
   function handlePersonalizePersonaSaved(nextConfig: PersonaConfigRecord) {
     setPersonaConfig(nextConfig)
     setActivePage('content-pillar')
-    replaceAppPath('/dashboard')
+    pushWorkspaceHistory('content-pillar')
   }
 
   const handleNavigate = useCallback((page: NavKey) => {
+    if (page !== activePage) {
+      pushWorkspaceHistory(page)
+    }
     setActivePage(page)
-    if (page === 'admin') replaceAppPath('/admin')
-    else if (window.location.pathname === '/admin') replaceAppPath('/dashboard')
 
     if (isSidebarMobile) {
       setIsSidebarOpen(false)
       setIsMoreOpen(false)
     }
-  }, [isSidebarMobile])
+  }, [activePage, isSidebarMobile])
 
   let content: ReactNode
 
@@ -690,12 +778,12 @@ function AppShell() {
           <h1 id="admin-entry-title">Mau masuk ke mana?</h1>
           <p className="admin-entry-description">Pilih dashboard yang ingin kamu buka. Kamu bisa berpindah kapan saja.</p>
           <div className="admin-entry-options">
-            <button className="admin-entry-option" type="button" onClick={() => { setShowAdminEntryChoice(false); setActivePage('dashboard'); replaceAppPath(personaConfig ? '/dashboard' : '/first-setup') }}>
+            <button className="admin-entry-option" type="button" onClick={() => { setShowAdminEntryChoice(false); setActivePage('dashboard'); if (personaConfig) establishWorkspaceHistory('dashboard'); else replaceAppPath('/first-setup') }}>
               <span className="admin-entry-option-icon" aria-hidden="true">⌂</span>
               <span><strong>Dashboard Pengguna</strong><small>Buat konten dan kelola workspace kamu</small></span>
               <span className="admin-entry-arrow" aria-hidden="true">→</span>
             </button>
-            <button className="admin-entry-option admin-entry-option-primary" type="button" onClick={() => { setShowAdminEntryChoice(false); setActivePage('admin'); setPersonaStatus('ready'); replaceAppPath('/admin') }}>
+            <button className="admin-entry-option admin-entry-option-primary" type="button" onClick={() => { setShowAdminEntryChoice(false); setActivePage('admin'); setPersonaStatus('ready'); establishWorkspaceHistory('admin') }}>
               <span className="admin-entry-option-icon" aria-hidden="true">▦</span>
               <span><strong>Admin Dashboard</strong><small>Kelola pengguna, paket, dan aktivitas</small></span>
               <span className="admin-entry-arrow" aria-hidden="true">→</span>
@@ -797,7 +885,7 @@ function AppShell() {
                 setThreadsStatus(status)
               }} />
             ) : activePage === 'settings' ? (
-              <SettingsPage user={currentUser} language={language} onLanguageChange={setLanguage} theme={theme} onThemeChange={setTheme} onReplayTutorial={() => setShowTutorial(true)} onLogout={handleLogout} />
+              <SettingsPage user={currentUser} language={language} onLanguageChange={setLanguage} theme={theme} onThemeChange={setTheme} onReplayTutorial={() => setShowTutorial(true)} onLogout={handleLogout} onNavigate={handleNavigate} />
               ) : (
                 <DashboardPage activePage={activePage} userId={currentUser?.id || ''} onNavigate={handleNavigate} threadsStatus={threadsStatus} />
               )}

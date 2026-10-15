@@ -23,6 +23,10 @@ export type GenerateContentTopicsPayload = {
   templateId?: string
 }
 
+export type UpdateContentTopicPayload = {
+  topic: string
+}
+
 export type ContentTopicRecord = Partial<ContentTopicPayload> & {
   id?: string
   userId?: string
@@ -200,6 +204,30 @@ export async function createContentTopic(payload: ContentTopicPayload) {
   }
 
   return normalizeRecord(item)
+}
+
+export async function updateContentTopic(id: string, payload: UpdateContentTopicPayload) {
+  const response = await fetch(buildApiUrl(`${CONTENT_TOPICS_ENDPOINT}/${id}`), {
+    method: 'PATCH',
+    headers: buildHeaders(true),
+    body: JSON.stringify({ topic: payload.topic }),
+  })
+
+  const contentType = response.headers.get('content-type') || ''
+  const data = contentType.includes('application/json')
+    ? ((await response.json()) as ContentTopicItemResponse)
+    : await response.text()
+
+  if (!response.ok) {
+    throw createApiResponseError(response.status, data)
+  }
+
+  if (typeof data === 'string') {
+    return normalizeRecord({ id, topic: payload.topic })
+  }
+
+  const item = unwrapItemResponse(data)
+  return normalizeRecord(item || { id, topic: payload.topic })
 }
 
 export async function generateContentTopics(payload: GenerateContentTopicsPayload) {

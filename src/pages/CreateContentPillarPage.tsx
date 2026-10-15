@@ -30,14 +30,6 @@ const pillarFields: PillarField[] = [
     label: 'Nama Content Pillar',
     placeholder: 'Contoh: Educational Threads Funnel',
   },
-  // {
-  //   key: 'threadType',
-  //   label: 'Thread Type',
-  //   options: [
-  //     { value: 'short', label: 'Short' },
-  //     { value: 'long', label: 'Long' },
-  //   ],
-  // },
   {
     key: 'templateContent',
     label: 'Template Content',
@@ -54,17 +46,6 @@ const pillarFields: PillarField[] = [
     key: 'audienceSegment',
     label: 'Audience Segment',
     placeholder: 'Contoh: Creator dan affiliate marketer yang ingin jualan lebih halus',
-  },
-  {
-    key: 'keyMessage',
-    label: 'Key Message',
-    placeholder: 'Contoh: Konten edukasi tetap bisa mendorong action tanpa terasa hard sell',
-    multiline: true,
-  },
-  {
-    key: 'ctaDirection',
-    label: 'CTA Direction',
-    placeholder: 'Contoh: Ajak reply, follow, atau klik link jika butuh resource lanjutan',
   },
   {
     key: 'affiliateLink',

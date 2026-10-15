@@ -22,10 +22,9 @@ const primary: Array<{ key: NavKey; label: string; icon: string }> = [
 
 const secondary: Array<{ key: NavKey; label: string; icon: string }> = [
   { key: 'personalize', label: 'Persona & Pillar', icon: 'user' },
-  { key: 'connecting-apps', label: 'Connected Accounts', icon: 'link' },
-  { key: 'subscription-plans', label: 'Subscription', icon: 'calendar' },
-  { key: 'ai-credits', label: 'AI Credits', icon: 'sparkles' },
 ]
+
+const settingsPages: NavKey[] = ['settings', 'connecting-apps', 'subscription-plans', 'ai-credits', 'payments']
 
 const createFlowPages: NavKey[] = ['create', 'generate-topic', 'content-engine', 'manual-post']
 
@@ -58,7 +57,7 @@ export function MobileNavigation(props: Props) {
             <AppIcon name={item.icon} /><span>{item.label}</span>
           </button>
         ))}
-        <button type="button" className={props.isMoreOpen || props.activePage === 'settings' || secondary.some((item) => item.key === props.activePage) ? 'active' : ''} onClick={props.onToggleMore}>
+        <button type="button" className={props.isMoreOpen || settingsPages.includes(props.activePage) || secondary.some((item) => item.key === props.activePage) ? 'active' : ''} onClick={props.onToggleMore}>
           <AppIcon name="menu" /><span>More</span>
         </button>
       </nav>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import type { AuthUser } from '../services/authService'
-import type { AppTheme } from '../types/navigation'
+import type { AppTheme, NavKey } from '../types/navigation'
 import type { UiLanguage } from '../utils/uiLanguage'
 import { withCurrentBrand } from '../utils/brand'
 
@@ -15,6 +15,7 @@ type Props = {
   onThemeChange: (theme: AppTheme) => void
   onReplayTutorial: () => void
   onLogout: () => void
+  onNavigate: (page: NavKey) => void
 }
 
 function displayName(user: AuthUser | null) {
@@ -29,7 +30,7 @@ function SettingsRow({ icon, title, description, value, onClick }: { icon: strin
   return <button className="settings-row" type="button" onClick={onClick}><span className="settings-row-icon"><AppIcon name={icon} /></span><span className="settings-row-copy"><strong>{title}</strong><small>{description}</small></span>{value ? <span className="settings-row-value">{value}</span> : null}<AppIcon name="chevron-right" /></button>
 }
 
-export function SettingsPage({ user, language, onLanguageChange, theme, onThemeChange, onReplayTutorial, onLogout }: Props) {
+export function SettingsPage({ user, language, onLanguageChange, theme, onThemeChange, onReplayTutorial, onLogout, onNavigate }: Props) {
   const [detail, setDetail] = useState<Detail>(null)
   const name = displayName(user)
   const notificationStatus = typeof Notification === 'undefined' ? 'Tidak tersedia' : Notification.permission === 'granted' ? 'Diizinkan' : Notification.permission === 'denied' ? 'Diblokir' : 'Belum diatur'
@@ -48,6 +49,7 @@ export function SettingsPage({ user, language, onLanguageChange, theme, onThemeC
   return <div className="settings-page">
     <header className="settings-page-header"><p className="eyebrow">Akun & aplikasi</p><h1>Pengaturan</h1><p>Kelola akun, preferensi, privasi, dan bantuan dari satu tempat.</p></header>
     <button className="settings-profile-card" type="button" onClick={() => setDetail('profile')}><span className="profile-avatar">{initials(name)}</span><span><strong>{name}</strong><small>{user?.email || 'Email tidak tersedia'}</small><em>Lihat profil</em></span><AppIcon name="chevron-right" /></button>
+    <section className="settings-group"><h2>Akun & langganan</h2><div className="settings-surface"><SettingsRow icon="link" title="Akun Terhubung" description="Kelola koneksi Threads dan akun sosial" onClick={() => onNavigate('connecting-apps')} /><SettingsRow icon="calendar" title="Langganan" description="Lihat paket dan manfaat langganan" onClick={() => onNavigate('subscription-plans')} /><SettingsRow icon="sparkles" title="AI Credits" description="Cek saldo, pemakaian, dan tambah credits" onClick={() => onNavigate('ai-credits')} /></div></section>
     <section className="settings-group"><h2>Preferensi</h2><div className="settings-surface"><div className="settings-control"><span className="settings-row-icon"><AppIcon name="menu" /></span><span><strong>Bahasa</strong><small>Bahasa antarmuka aplikasi</small></span><select value={language} onChange={(event) => onLanguageChange(event.target.value as UiLanguage)}><option value="id">Indonesia</option><option value="en">English</option></select></div><div className="settings-control"><span className="settings-row-icon"><AppIcon name="sun" /></span><span><strong>Tampilan</strong><small>Pilih tema yang nyaman digunakan</small></span><select value={theme} onChange={(event) => onThemeChange(event.target.value as AppTheme)}><option value="dark">Dark</option><option value="light">Light</option></select></div><SettingsRow icon="info" title="Device Permissions" description="Izin notifikasi dan perangkat" value={notificationStatus} onClick={() => setDetail('permissions')} /></div></section>
     <section className="settings-group"><h2>Bantuan & privasi</h2><div className="settings-surface"><SettingsRow icon="sparkles" title="Help Center" description="Tutorial, bantuan, dan dukungan" onClick={() => setDetail('help')} /><SettingsRow icon="lock" title="Privacy Center" description="Data, keamanan, dan kontrol privasi" onClick={() => setDetail('privacy')} /></div></section>
     <section className="settings-group"><h2>Informasi</h2><div className="settings-surface"><SettingsRow icon="info" title="Tentang alurin" description="Privacy Policy, Terms, source, dan versi" onClick={() => setDetail('about')} /></div></section>

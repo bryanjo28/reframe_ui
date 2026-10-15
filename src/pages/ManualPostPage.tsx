@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import { dismissModal } from '../utils/modalAnimation'
@@ -7,6 +7,7 @@ import { createContentOutput } from '../services/contentOutputs'
 import {
   getContentTopicById,
   listContentTopics,
+  updateContentTopic,
   type ContentTopicRecord,
 } from '../services/contentTopics'
 
@@ -71,6 +72,9 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [isTopicPickerOpen, setIsTopicPickerOpen] = useState(false)
+  const [editingTopic, setEditingTopic] = useState<ContentTopicRecord | null>(null)
+  const [editingTopicName, setEditingTopicName] = useState('')
+  const [isSavingTopic, setIsSavingTopic] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [, setIsLoadingDetail] = useState(false)
@@ -168,6 +172,33 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
     () => filteredTopics.find((topic) => topic.id === selectedTopicId) || detailTopic || null,
     [detailTopic, filteredTopics, selectedTopicId],
   )
+
+  function openTopicEditor(topic: ContentTopicRecord) {
+    if (!topic.id) return
+    setEditingTopic(topic)
+    setEditingTopicName(getTopicTitle(topic))
+  }
+
+  async function saveTopicName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const topicId = editingTopic?.id
+    const nextName = editingTopicName.trim()
+    if (!topicId || !nextName || isSavingTopic) return
+
+    setIsSavingTopic(true)
+    try {
+      const updated = await updateContentTopic(topicId, { topic: nextName })
+      setTopics((current) => current.map((topic) => topic.id === topicId ? { ...topic, ...updated, topic: nextName } : topic))
+      if (detailTopic?.id === topicId) setDetailTopic((current) => current ? { ...current, ...updated, topic: nextName } : current)
+      setEditingTopic(null)
+      setEditingTopicName('')
+      toastSuccess('Topic diperbarui', 'Nama topic berhasil disimpan.')
+    } catch (error) {
+      toastError('Topic belum tersimpan', error instanceof Error ? error.message : 'Gagal memperbarui nama topic.')
+    } finally {
+      setIsSavingTopic(false)
+    }
+  }
 
   useEffect(() => {
     if (!selectedTopic) {
@@ -337,12 +368,13 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
                 <tr>
                   <th>Topic</th>
                   <th>Category</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={2} className="table-empty-cell">
+                    <td colSpan={3} className="table-empty-cell">
                       <div className="generate-empty-state">
                         <AppIcon name="info" />
                         <div>
@@ -362,6 +394,7 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
                           <button
                             className="table-link-button"
                             type="button"
+                            title={getTopicTitle(topic)}
                             onClick={() => topic.id && selectTopicFromTable(topic.id)}
                           >
                             {getTopicTitle(topic)}
@@ -370,12 +403,17 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
                         <td>
                           <span className="status-badge draft">{getTopicCategory(topic)}</span>
                         </td>
+                        <td className="topic-table-action-cell">
+                          <button type="button" className="content-topic-edit-button" onClick={() => openTopicEditor(topic)} aria-label={`Edit topic ${getTopicTitle(topic)}`} disabled={!topic.id}>
+                            <AppIcon name="pencil" />
+                          </button>
+                        </td>
                       </tr>
                     )
                   })
                 ) : (
                   <tr>
-                    <td colSpan={2} className="table-empty-cell">
+                    <td colSpan={3} className="table-empty-cell">
                       <div className="generate-empty-state">
                         <AppIcon name="layers" />
                         <div>
@@ -519,6 +557,15 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
         </aside>
       </section>
 
+      {editingTopic ? (
+        <div className="schedule-dialog-backdrop topic-edit-dialog-backdrop" onClick={() => { if (!isSavingTopic) setEditingTopic(null) }}>
+          <section className="schedule-dialog topic-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-topic-edit-title" onClick={(event) => event.stopPropagation()}>
+            <header><div><h2 id="manual-topic-edit-title">Edit nama topic</h2><p>Ubah nama topic yang dipilih.</p></div><button type="button" aria-label="Tutup" disabled={isSavingTopic} onClick={() => setEditingTopic(null)}>×</button></header>
+            <form onSubmit={saveTopicName}><label><span>Nama topic</span><input autoFocus value={editingTopicName} onChange={(event) => setEditingTopicName(event.target.value)} placeholder="Masukkan nama topic" /></label><div className="schedule-dialog-actions"><button className="ghost-button" type="button" disabled={isSavingTopic} onClick={() => setEditingTopic(null)}>Batal</button><button className="schedule-primary schedule-submit" type="submit" disabled={!editingTopicName.trim() || isSavingTopic}>{isSavingTopic ? 'Menyimpan...' : 'Simpan'}</button></div></form>
+          </section>
+        </div>
+      ) : null}
+
       {isTopicPickerOpen ? (
         <div className="topic-picker-backdrop" onClick={(event) => dismissModal(() => setIsTopicPickerOpen(false), event.currentTarget)}>
           <section className="topic-picker-sheet" role="dialog" aria-modal="true" aria-label="Pilih topic" onClick={(event) => event.stopPropagation()}>
@@ -543,10 +590,12 @@ export function ManualPostPage({ userId, onBackToContentEngine, embedded = false
             </div>
             <div className="topic-picker-list">
               {paginatedTopics.map((topic) => (
-                <button key={topic.id || getTopicTitle(topic)} type="button" className={topic.id === selectedTopicId ? 'selected' : ''} aria-label={`Pilih ${getTopicTitle(topic)}`} onClick={() => topic.id && selectTopicFromTable(topic.id)}>
-                  <span className="status-badge draft">{getTopicCategory(topic)}</span>
-                  <strong>{getTopicTitle(topic)}</strong>
-                </button>
+                <div key={topic.id || getTopicTitle(topic)} className={`topic-picker-item${topic.id === selectedTopicId ? ' selected' : ''}`}>
+                  <button type="button" className="topic-picker-select" aria-label={`Pilih ${getTopicTitle(topic)}`} onClick={() => topic.id && selectTopicFromTable(topic.id)}>
+                    <span className="status-badge draft">{getTopicCategory(topic)}</span><strong>{getTopicTitle(topic)}</strong>
+                  </button>
+                  <button type="button" className="content-topic-edit-button" aria-label={`Edit topic ${getTopicTitle(topic)}`} onClick={() => openTopicEditor(topic)} disabled={!topic.id}><AppIcon name="pencil" /></button>
+                </div>
               ))}
             </div>
             {filteredTopics.length > topicsPerPage ? (

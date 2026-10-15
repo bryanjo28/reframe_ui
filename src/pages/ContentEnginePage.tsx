@@ -13,7 +13,7 @@ import {
   type ContentOutputRecord,
 } from '../services/contentOutputs'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
-import { listContentTopics, type ContentTopicRecord } from '../services/contentTopics'
+import { listContentTopics, updateContentTopic, type ContentTopicRecord } from '../services/contentTopics'
 import { ManualPostPage } from './ManualPostPage'
 
 type ContentEnginePageProps = {
@@ -335,6 +335,9 @@ export function ContentEnginePage({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [contentTopics, setContentTopics] = useState<ContentTopicRecord[]>([])
   const [isLoadingTopics, setIsLoadingTopics] = useState(true)
+  const [editingTopic, setEditingTopic] = useState<ContentTopicRecord | null>(null)
+  const [editingTopicName, setEditingTopicName] = useState('')
+  const [isSavingTopic, setIsSavingTopic] = useState(false)
   const [contentOutputs, setContentOutputs] = useState<ContentOutputRecord[]>([])
   const [selectedOutputId, setSelectedOutputId] = useState('')
   const [isOutputEditorOpen, setIsOutputEditorOpen] = useState(false)
@@ -844,6 +847,34 @@ export function ContentEnginePage({
     }
   }
 
+  function openTopicEditor(topic: ContentTopicRecord) {
+    if (!topic.id) return
+    setEditingTopic(topic)
+    setEditingTopicName(getTopicLabel(topic))
+  }
+
+  async function handleSaveTopic(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const topicId = editingTopic?.id
+    const nextName = editingTopicName.trim()
+    if (!topicId || !nextName || isSavingTopic) return
+
+    setIsSavingTopic(true)
+    try {
+      const updatedTopic = await updateContentTopic(topicId, { topic: nextName })
+      setContentTopics((current) => current.map((topic) => (
+        topic.id === topicId ? { ...topic, ...updatedTopic, topic: nextName } : topic
+      )))
+      setEditingTopic(null)
+      setEditingTopicName('')
+      toastSuccess('Topic diperbarui', 'Nama topic berhasil disimpan.')
+    } catch (error) {
+      toastError('Topic belum tersimpan', getUserFacingError(error))
+    } finally {
+      setIsSavingTopic(false)
+    }
+  }
+
   function renderListOutputsView() {
     return (
       <section className="generate-page">
@@ -1145,55 +1176,55 @@ export function ContentEnginePage({
 	        ) : null}
 
           {retryModalOutput ? (
-            <div className="auth-overlay content-output-modal-overlay" onClick={closeRetryModal}>
-              <div
-                className="content-output-modal retry-output-modal"
+            <div className="schedule-dialog-backdrop retry-output-dialog-backdrop" onClick={closeRetryModal}>
+              <section
+                className="schedule-dialog retry-output-dialog"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="retry-output-modal-title"
                 onClick={(event) => event.stopPropagation()}
               >
-                <div className="content-output-modal-head">
+                <header>
                   <div>
-                    <p className="eyebrow">Retry Post</p>
-                    <h3 id="retry-output-modal-title">{getOutputTitle(retryModalOutput)}</h3>
+                    <h2 id="retry-output-modal-title">Jadwalkan retry</h2>
+                    <p>{getOutputTitle(retryModalOutput)}</p>
                   </div>
-                  <button className="ghost-button" type="button" onClick={closeRetryModal}>
-                    Close
+                  <button type="button" aria-label="Tutup" onClick={closeRetryModal}>
+                    ×
                   </button>
-                </div>
+                </header>
 
-                <div className="retry-output-modal-body">
-                  <label className="persona-field full-width">
-                    <span>Scheduled At</span>
+                <form onSubmit={(event) => { event.preventDefault(); void handleRetryOutput() }}>
+                  <label>
+                    <span>Jadwal retry</span>
                     <input
                       type="datetime-local"
                       value={retryScheduledAt}
+                      onClick={(event) => event.currentTarget.showPicker?.()}
                       onChange={(event) => setRetryScheduledAt(event.target.value)}
                     />
-                    <small className="field-hint">Pilih waktu retry posting yang baru.</small>
+                    <small>Pilih tanggal dan waktu baru untuk mencoba posting kembali.</small>
                   </label>
-                </div>
 
-                <div className="content-output-modal-actions">
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={closeRetryModal}
-                    disabled={Boolean(retryingOutputId)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={() => void handleRetryOutput()}
-                    disabled={!retryScheduledAt.trim() || Boolean(retryingOutputId)}
-                  >
-                    {retryingOutputId ? 'Scheduling...' : 'Schedule retry'}
-                  </button>
-                </div>
-              </div>
+                  <div className="schedule-dialog-actions">
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={closeRetryModal}
+                      disabled={Boolean(retryingOutputId)}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      className="schedule-primary schedule-submit"
+                      type="submit"
+                      disabled={!retryScheduledAt.trim() || Boolean(retryingOutputId)}
+                    >
+                      {retryingOutputId ? 'Menjadwalkan...' : 'Jadwalkan retry'}
+                    </button>
+                  </div>
+                </form>
+              </section>
             </div>
           ) : null}
 	      </section>
@@ -1448,7 +1479,12 @@ export function ContentEnginePage({
                       <span className="pill subtle">#{index + 1}</span>
                       {topic.category ? <span className="pill">{topic.category}</span> : null}
                     </div>
-                    <p className="auto-post-output-text">{shortenText(getTopicLabel(topic), 90)}</p>
+                    <div className="content-topic-list-row">
+                      <p className="auto-post-output-text">{shortenText(getTopicLabel(topic), 90)}</p>
+                      <button type="button" className="content-topic-edit-button" onClick={() => openTopicEditor(topic)} aria-label={`Edit topic ${getTopicLabel(topic)}`} disabled={!topic.id}>
+                        <AppIcon name="pencil" />
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {selectedPillarTopics.length > 8 ? (
@@ -1468,6 +1504,24 @@ export function ContentEnginePage({
             )}
           </article>
         </div>
+
+        {editingTopic ? (
+          <div className="schedule-dialog-backdrop topic-edit-dialog-backdrop" onClick={() => { if (!isSavingTopic) setEditingTopic(null) }}>
+            <section className="schedule-dialog topic-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="topic-edit-title" onClick={(event) => event.stopPropagation()}>
+              <header>
+                <div><h2 id="topic-edit-title">Edit nama topic</h2><p>Ubah nama topic yang dipilih.</p></div>
+                <button type="button" aria-label="Tutup" disabled={isSavingTopic} onClick={() => setEditingTopic(null)}>×</button>
+              </header>
+              <form onSubmit={handleSaveTopic}>
+                <label><span>Nama topic</span><input autoFocus value={editingTopicName} onChange={(event) => setEditingTopicName(event.target.value)} placeholder="Masukkan nama topic" /></label>
+                <div className="schedule-dialog-actions">
+                  <button className="ghost-button" type="button" disabled={isSavingTopic} onClick={() => setEditingTopic(null)}>Batal</button>
+                  <button className="schedule-primary schedule-submit" type="submit" disabled={!editingTopicName.trim() || isSavingTopic}>{isSavingTopic ? 'Menyimpan...' : 'Simpan'}</button>
+                </div>
+              </form>
+            </section>
+          </div>
+        ) : null}
 
         <aside className="generate-side-column">
           <form className="panel generate-panel generate-form-panel" data-tour-step={tourStep === 9 ? 9 : undefined} onSubmit={handleSubmit}>

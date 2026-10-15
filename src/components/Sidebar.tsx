@@ -34,11 +34,11 @@ const overviewMenu: SidebarMenuItem[] = [
   { key: 'auto-post', label: 'Schedule', icon: 'calendar' },
 ]
 
-const settingsMenu: SidebarMenuItem[] = [
+const contentBrainMenu: SidebarMenuItem[] = [
   { key: 'personalize', label: 'Content Brain', icon: 'user' },
-  { key: 'connecting-apps', label: 'Connected Accounts', icon: 'link' },
-  { key: 'subscription-plans', label: 'Subscription', icon: 'calendar' },
-  { key: 'ai-credits', label: 'AI Credits', icon: 'sparkles' },
+]
+
+const settingsMenu: SidebarMenuItem[] = [
   { key: 'settings', label: 'Settings', icon: 'menu' },
 ]
 
@@ -239,6 +239,14 @@ export function Sidebar({
         <SidebarSection
           title="Workspace"
           items={overviewMenu}
+          activePage={activePage}
+          onNavigate={onNavigate}
+          isCollapsed={isCollapsed}
+        />
+
+        <SidebarSection
+          title="Content Brain"
+          items={contentBrainMenu}
           activePage={activePage}
           onNavigate={onNavigate}
           isCollapsed={isCollapsed}
