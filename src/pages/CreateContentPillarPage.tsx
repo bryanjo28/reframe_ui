@@ -30,14 +30,14 @@ const pillarFields: PillarField[] = [
     label: 'Nama Content Pillar',
     placeholder: 'Contoh: Educational Threads Funnel',
   },
-  {
-    key: 'threadType',
-    label: 'Thread Type',
-    options: [
-      { value: 'short', label: 'Short' },
-      { value: 'long', label: 'Long' },
-    ],
-  },
+  // {
+  //   key: 'threadType',
+  //   label: 'Thread Type',
+  //   options: [
+  //     { value: 'short', label: 'Short' },
+  //     { value: 'long', label: 'Long' },
+  //   ],
+  // },
   {
     key: 'templateContent',
     label: 'Template Content',
