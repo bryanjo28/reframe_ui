@@ -32,6 +32,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { OnboardingTutorial } from './components/OnboardingTutorial'
 import { LegalPage } from './pages/LegalPage'
 import { LandingPage } from './pages/LandingPage'
+import { AdminDashboardPage } from './pages/AdminDashboardPage'
 import { watchLanguage, type UiLanguage } from './utils/uiLanguage'
 import { reportError, SESSION_EXPIRED_EVENT, UPGRADE_PLAN_REQUIRED_EVENT } from './utils/apiError'
 import {
@@ -204,6 +205,7 @@ function AppShell() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [theme, setTheme] = useState<AppTheme>(getStoredTheme)
   const [personaStatus, setPersonaStatus] = useState<PersonaStatus>('idle')
+  const [showAdminEntryChoice, setShowAdminEntryChoice] = useState(false)
   const [personaConfig, setPersonaConfig] = useState<PersonaConfigRecord | null>(null)
   const [activeGenerationJobId, setActiveGenerationJobId] = useState('')
   const [generationProgress, setGenerationProgress] = useState<ScheduledJobProgress | null>(null)
@@ -410,6 +412,16 @@ function AppShell() {
       setAuthHelperMessage('')
       setAuthStatus('authenticated')
 
+      if (window.location.pathname.startsWith('/admin')) {
+        if (user.role === 'admin') {
+          setActivePage('admin')
+          setPersonaStatus('ready')
+          return
+        }
+        setActivePage('dashboard')
+        replaceAppPath('/dashboard')
+      }
+
       if (onboarding?.hasPersona === false) {
         setPersonaConfig(null)
         setPersonaStatus('ready')
@@ -422,7 +434,7 @@ function AppShell() {
       if (runId === bootstrapRunIdRef.current) {
         if (!config) {
           replaceAppPath('/first-setup')
-        } else if (window.location.pathname !== '/connecting-apps') {
+      } else if (window.location.pathname !== '/connecting-apps' && !window.location.pathname.startsWith('/admin')) {
           replaceAppPath('/dashboard')
         }
       }
@@ -550,19 +562,35 @@ function AppShell() {
       setPendingVerificationEmail('')
       clearStoredAuthHelperMessage()
       setAuthHelperMessage('')
+      if (window.location.pathname.startsWith('/admin') && authState.user.role === 'admin') {
+        setActivePage('admin')
+        setPersonaStatus('ready')
+        setShowAdminEntryChoice(false)
+        return
+      }
+      const shouldOfferAdminEntry = authState.user.role === 'admin'
+      setShowAdminEntryChoice(shouldOfferAdminEntry)
+      if (window.location.pathname.startsWith('/admin')) {
+        replaceAppPath('/dashboard')
+      }
       setActivePage('dashboard')
 
       if (authState.onboarding?.hasPersona === false) {
         setPersonaConfig(null)
         setPersonaStatus('ready')
-        replaceAppPath('/first-setup')
+        if (!shouldOfferAdminEntry) replaceAppPath('/first-setup')
         return
       }
 
       const config = await loadPersonaConfig(authState.user.id, runId)
 
       if (runId === bootstrapRunIdRef.current) {
-        replaceAppPath(config ? '/dashboard' : '/first-setup')
+        if (shouldOfferAdminEntry) {
+          setPersonaConfig(config ?? null)
+          setPersonaStatus('ready')
+        } else {
+          replaceAppPath(config ? '/dashboard' : '/first-setup')
+        }
       }
     } catch (error) {
       if (runId !== bootstrapRunIdRef.current) return
@@ -596,6 +624,8 @@ function AppShell() {
 
   const handleNavigate = useCallback((page: NavKey) => {
     setActivePage(page)
+    if (page === 'admin') replaceAppPath('/admin')
+    else if (window.location.pathname === '/admin') replaceAppPath('/dashboard')
 
     if (isSidebarMobile) {
       setIsSidebarOpen(false)
@@ -657,6 +687,30 @@ function AppShell() {
         helperMessage={authHelperMessage}
       />
     )
+  } else if (showAdminEntryChoice && currentUser?.role === 'admin') {
+    content = (
+      <main className="admin-entry-shell">
+        <section className="admin-entry-card" aria-labelledby="admin-entry-title">
+          <p className="eyebrow">Akun administrator</p>
+          <h1 id="admin-entry-title">Mau masuk ke mana?</h1>
+          <p className="admin-entry-description">Pilih dashboard yang ingin kamu buka. Kamu bisa berpindah kapan saja.</p>
+          <div className="admin-entry-options">
+            <button className="admin-entry-option" type="button" onClick={() => { setShowAdminEntryChoice(false); setActivePage('dashboard'); replaceAppPath(personaConfig ? '/dashboard' : '/first-setup') }}>
+              <span className="admin-entry-option-icon" aria-hidden="true">⌂</span>
+              <span><strong>Dashboard Pengguna</strong><small>Buat konten dan kelola workspace kamu</small></span>
+              <span className="admin-entry-arrow" aria-hidden="true">→</span>
+            </button>
+            <button className="admin-entry-option admin-entry-option-primary" type="button" onClick={() => { setShowAdminEntryChoice(false); setActivePage('admin'); setPersonaStatus('ready'); replaceAppPath('/admin') }}>
+              <span className="admin-entry-option-icon" aria-hidden="true">▦</span>
+              <span><strong>Admin Dashboard</strong><small>Kelola pengguna, paket, dan aktivitas</small></span>
+              <span className="admin-entry-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
+        </section>
+      </main>
+    )
+  } else if (activePage === 'admin' && currentUser?.role === 'admin') {
+    content = <main className="content-area admin-content-area"><AdminDashboardPage onBackToUser={() => { setActivePage('dashboard'); replaceAppPath('/dashboard') }} /></main>
   } else if (personaStatus === 'loading' || personaStatus === 'idle') {
     content = (
       <div className="bootstrap-shell">
@@ -774,7 +828,7 @@ function AppShell() {
   return (
     <ToastProvider>
       {content}
-      {showTutorial && authStatus === 'authenticated' && personaStatus === 'ready' ? <OnboardingTutorial onComplete={completeTutorial} /> : null}
+      {showTutorial && authStatus === 'authenticated' && !showAdminEntryChoice && personaStatus === 'ready' ? <OnboardingTutorial onComplete={completeTutorial} /> : null}
       {upgradePrompt ? (
         <div className="content-bank-dialog-backdrop" role="presentation" onMouseDown={() => setUpgradePrompt('')}>
           <section className="content-bank-dialog idea-upgrade-dialog" role="dialog" aria-modal="true" aria-labelledby="upgrade-plan-title" onMouseDown={(event) => event.stopPropagation()}>
