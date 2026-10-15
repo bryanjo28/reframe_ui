@@ -116,6 +116,7 @@ export function Sidebar({
   language,
   onLanguageChange,
 }: SidebarProps) {
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [usedCredits, setUsedCredits] = useState<number | null>(null)
   const [creditLimit, setCreditLimit] = useState<number | null>(null)
   const [planName, setPlanName] = useState('Current plan')
@@ -268,6 +269,32 @@ export function Sidebar({
             </div>
           </div>
         ) : null}
+
+        <div className="sidebar-profile-menu">
+          <button
+            className="sidebar-profile-trigger"
+            type="button"
+            onClick={() => setIsProfileMenuOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={isProfileMenuOpen}
+            aria-label="Buka menu profil"
+          >
+            <span className="sidebar-profile-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span>
+            {!isCollapsed ? <><span className="sidebar-profile-copy"><strong>{displayName}</strong><small>Menu profil</small></span><AppIcon name="chevron-right" /></> : null}
+          </button>
+          {isProfileMenuOpen ? (
+            <div className="sidebar-profile-popover" role="menu" aria-label="Menu profil">
+              {currentUser?.role === 'admin' ? (
+                <button type="button" role="menuitem" aria-current={activePage === 'admin' ? 'page' : undefined} onClick={() => { setIsProfileMenuOpen(false); onNavigate('admin') }}>
+                  <AppIcon name="lock" /><span>Admin Dashboard</span>
+                </button>
+              ) : null}
+              <button type="button" role="menuitem" onClick={() => { setIsProfileMenuOpen(false); onNavigate('settings') }}>
+                <AppIcon name="user" /><span>Profile & Settings</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
 
         <button
           className="sidebar-logout-button"

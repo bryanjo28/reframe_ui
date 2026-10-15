@@ -15,6 +15,7 @@ export type NavKey =
   | 'payments'
   | 'connecting-apps'
   | 'settings'
+  | 'admin'
 
 export type AppTheme = 'dark' | 'light'
 
