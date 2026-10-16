@@ -44,6 +44,9 @@ type TokenUsageSummary = {
 }
 
 const maxTopics = 10
+// Flow pemilihan dan penyimpanan manual dipertahankan sementara di bawah,
+// tetapi dinonaktifkan karena hasil generate sekarang langsung disimpan semua.
+const useLegacyTopicSelectionFlow = false
 
 const topicCategoryOptions = [
   'educational',
@@ -396,7 +399,7 @@ export function GenerateTopicPage({ userId, onContinueToContent, onUpgrade }: Ge
     setTokenUsage(null)
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (!canSubmitManual) {
@@ -419,28 +422,72 @@ export function GenerateTopicPage({ userId, onContinueToContent, onUpgrade }: Ge
     setIsSubmitting(true)
     resetResponseState()
 
-    void generateContentTopics({
-      contentPillarId: selectedContentPillarId,
-      templateText: '',
-      jumlahTopics,
-    })
-      .then((rawData) => {
-        const topics = extractTopicsFromWebhookResponse(rawData)
-        const usage = extractTokenUsageFromWebhookResponse(rawData)
+    let topicsGenerated = false
 
-        setResponseTopics(topics)
-        setTokenUsage(usage)
+    try {
+      const rawData = await generateContentTopics({
+        contentPillarId: selectedContentPillarId,
+        templateText: '',
+        jumlahTopics,
       })
-      .catch((error) => {
-        setStatusTone('error')
-        const detail = getUserFacingError(error, 'Coba generate lagi dalam beberapa saat.')
-        const errorMessage = `Ide belum berhasil dibuat. ${detail}`
-        setStatusMessage(errorMessage)
-        toastError('Ide belum berhasil dibuat', errorMessage)
-      })
-      .finally(() => {
-        setIsSubmitting(false)
-      })
+      const topics = extractTopicsFromWebhookResponse(rawData)
+      const usage = extractTokenUsageFromWebhookResponse(rawData)
+      const contentPillarId = selectedContentPillar?.id || ''
+      const personaConfigId =
+        getRecordValue(selectedContentPillar, ['personaConfigId', 'persona_config_id']) || ''
+
+      topicsGenerated = true
+      setResponseTopics(topics)
+      setTokenUsage(usage)
+
+      if (!topics.length) {
+        throw new Error('Tidak ada ide yang diterima dari hasil generate.')
+      }
+
+      if (!userId || !contentPillarId || !personaConfigId) {
+        throw new Error('Topik utama belum memiliki data yang lengkap.')
+      }
+
+      setSavingTopicIndices(topics.map((_, index) => index))
+      setStatusTone('idle')
+      setStatusMessage(`Menyimpan ${topics.length} ide...`)
+
+      for (const [index, topic] of topics.entries()) {
+        const normalizedTopic = normalizeGeneratedTopic(topic, index)
+
+        if (!normalizedTopic.title.trim() || !normalizedTopic.categoryType.trim()) {
+          throw new Error(`Ide ${index + 1} belum memiliki judul atau kategori.`)
+        }
+
+        await createContentTopic({
+          userId,
+          personaConfigId,
+          contentPillarId,
+          category: normalizedTopic.categoryType,
+          subcategory: '',
+          topic: normalizedTopic.title,
+        })
+        setSavedTopicIndices((current) => [...current, index])
+      }
+
+      setStatusTone('success')
+      setStatusMessage(`${topics.length} ide berhasil disimpan.`)
+      toastSuccess('Semua ide tersimpan', `${topics.length} ide sudah masuk ke daftar topik.`)
+      onContinueToContent?.()
+    } catch (error) {
+      setStatusTone('error')
+      const fallback = topicsGenerated
+        ? 'Coba lagi agar semua ide dapat disimpan.'
+        : 'Coba generate lagi dalam beberapa saat.'
+      const detail = getUserFacingError(error, fallback)
+      const title = topicsGenerated ? 'Ide belum berhasil disimpan' : 'Ide belum berhasil dibuat'
+      const errorMessage = `${title}. ${detail}`
+      setStatusMessage(errorMessage)
+      toastError(title, errorMessage)
+    } finally {
+      setSavingTopicIndices([])
+      setIsSubmitting(false)
+    }
   }
 
   async function handleSaveTopic(topic: GeneratedTopic, index: number) {
@@ -666,7 +713,8 @@ export function GenerateTopicPage({ userId, onContinueToContent, onUpgrade }: Ge
             )}
           </article>
 
-          {responseTopics.length ? <article className="panel generate-panel generate-results-modal" role="dialog" aria-modal="true" aria-label="Hasil ide">
+          {/* Legacy manual topic-selection flow. Keep disabled while generated topics auto-save. */}
+          {useLegacyTopicSelectionFlow && responseTopics.length ? <article className="panel generate-panel generate-results-modal" role="dialog" aria-modal="true" aria-label="Hasil ide">
             <div className="panel-heading compact">
               <div>
                 <h2>{responseTopics.length ? 'Ide untuk kamu' : 'Hasil ide'}</h2>
