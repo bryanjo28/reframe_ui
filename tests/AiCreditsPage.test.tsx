@@ -88,13 +88,11 @@ describe('AiCreditsPage', () => {
     expect(screen.getByText('-2 credits')).toBeInTheDocument()
   })
 
-  it('shows the latest payment order summary on the AI Credits page', async () => {
+  it('keeps payment orders out of the AI Credits page', async () => {
     render(<AiCreditsPage onTopUp={vi.fn()} onViewPlans={vi.fn()} />)
 
-    const summary = await screen.findByRole('region', { name: 'Ringkasan order terbaru' })
-    expect(summary).toHaveTextContent('Starter')
-    expect(summary).toHaveTextContent(/Rp\s*29\.000/)
-    expect(summary).toHaveTextContent('Berhasil')
-    expect(summary).toHaveTextContent('QRIS')
+    expect(await screen.findByRole('heading', { name: 'Riwayat credits' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Ringkasan order terbaru' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Starter')).not.toBeInTheDocument()
   })
 })

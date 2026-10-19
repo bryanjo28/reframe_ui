@@ -13,6 +13,7 @@ export type NavKey =
   | 'subscription-plans'
   | 'ai-credits'
   | 'payments'
+  | 'top-up-credits'
   | 'connecting-apps'
   | 'settings'
   | 'admin'

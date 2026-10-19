@@ -27,6 +27,7 @@ import { MobileNavigation } from './components/MobileNavigation'
 import { CreateHubPage } from './pages/CreateHubPage'
 import { TokenBalance } from './components/TokenBalance'
 import { PaymentsPage } from './pages/PaymentsPage'
+import { TopUpCreditsPage } from './pages/TopUpCreditsPage'
 import { AiCreditsPage } from './pages/AiCreditsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { OnboardingTutorial } from './components/OnboardingTutorial'
@@ -98,7 +99,7 @@ function isNavKey(value: unknown): value is NavKey {
   return typeof value === 'string' && [
     'dashboard', 'create', 'content-bank', 'personalize', 'create-persona-chat',
     'create-persona', 'content-pillar', 'generate-topic', 'content-engine',
-    'manual-post', 'auto-post', 'subscription-plans', 'ai-credits', 'payments',
+    'manual-post', 'auto-post', 'subscription-plans', 'ai-credits', 'payments', 'top-up-credits',
     'connecting-apps', 'settings', 'admin',
   ].includes(value)
 }
@@ -203,6 +204,7 @@ function getStoredActivePage(): NavKey {
     value === 'subscription-plans' ||
     value === 'ai-credits' ||
     value === 'payments' ||
+    value === 'top-up-credits' ||
     value === 'connecting-apps' ||
     value === 'settings'
   ) {
@@ -832,7 +834,7 @@ function AppShell() {
 	        /> : null}
 
         <main className="content-area">
-          <TokenBalance onOpenCredits={() => handleNavigate('ai-credits')} onTopUp={() => handleNavigate('payments')} />
+          <TokenBalance onOpenCredits={() => handleNavigate('ai-credits')} onTopUp={() => handleNavigate('top-up-credits')} />
           <div key={activePage} className="page-transition">
             {activePage === 'create' ? (
               <CreateHubPage onNavigate={handleNavigate} />
@@ -877,9 +879,11 @@ function AppShell() {
             ) : activePage === 'subscription-plans' ? (
               <SubscriptionPlansPage userId={currentUser?.id || ''} />
             ) : activePage === 'ai-credits' ? (
-              <AiCreditsPage onTopUp={() => handleNavigate('payments')} onViewPlans={() => handleNavigate('subscription-plans')} />
+              <AiCreditsPage onTopUp={() => handleNavigate('top-up-credits')} onViewPlans={() => handleNavigate('subscription-plans')} />
             ) : activePage === 'payments' ? (
-              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} onPaymentComplete={() => handleNavigate('ai-credits')} />
+              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} />
+            ) : activePage === 'top-up-credits' ? (
+              <TopUpCreditsPage onBackToCredits={() => handleNavigate('ai-credits')} onPaymentComplete={() => handleNavigate('ai-credits')} />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage onStatusChange={(status) => {
                 setThreadsStatus(status)

@@ -2,7 +2,7 @@ import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
 import { createApiResponseError, SESSION_EXPIRED_EVENT } from '../utils/apiError'
 export type TokenPackage={id:string;code:string;name:string;token_amount:number;price_idr:number}
-export type PaymentOrder={id:string;amount_idr:number;token_amount:number;status:string;provider:string|null;created_at:string;paid_at:string|null;product_name?:string;product_type?:string}
+export type PaymentOrder={id:string;amount_idr:number;token_amount:number;status:string;provider:string|null;payment_method?:string|null;created_at:string;paid_at:string|null;product_name?:string;product_type?:string}
 export type PaymentNotification={id:string;type:string;title:string;message:string;read_at:string|null;created_at:string}
 export type TokenLedgerItem={id:string;amount?:number;credits_delta?:number;balance_after:number;kind?:string;transaction_type?:string;source_type?:string|null;description?:string;created_at:string}
 export type UsageHistoryItem={request_id:string;feature:string;total_tokens:number;credits_charged:number;status:string;created_at:string}
@@ -89,7 +89,7 @@ export async function createPaymentOrder(
   }
 }
 
-export async function getPaymentOrderStatus(id:string){return await payload(await fetch(buildApiUrl(`/api/payments/orders/${id}`),{headers:headers()})) as {status:string}}
+export async function getPaymentOrderStatus(id:string){return await payload(await fetch(buildApiUrl(`/api/payments/orders/${id}`),{headers:headers()})) as {id?:string;status:string;credited?:boolean}}
 export async function markPaymentNotificationRead(id:string){await payload(await fetch(buildApiUrl(`/api/payments/notifications/${id}/read`),{method:'PATCH',headers:headers()}))}
 
 export async function getNotifications(): Promise<PaymentNotification[]> {

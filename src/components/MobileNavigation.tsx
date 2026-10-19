@@ -24,7 +24,7 @@ const secondary: Array<{ key: NavKey; label: string; icon: string }> = [
   { key: 'personalize', label: 'Persona & Pillar', icon: 'user' },
 ]
 
-const settingsPages: NavKey[] = ['settings', 'connecting-apps', 'subscription-plans', 'ai-credits', 'payments']
+const settingsPages: NavKey[] = ['settings', 'connecting-apps', 'subscription-plans', 'ai-credits', 'payments', 'top-up-credits']
 
 const createFlowPages: NavKey[] = ['create', 'generate-topic', 'content-engine', 'manual-post']
 
