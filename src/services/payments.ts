@@ -6,7 +6,8 @@ export type PaymentOrder={id:string;amount_idr:number;token_amount:number;status
 export type PaymentNotification={id:string;type:string;title:string;message:string;read_at:string|null;created_at:string}
 export type TokenLedgerItem={id:string;amount?:number;credits_delta?:number;balance_after:number;kind?:string;transaction_type?:string;source_type?:string|null;description?:string;created_at:string}
 export type UsageHistoryItem={request_id:string;feature:string;total_tokens:number;credits_charged:number;status:string;created_at:string}
-export type PaymentPageData={packages:TokenPackage[];balance:number;subscriptionBalance:number;topUpBalance:number;orders:PaymentOrder[];notifications:PaymentNotification[];ledger:TokenLedgerItem[];usageHistory:UsageHistoryItem[]}
+export type PaymentMethod=string
+export type PaymentPageData={packages:TokenPackage[];balance:number;subscriptionBalance:number;topUpBalance:number;orders:PaymentOrder[];notifications:PaymentNotification[];ledger:TokenLedgerItem[];usageHistory:UsageHistoryItem[];paymentMethods:PaymentMethod[]}
 function headers(){const value=buildApiHeaders();const token=getCurrentAuthToken();if(token)value.Authorization=`Bearer ${token}`;return value}
 async function payload(response:Response){
   const value=await response.json().catch(()=>({})) as {message?:string;data?:unknown}
@@ -20,10 +21,12 @@ async function payload(response:Response){
 export async function getPaymentPage(){
   const data=await payload(await fetch(buildApiUrl('/api/payments/me'),{headers:headers()})) as PaymentPageData
   if(!data || typeof data!=='object') throw new Error('Respons pembayaran tidak valid.')
-  return {...data,notifications:Array.isArray(data.notifications)?data.notifications:[],ledger:Array.isArray(data.ledger)?data.ledger:[],usageHistory:Array.isArray(data.usageHistory)?data.usageHistory:[]}
+  return {...data,notifications:Array.isArray(data.notifications)?data.notifications:[],ledger:Array.isArray(data.ledger)?data.ledger:[],usageHistory:Array.isArray(data.usageHistory)?data.usageHistory:[],paymentMethods:Array.isArray(data.paymentMethods)&&data.paymentMethods.length?data.paymentMethods:['qris']}
 }
-export type CreatedPaymentOrder={id:string;message:string;checkoutAvailable:boolean;checkoutUrl:string|null;qrImageUrl?:string|null;expiresAt?:string|null}
-export async function createPaymentOrder(packageId:string){return await payload(await fetch(buildApiUrl('/api/payments/orders'),{method:'POST',headers:headers(),body:JSON.stringify({packageId})})) as CreatedPaymentOrder}
+export type PaymentDetails={va_number:string|null;total_payment:number;expired_at:string|null;qr_string:string|null}
+export type CreatedPaymentOrder={id:string;message?:string;status:string;credits:number;amount_idr:number;payment_method:string;checkoutAvailable:boolean;checkoutUrl:string|null;payment:PaymentDetails;qrImageUrl?:string|null;expiresAt?:string|null}
+export type CreatePaymentOrderInput=({packageId:string;planId?:never}|{planId:string;packageId?:never})&{method:string}
+export async function createPaymentOrder(input:CreatePaymentOrderInput){return await payload(await fetch(buildApiUrl('/api/payments/orders'),{method:'POST',headers:headers(),body:JSON.stringify(input)})) as CreatedPaymentOrder}
 export async function getPaymentOrderStatus(id:string){return await payload(await fetch(buildApiUrl(`/api/payments/orders/${id}`),{headers:headers()})) as {status:string}}
 export async function markPaymentNotificationRead(id:string){await payload(await fetch(buildApiUrl(`/api/payments/notifications/${id}/read`),{method:'PATCH',headers:headers()}))}
 

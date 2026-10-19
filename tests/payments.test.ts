@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { getNotifications, getPaymentPage, markPaymentNotificationRead } from '../src/services/payments'
+import { createPaymentOrder, getNotifications, getPaymentPage, markPaymentNotificationRead } from '../src/services/payments'
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear() })
 
@@ -21,4 +21,37 @@ it('reads payment histories from nested data and authorizes notification updates
   expect(await getPaymentPage()).toMatchObject({ ledger, usageHistory, notifications: [] })
   await markPaymentNotificationRead('notification-1')
   expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: '/api/payments/notifications/notification-1/read' }), expect.objectContaining({ method: 'PATCH', headers: expect.objectContaining({ Authorization: 'Bearer payment-token' }) }))
+})
+
+it('creates top-up and subscription orders with the selected payment method', async () => {
+  const request = vi.fn(async () => new Response(JSON.stringify({
+    data: {
+      id: 'order-1',
+      status: 'pending',
+      credits: 1000,
+      amount_idr: 99000,
+      payment_method: 'bni_va',
+      checkoutAvailable: true,
+      checkoutUrl: null,
+      payment: {
+        va_number: '880812345678',
+        total_payment: 100500,
+        expired_at: '2026-10-19T12:00:00.000Z',
+        qr_string: null,
+      },
+    },
+  }), { status: 200 }))
+  vi.stubGlobal('fetch', request)
+
+  await createPaymentOrder({ packageId: 'plus-id', method: 'bni_va' })
+  expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({
+    packageId: 'plus-id',
+    method: 'bni_va',
+  })
+
+  await createPaymentOrder({ planId: 'creator-id', method: 'qris' })
+  expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body))).toEqual({
+    planId: 'creator-id',
+    method: 'qris',
+  })
 })

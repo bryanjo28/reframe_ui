@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { QrisCheckoutModal } from '../components/QrisCheckoutModal'
+import { PaymentMethodSelector } from '../components/PaymentMethodSelector'
 import { useToast } from '../components/useToast'
 import { createPaymentOrder, getPaymentOrderStatus, getPaymentPage, type CreatedPaymentOrder, type PaymentPageData, type TokenPackage } from '../services/payments'
 
@@ -20,6 +21,7 @@ export function PaymentsPage({ onBackToCredits, onPaymentComplete }: { onBackToC
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState(false)
   const [selectedId, setSelectedId] = useState('')
+  const [selectedMethod, setSelectedMethod] = useState('qris')
   const [error, setError] = useState('')
   const [checkoutOrder, setCheckoutOrder] = useState<CreatedPaymentOrder | null>(null)
   const toast = useToast()
@@ -35,6 +37,7 @@ export function PaymentsPage({ onBackToCredits, onPaymentComplete }: { onBackToC
         const nextPackages = nextData.packages.filter((pack) => allowedPackages.has(pack.code.toLowerCase()))
         return nextPackages.some((pack) => pack.id === current) ? current : nextPackages[0]?.id || ''
       })
+      setSelectedMethod((current) => nextData.paymentMethods.includes(current) ? current : nextData.paymentMethods[0] || 'qris')
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Gagal memuat pembayaran.')
     } finally {
@@ -48,8 +51,8 @@ export function PaymentsPage({ onBackToCredits, onPaymentComplete }: { onBackToC
     if (!selectedPackage || buying) return
     setBuying(true)
     try {
-      const order = await createPaymentOrder(selectedPackage.id)
-      toast.info('Order pembayaran dibuat', order.message)
+      const order = await createPaymentOrder({ packageId: selectedPackage.id, method: selectedMethod })
+      toast.info('Order pembayaran dibuat', order.message || 'Silakan selesaikan pembayaran.')
       setCheckoutOrder(order)
     } catch (buyError) {
       toast.error('Pembayaran gagal', buyError instanceof Error ? buyError.message : 'Coba lagi.')
@@ -79,8 +82,8 @@ export function PaymentsPage({ onBackToCredits, onPaymentComplete }: { onBackToC
           </section>
 
           <section className="payment-checkout-section">
-            <div className="payment-step-title"><span>2</span><div><h2>Metode pembayaran</h2><p>Pilih metode pembayaran pada langkah berikutnya.</p></div></div>
-            <div className="payment-method-card"><span className="payment-method-icon"><AppIcon name="lock" /></span><div><strong>Pembayaran Aman</strong><p>Virtual account, QRIS, e-wallet, dan metode lain ditampilkan sesuai ketersediaan.</p></div><span className="payment-method-status"><AppIcon name="check" /> Aman</span></div>
+            <div className="payment-step-title"><span>2</span><div><h2>Metode pembayaran</h2><p>Pilih QRIS atau virtual account yang tersedia.</p></div></div>
+            <PaymentMethodSelector methods={data?.paymentMethods || ['qris']} value={selectedMethod} onChange={setSelectedMethod} />
           </section>
 
           {data?.orders.length ? <section className="payment-checkout-section payment-order-history"><div className="payment-step-title plain"><div><h2>Order terakhir</h2><p>Status pembayaran terbaru dari akun kamu.</p></div></div>{data.orders.slice(0, 4).map((order) => <div className="payment-order-row" key={order.id}><div><strong>{order.token_amount.toLocaleString('id-ID')} AI Credits</strong><small>{formatDate(order.created_at)} · {order.id.slice(0, 8).toUpperCase()}</small></div><span>{money(order.amount_idr)}</span><b className={`payment-order-status ${order.status}`}>{order.status}</b></div>)}</section> : null}
@@ -96,13 +99,17 @@ export function PaymentsPage({ onBackToCredits, onPaymentComplete }: { onBackToC
         open
         title={selectedPackage.name}
         description={`${selectedPackage.token_amount.toLocaleString('id-ID')} AI Credits`}
-        amount={selectedPackage.price_idr}
+        amount={checkoutOrder.amount_idr || selectedPackage.price_idr}
+        totalPayment={checkoutOrder.payment?.total_payment}
+        paymentMethod={checkoutOrder.payment_method || selectedMethod}
+        qrString={checkoutOrder.payment?.qr_string}
+        vaNumber={checkoutOrder.payment?.va_number}
         qrImageUrl={checkoutOrder.qrImageUrl}
         checkoutUrl={checkoutOrder.checkoutUrl}
-        expiresAt={checkoutOrder.expiresAt}
+        expiresAt={checkoutOrder.payment?.expired_at || checkoutOrder.expiresAt}
         orderId={checkoutOrder.id}
         checkStatus={getPaymentOrderStatus}
-        onPaid={onPaymentComplete}
+        onPaid={(orderId) => { void load(); onPaymentComplete?.(orderId) }}
         onClose={() => setCheckoutOrder(null)}
       /> : null}
     </section>

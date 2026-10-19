@@ -4,10 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SubscriptionPlansPage } from '../src/pages/SubscriptionPlansPage'
 import { getCurrentSubscription, listSubscriptionPlans } from '../src/services/subscriptionPlans'
+import { createPaymentOrder, getPaymentOrderStatus, getPaymentPage } from '../src/services/payments'
 
 vi.mock('../src/services/subscriptionPlans', () => ({
   getCurrentSubscription: vi.fn(),
   listSubscriptionPlans: vi.fn(),
+}))
+
+vi.mock('../src/services/payments', () => ({
+  getPaymentPage: vi.fn(),
+  createPaymentOrder: vi.fn(),
+  getPaymentOrderStatus: vi.fn(),
 }))
 
 describe('SubscriptionPlansPage', () => {
@@ -36,6 +43,16 @@ describe('SubscriptionPlansPage', () => {
         },
       },
     ])
+    vi.mocked(getPaymentPage).mockResolvedValue({
+      packages: [], balance: 0, subscriptionBalance: 0, topUpBalance: 0,
+      orders: [], notifications: [], ledger: [], usageHistory: [], paymentMethods: ['qris', 'bni_va'],
+    })
+    vi.mocked(createPaymentOrder).mockResolvedValue({
+      id: 'plan-order', message: 'Order dibuat', status: 'pending', credits: 600,
+      amount_idr: 59000, payment_method: 'bni_va', checkoutAvailable: true, checkoutUrl: null,
+      payment: { va_number: '880812345678', total_payment: 60500, expired_at: '2026-10-19T12:00:00.000Z', qr_string: null },
+    })
+    vi.mocked(getPaymentOrderStatus).mockResolvedValue({ status: 'pending' })
   })
 
   it('shows a concise recommended plan card without repeated plan copy', async () => {
@@ -55,14 +72,17 @@ describe('SubscriptionPlansPage', () => {
     expect(screen.queryByText('Generate Topic, Content, dan Regenerate AI')).not.toBeInTheDocument()
   })
 
-  it('opens the QRIS checkout preview when a paid plan is selected', async () => {
+  it('creates a plan order after the user selects a payment method', async () => {
     render(<SubscriptionPlansPage userId="user-1" />)
 
     await userEvent.click(await screen.findByRole('button', { name: 'Buy Creator' }))
+    await userEvent.click(screen.getByRole('radio', { name: /BNI Virtual Account/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Bayar sekarang' }))
 
-    const checkout = screen.getByRole('dialog', { name: 'Pembayaran QRIS' })
+    expect(createPaymentOrder).toHaveBeenCalledWith({ planId: 'creator-plan', method: 'bni_va' })
+    const checkout = await screen.findByRole('dialog', { name: 'Pembayaran BNI Virtual Account' })
     expect(checkout).toBeInTheDocument()
-    expect(within(checkout).getByText(/Rp\s*59\.000/)).toBeInTheDocument()
+    expect(within(checkout).getByText(/Rp\s*60\.500/)).toBeInTheDocument()
     expect(within(checkout).getByText('600 AI Credits per bulan')).toBeInTheDocument()
   })
 })

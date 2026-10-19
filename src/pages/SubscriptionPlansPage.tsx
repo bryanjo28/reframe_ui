@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { QrisCheckoutModal } from '../components/QrisCheckoutModal'
+import { PaymentMethodSelector } from '../components/PaymentMethodSelector'
+import { createPaymentOrder, getPaymentOrderStatus, getPaymentPage, type CreatedPaymentOrder } from '../services/payments'
 import {
   getCurrentSubscription,
   listSubscriptionPlans,
@@ -219,6 +221,10 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [checkoutPlan, setCheckoutPlan] = useState<NormalizedSubscriptionPlan | null>(null)
+  const [checkoutOrder, setCheckoutOrder] = useState<CreatedPaymentOrder | null>(null)
+  const [paymentMethods, setPaymentMethods] = useState(['qris'])
+  const [selectedMethod, setSelectedMethod] = useState('qris')
+  const [isBuying, setIsBuying] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -227,9 +233,10 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
       setIsLoading(true)
 
       try {
-        const [nextPlans, nextSubscription] = await Promise.all([
+        const [nextPlans, nextSubscription, paymentData] = await Promise.all([
           listSubscriptionPlans(),
           getCurrentSubscription(),
+          getPaymentPage(),
         ])
 
         if (!isMounted) {
@@ -249,6 +256,8 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
 
         setPlans(sortedPlans)
         setCurrentSubscription(nextSubscription)
+        setPaymentMethods(paymentData.paymentMethods)
+        setSelectedMethod(paymentData.paymentMethods[0] || 'qris')
         setErrorMessage('')
       } catch (error) {
         if (!isMounted) {
@@ -278,6 +287,24 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
     () => plans.find((plan) => isCurrentPlan(plan, currentSubscription)) || null,
     [currentSubscription, plans],
   )
+
+  async function createPlanOrder() {
+    if (!checkoutPlan || isBuying) return
+    setIsBuying(true)
+    try {
+      const order = await createPaymentOrder({ planId: checkoutPlan.id, method: selectedMethod })
+      setCheckoutOrder(order)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Gagal membuat order pembayaran. Coba lagi.')
+    } finally {
+      setIsBuying(false)
+    }
+  }
+
+  async function refreshSubscription() {
+    const nextSubscription = await getCurrentSubscription()
+    setCurrentSubscription(nextSubscription)
+  }
 
   return (
     <section className="subscription-page">
@@ -343,12 +370,28 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
         )}
         {!isLoading ? <CustomPlanCard /> : null}
       </div>
-      {checkoutPlan ? <QrisCheckoutModal
+      {checkoutPlan && !checkoutOrder ? <div className="qris-modal-backdrop">
+        <section className="payment-method-dialog" role="dialog" aria-modal="true" aria-label={`Pilih pembayaran ${checkoutPlan.name}`}>
+          <header><div><p className="eyebrow">Metode pembayaran</p><h2>Bayar {checkoutPlan.name}</h2></div><button type="button" aria-label="Tutup pembayaran" onClick={() => setCheckoutPlan(null)}><AppIcon name="close" /></button></header>
+          <PaymentMethodSelector methods={paymentMethods} value={selectedMethod} onChange={setSelectedMethod} name="subscription-payment-method" />
+          <div className="payment-method-dialog-actions"><button className="ghost-button" type="button" onClick={() => setCheckoutPlan(null)}>Batal</button><button className="primary-button" type="button" disabled={isBuying} onClick={() => void createPlanOrder()}>{isBuying ? 'Membuat order...' : 'Bayar sekarang'}</button></div>
+        </section>
+      </div> : null}
+      {checkoutPlan && checkoutOrder ? <QrisCheckoutModal
         open
         title={checkoutPlan.name}
         description={`${(checkoutPlan.monthlyAiCredits || 0).toLocaleString('id-ID')} AI Credits per bulan`}
-        amount={checkoutPlan.price || 0}
-        onClose={() => setCheckoutPlan(null)}
+        amount={checkoutOrder.amount_idr || checkoutPlan.price || 0}
+        totalPayment={checkoutOrder.payment?.total_payment}
+        paymentMethod={checkoutOrder.payment_method || selectedMethod}
+        qrString={checkoutOrder.payment?.qr_string}
+        vaNumber={checkoutOrder.payment?.va_number}
+        checkoutUrl={checkoutOrder.checkoutUrl}
+        expiresAt={checkoutOrder.payment?.expired_at}
+        orderId={checkoutOrder.id}
+        checkStatus={getPaymentOrderStatus}
+        onPaid={() => { void refreshSubscription(); setCheckoutOrder(null); setCheckoutPlan(null) }}
+        onClose={() => { setCheckoutOrder(null); setCheckoutPlan(null) }}
       /> : null}
     </section>
   )

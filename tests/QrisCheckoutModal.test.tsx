@@ -50,6 +50,44 @@ describe('QrisCheckoutModal', () => {
     )
   })
 
+  it('renders payment.qr_string locally as a QR image', async () => {
+    render(
+      <QrisCheckoutModal
+        open
+        title="Top Up Plus"
+        description="1.000 AI Credits"
+        amount={99000}
+        paymentMethod="qris"
+        qrString="00020101021226670016COM.NOBUBANK.WWW"
+        onClose={() => undefined}
+      />,
+    )
+
+    expect(await screen.findByRole('img', { name: 'QRIS untuk Top Up Plus' })).toHaveAttribute(
+      'src',
+      expect.stringMatching(/^data:image\/png;base64,/),
+    )
+  })
+
+  it('shows the VA number and final backend total for virtual-account payments', () => {
+    render(
+      <QrisCheckoutModal
+        open
+        title="Creator"
+        description="600 AI Credits per bulan"
+        amount={59000}
+        totalPayment={60500}
+        paymentMethod="bni_va"
+        vaNumber="880812345678"
+        onClose={() => undefined}
+      />,
+    )
+
+    expect(screen.getByRole('dialog', { name: 'Pembayaran BNI Virtual Account' })).toBeInTheDocument()
+    expect(screen.getByText('880812345678')).toBeInTheDocument()
+    expect(screen.getByText(/Rp\s*60\.500/)).toBeInTheDocument()
+  })
+
   it('shows the backend expiry countdown and completes when polling returns paid', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-19T10:00:00.000Z'))
@@ -71,7 +109,9 @@ describe('QrisCheckoutModal', () => {
     )
 
     expect(screen.getByText('15:00')).toBeInTheDocument()
-    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(4999) })
+    expect(checkStatus).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
     expect(onPaid).toHaveBeenCalledWith('order-1')
   })
 })

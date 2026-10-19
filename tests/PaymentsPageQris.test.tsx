@@ -26,6 +26,7 @@ describe('PaymentsPage QRIS checkout', () => {
       notifications: [],
       ledger: [],
       usageHistory: [],
+      paymentMethods: ['qris', 'bni_va'],
     })
     vi.mocked(createPaymentOrder).mockResolvedValue({
       id: 'order-1',
@@ -34,6 +35,13 @@ describe('PaymentsPage QRIS checkout', () => {
       checkoutUrl: 'https://payments.example/order-1',
       qrImageUrl: 'https://payments.example/order-1.png',
       expiresAt: '2026-10-19T12:00:00.000Z',
+      payment_method: 'qris',
+      payment: {
+        va_number: null,
+        total_payment: 100500,
+        expired_at: '2026-10-19T12:00:00.000Z',
+        qr_string: '00020101021226670016COM.NOBUBANK.WWW',
+      },
     })
     vi.mocked(getPaymentOrderStatus).mockResolvedValue({ status: 'pending' })
   })
@@ -49,5 +57,14 @@ describe('PaymentsPage QRIS checkout', () => {
       'https://payments.example/order-1.png',
     )
     expect(checkout).toHaveTextContent('1.000 AI Credits')
+  })
+
+  it('lets the user choose a backend-provided VA method before paying', async () => {
+    render(<PaymentsPage onBackToCredits={() => undefined} />)
+
+    await userEvent.click(await screen.findByRole('radio', { name: /BNI Virtual Account/i }))
+    await userEvent.click(screen.getByRole('button', { name: /Lanjut Pembayaran/i }))
+
+    expect(createPaymentOrder).toHaveBeenCalledWith({ packageId: 'plus-id', method: 'bni_va' })
   })
 })
