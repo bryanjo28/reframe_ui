@@ -26,7 +26,69 @@ export async function getPaymentPage(){
 export type PaymentDetails={va_number:string|null;total_payment:number;expired_at:string|null;qr_string:string|null}
 export type CreatedPaymentOrder={id:string;message?:string;status:string;credits:number;amount_idr:number;payment_method:string;checkoutAvailable:boolean;checkoutUrl:string|null;payment:PaymentDetails;qrImageUrl?:string|null;expiresAt?:string|null}
 export type CreatePaymentOrderInput=({packageId:string;planId?:never}|{planId:string;packageId?:never})&{method:string}
-export async function createPaymentOrder(input:CreatePaymentOrderInput){return await payload(await fetch(buildApiUrl('/api/payments/orders'),{method:'POST',headers:headers(),body:JSON.stringify(input)})) as CreatedPaymentOrder}
+
+export async function createPaymentOrder(
+  input: CreatePaymentOrderInput
+) {
+  const url = buildApiUrl('/api/payments/orders');
+
+  const requestHeaders = {
+    ...headers(),
+    'Content-Type': 'application/json',
+  };
+
+  const requestBody = JSON.stringify(input);
+
+  console.log('[PAYMENT FE] REQUEST', {
+    url,
+    method: 'POST',
+    contentType: requestHeaders['Content-Type'],
+    input,
+    serializedBody: requestBody,
+  });
+
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: requestBody,
+    });
+  } catch (error) {
+    console.error('[PAYMENT FE] FETCH FAILED', error);
+    throw error;
+  }
+
+  const requestId = response.headers.get('X-Request-Id');
+
+  console.log('[PAYMENT FE] RESPONSE', {
+    status: response.status,
+    ok: response.ok,
+    requestId,
+    contentType: response.headers.get('content-type'),
+  });
+
+  try {
+    const result = await payload(response) as CreatedPaymentOrder;
+
+    console.log('[PAYMENT FE] ORDER RESULT', {
+      id: result?.id,
+      status: result?.status,
+    });
+
+    return result;
+  } catch (error) {
+    console.error('[PAYMENT FE] ORDER ERROR', {
+      requestId,
+      status: response.status,
+      error,
+    });
+
+    throw error;
+  }
+}
+
 export async function getPaymentOrderStatus(id:string){return await payload(await fetch(buildApiUrl(`/api/payments/orders/${id}`),{headers:headers()})) as {status:string}}
 export async function markPaymentNotificationRead(id:string){await payload(await fetch(buildApiUrl(`/api/payments/notifications/${id}/read`),{method:'PATCH',headers:headers()}))}
 
