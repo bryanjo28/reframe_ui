@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SubscriptionPlansPage } from '../src/pages/SubscriptionPlansPage'
@@ -52,5 +53,16 @@ describe('SubscriptionPlansPage', () => {
     expect(screen.queryByText('Paket aktif yang siap dipakai untuk workspace Anda.')).not.toBeInTheDocument()
     expect(screen.queryByText('Available')).not.toBeInTheDocument()
     expect(screen.queryByText('Generate Topic, Content, dan Regenerate AI')).not.toBeInTheDocument()
+  })
+
+  it('opens the QRIS checkout preview when a paid plan is selected', async () => {
+    render(<SubscriptionPlansPage userId="user-1" />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Buy Creator' }))
+
+    const checkout = screen.getByRole('dialog', { name: 'Pembayaran QRIS' })
+    expect(checkout).toBeInTheDocument()
+    expect(within(checkout).getByText(/Rp\s*59\.000/)).toBeInTheDocument()
+    expect(within(checkout).getByText('600 AI Credits per bulan')).toBeInTheDocument()
   })
 })

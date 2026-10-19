@@ -16,10 +16,14 @@ const formatDate = (value: string) => {
 }
 const formatAmount = (value: number | undefined) => typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('id-ID') : '—'
 
+const formatMoney = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
+const successfulStatuses = new Set(['paid', 'settlement', 'capture', 'success'])
+
 export function AiCreditsPage({ onTopUp, onViewPlans }: AiCreditsPageProps) {
   const [data, setData] = useState<PaymentPageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const latestOrder = data?.orders.slice().sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())[0]
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +87,11 @@ export function AiCreditsPage({ onTopUp, onViewPlans }: AiCreditsPageProps) {
           <AppIcon name="chevron-right" />
         </button>
       </div>
+
+      {latestOrder ? <section className="payment-panel ai-credits-order-summary" aria-label="Ringkasan order terbaru">
+        <div className="payment-panel-head"><div><p className="eyebrow">Order terbaru</p><h2>{latestOrder.product_name || `${latestOrder.token_amount.toLocaleString('id-ID')} AI Credits`}</h2></div><span className={`payment-order-status ${latestOrder.status}`}>{successfulStatuses.has(latestOrder.status.toLowerCase()) ? 'Berhasil' : latestOrder.status}</span></div>
+        <div className="ai-credits-order-details"><div><small>Total pembayaran</small><strong>{formatMoney(latestOrder.amount_idr)}</strong></div><div><small>Metode</small><strong>{(latestOrder.provider || 'QRIS').toUpperCase()}</strong></div><div><small>Waktu order</small><strong>{formatDate(latestOrder.paid_at || latestOrder.created_at)}</strong></div><div><small>ID order</small><strong>{latestOrder.id.slice(0, 8).toUpperCase()}</strong></div></div>
+      </section> : null}
 
       <div className="payment-detail-grid ai-credits-history-grid">
         <section className="payment-panel">

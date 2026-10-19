@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
+import { QrisCheckoutModal } from '../components/QrisCheckoutModal'
 import { useToast } from '../components/useToast'
-import { createPaymentOrder, getPaymentPage, type PaymentPageData, type TokenPackage } from '../services/payments'
+import { createPaymentOrder, getPaymentOrderStatus, getPaymentPage, type CreatedPaymentOrder, type PaymentPageData, type TokenPackage } from '../services/payments'
 
 const money = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 const formatDate = (value: string) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -14,12 +15,13 @@ function packageBenefit(pack: TokenPackage) {
   return 'Kapasitas terbesar untuk produksi intensif.'
 }
 
-export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void }) {
+export function PaymentsPage({ onBackToCredits, onPaymentComplete }: { onBackToCredits: () => void; onPaymentComplete?: (orderId: string) => void }) {
   const [data, setData] = useState<PaymentPageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState(false)
   const [selectedId, setSelectedId] = useState('')
   const [error, setError] = useState('')
+  const [checkoutOrder, setCheckoutOrder] = useState<CreatedPaymentOrder | null>(null)
   const toast = useToast()
   const packages = useMemo(() => data?.packages.filter((pack) => allowedPackages.has(pack.code.toLowerCase())) || [], [data?.packages])
   const selectedPackage = packages.find((pack) => pack.id === selectedId) || packages[0] || null
@@ -48,11 +50,7 @@ export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void 
     try {
       const order = await createPaymentOrder(selectedPackage.id)
       toast.info('Order pembayaran dibuat', order.message)
-      if (order.checkoutUrl) {
-        window.location.assign(order.checkoutUrl)
-        return
-      }
-      await load()
+      setCheckoutOrder(order)
     } catch (buyError) {
       toast.error('Pembayaran gagal', buyError instanceof Error ? buyError.message : 'Coba lagi.')
     } finally {
@@ -94,6 +92,19 @@ export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void 
           <div className="payment-trust-list"><span><AppIcon name="lock" /> Pembayaran terenkripsi</span><span><AppIcon name="check" /> Credits diberikan otomatis</span><span><AppIcon name="refresh" /> Webhook aman dan idempotent</span></div>
         </aside>
       </div>
+      {checkoutOrder && selectedPackage ? <QrisCheckoutModal
+        open
+        title={selectedPackage.name}
+        description={`${selectedPackage.token_amount.toLocaleString('id-ID')} AI Credits`}
+        amount={selectedPackage.price_idr}
+        qrImageUrl={checkoutOrder.qrImageUrl}
+        checkoutUrl={checkoutOrder.checkoutUrl}
+        expiresAt={checkoutOrder.expiresAt}
+        orderId={checkoutOrder.id}
+        checkStatus={getPaymentOrderStatus}
+        onPaid={onPaymentComplete}
+        onClose={() => setCheckoutOrder(null)}
+      /> : null}
     </section>
   )
 }

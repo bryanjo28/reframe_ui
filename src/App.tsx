@@ -879,7 +879,7 @@ function AppShell() {
             ) : activePage === 'ai-credits' ? (
               <AiCreditsPage onTopUp={() => handleNavigate('payments')} onViewPlans={() => handleNavigate('subscription-plans')} />
             ) : activePage === 'payments' ? (
-              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} />
+              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} onPaymentComplete={() => handleNavigate('ai-credits')} />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage onStatusChange={(status) => {
                 setThreadsStatus(status)

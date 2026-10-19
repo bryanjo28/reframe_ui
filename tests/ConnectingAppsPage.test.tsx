@@ -32,6 +32,7 @@ describe('ConnectingAppsPage', () => {
     renderPage()
     expect(await screen.findByRole('button', { name: /hubungkan ulang threads/i })).toBeInTheDocument()
     expect(screen.getAllByText('Perlu dihubungkan ulang')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /^disconnect$/i })).not.toBeInTheDocument()
   })
 
   it('invalidates and refetches account state after disconnect', async () => {

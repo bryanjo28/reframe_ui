@@ -32,7 +32,11 @@ describe('AiCreditsPage', () => {
       balance: 98,
       subscriptionBalance: 80,
       topUpBalance: 18,
-      orders: [],
+      orders: [{
+        id: 'order-1', amount_idr: 29000, token_amount: 200, status: 'paid', provider: 'qris',
+        created_at: '2026-10-14T08:00:00.000Z', paid_at: '2026-10-14T08:05:00.000Z',
+        product_name: 'Starter', product_type: 'subscription',
+      }],
       notifications: [{
         id: 'notification-1',
         type: 'payment_success',
@@ -82,5 +86,15 @@ describe('AiCreditsPage', () => {
     expect(creditHistory.closest('.ai-credits-history-grid')).toBe(usageHistory.closest('.ai-credits-history-grid'))
     expect(screen.getByText('top up')).toBeInTheDocument()
     expect(screen.getByText('-2 credits')).toBeInTheDocument()
+  })
+
+  it('shows the latest payment order summary on the AI Credits page', async () => {
+    render(<AiCreditsPage onTopUp={vi.fn()} onViewPlans={vi.fn()} />)
+
+    const summary = await screen.findByRole('region', { name: 'Ringkasan order terbaru' })
+    expect(summary).toHaveTextContent('Starter')
+    expect(summary).toHaveTextContent(/Rp\s*29\.000/)
+    expect(summary).toHaveTextContent('Berhasil')
+    expect(summary).toHaveTextContent('QRIS')
   })
 })

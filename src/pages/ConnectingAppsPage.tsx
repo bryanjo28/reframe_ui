@@ -265,15 +265,6 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
                     <AppIcon name={isConnectingThreads ? 'link' : 'plus'} />
                     {isConnectingThreads ? 'Menghubungkan...' : 'Hubungkan Ulang Threads'}
                   </button>
-                  <button
-                    className="ghost-button integration-unlink-button"
-                    type="button"
-                    onClick={() => setIsDisconnectModalOpen(true)}
-                    disabled={isDeletingThreads || isConnectingThreads || isLoadingThreadsStatus}
-                  >
-                    <AppIcon name="close" />
-                    {isDeletingThreads ? 'Disconnecting...' : 'Disconnect'}
-                  </button>
                 </div>
               ) : isThreads ? (
                 <button

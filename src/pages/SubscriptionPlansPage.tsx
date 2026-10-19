@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
+import { QrisCheckoutModal } from '../components/QrisCheckoutModal'
 import {
   getCurrentSubscription,
   listSubscriptionPlans,
@@ -131,9 +132,11 @@ function isCurrentPlan(plan: NormalizedSubscriptionPlan, current: NormalizedCurr
 function SubscriptionPlanCard({
   plan,
   currentSubscription,
+  onBuy,
 }: {
   plan: NormalizedSubscriptionPlan
   currentSubscription: NormalizedCurrentSubscription | null
+  onBuy: (plan: NormalizedSubscriptionPlan) => void
 }) {
   const isOwned = isCurrentPlan(plan, currentSubscription)
   const tone = getPlanTone(plan)
@@ -163,7 +166,7 @@ function SubscriptionPlanCard({
       </ul>
 
       <div className="subscription-card-footer">
-        <button className="primary-button subscription-action" type="button" disabled={isOwned}>
+        <button className="primary-button subscription-action" type="button" disabled={isOwned} onClick={() => onBuy(plan)}>
           {isOwned ? 'Current Plan' : `Buy ${plan.name}`}
         </button>
       </div>
@@ -215,6 +218,7 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
   const [currentSubscription, setCurrentSubscription] = useState<NormalizedCurrentSubscription | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const [checkoutPlan, setCheckoutPlan] = useState<NormalizedSubscriptionPlan | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -325,6 +329,7 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
               key={plan.id || plan.key}
               plan={plan}
               currentSubscription={currentSubscription}
+              onBuy={setCheckoutPlan}
             />
           ))
         ) : (
@@ -338,6 +343,13 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
         )}
         {!isLoading ? <CustomPlanCard /> : null}
       </div>
+      {checkoutPlan ? <QrisCheckoutModal
+        open
+        title={checkoutPlan.name}
+        description={`${(checkoutPlan.monthlyAiCredits || 0).toLocaleString('id-ID')} AI Credits per bulan`}
+        amount={checkoutPlan.price || 0}
+        onClose={() => setCheckoutPlan(null)}
+      /> : null}
     </section>
   )
 }
