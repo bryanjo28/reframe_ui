@@ -56,6 +56,7 @@ import {
   type ScheduledJobProgress,
 } from './services/threadsAutoPost'
 import { notifyUsageChanged } from './services/usage'
+import { listContentPillars } from './services/contentPillars'
 
 type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated' | 'error'
 
@@ -261,6 +262,7 @@ function AppShell() {
   const [personaStatus, setPersonaStatus] = useState<PersonaStatus>('idle')
   const [showAdminEntryChoice, setShowAdminEntryChoice] = useState(false)
   const [personaConfig, setPersonaConfig] = useState<PersonaConfigRecord | null>(null)
+  const [isFirstSetup, setIsFirstSetup] = useState(() => window.location.pathname === '/first-setup')
   const [activeGenerationJobId, setActiveGenerationJobId] = useState('')
   const [generationProgress, setGenerationProgress] = useState<ScheduledJobProgress | null>(null)
   const [generationCompletion, setGenerationCompletion] = useState<{ jobId: string; status: string; errorMessage?: string } | null>(null)
@@ -428,6 +430,7 @@ function AppShell() {
   }, [])
 
   function resetWorkspaceState() {
+    setIsFirstSetup(false)
     setShowAdminEntryChoice(false)
     setCurrentUser(null)
     setThreadsStatus('disconnected')
@@ -479,6 +482,7 @@ function AppShell() {
       }
 
       if (onboarding?.hasPersona === false) {
+        setIsFirstSetup(true)
         setPersonaConfig(null)
         setPersonaStatus('ready')
         replaceAppPath('/first-setup')
@@ -489,7 +493,20 @@ function AppShell() {
 
       if (runId === bootstrapRunIdRef.current) {
         if (!config) {
+          setIsFirstSetup(true)
           replaceAppPath('/first-setup')
+        } else if (window.location.pathname === '/first-setup') {
+          // If the lookup fails, keep setup open rather than ending a valid session.
+          const pillars = await listContentPillars().catch(() => [])
+          if (runId !== bootstrapRunIdRef.current) return
+          if (!pillars.some((pillar) => (pillar.personaConfigId || pillar.persona_config_id) === config.id)) {
+            setIsFirstSetup(true)
+            setActivePage('content-pillar')
+          } else {
+            setIsFirstSetup(false)
+            setActivePage('dashboard')
+            establishWorkspaceHistory('dashboard')
+          }
         } else if (window.location.pathname !== '/connecting-apps' && !window.location.pathname.startsWith('/admin')) {
           replaceAppPath('/dashboard')
           establishWorkspaceHistory(getStoredActivePage())
@@ -659,6 +676,7 @@ function AppShell() {
       setActivePage('dashboard')
 
       if (authState.onboarding?.hasPersona === false) {
+        setIsFirstSetup(true)
         setPersonaConfig(null)
         setPersonaStatus('ready')
         if (!shouldOfferAdminEntry) replaceAppPath('/first-setup')
@@ -672,6 +690,7 @@ function AppShell() {
           setPersonaConfig(config ?? null)
           setPersonaStatus('ready')
         } else {
+          setIsFirstSetup(!config)
           replaceAppPath(config ? '/dashboard' : '/first-setup')
           if (config) establishWorkspaceHistory('dashboard')
         }
@@ -701,9 +720,18 @@ function AppShell() {
   }, [])
 
   function handlePersonalizePersonaSaved(nextConfig: PersonaConfigRecord) {
+    const continueFirstSetup = isFirstSetup || !personaConfig
+    setIsFirstSetup(continueFirstSetup)
     setPersonaConfig(nextConfig)
     setActivePage('content-pillar')
-    pushWorkspaceHistory('content-pillar')
+    if (continueFirstSetup) replaceAppPath('/first-setup')
+    else pushWorkspaceHistory('content-pillar')
+  }
+
+  function completeFirstSetup() {
+    setIsFirstSetup(false)
+    setActivePage('dashboard')
+    establishWorkspaceHistory('dashboard')
   }
 
   const handleNavigate = useCallback((page: NavKey) => {
@@ -804,13 +832,16 @@ function AppShell() {
         </section>
       </div>
     )
-  } else if (!personaConfig) {
+  } else if (!personaConfig || isFirstSetup) {
     content = (
       <main className="content-area setup-mode setup-immersive">
         <div className="page-transition">
           <PersonalizePage
+            key={personaConfig ? 'setup-content-pillar' : 'setup-persona'}
             personaConfig={personaConfig}
             onPersonaSaved={handlePersonalizePersonaSaved}
+            initialTab={personaConfig ? 'content-pillar' : 'persona'}
+            onPillarSaved={completeFirstSetup}
           />
         </div>
       </main>
