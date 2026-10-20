@@ -5,6 +5,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QrisCheckoutModal } from '../src/components/QrisCheckoutModal'
 
 describe('QrisCheckoutModal', () => {
+  it('keeps checking after countdown zero until server cancellation', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-20T10:00:00Z'))
+    const checkStatus = vi.fn().mockResolvedValueOnce({ status: 'pending' }).mockResolvedValue({ status: 'cancelled' })
+    render(<QrisCheckoutModal open title="Order" description="Credits" amount={29000} orderId="order-1" expiresAt="2026-10-20T10:00:01Z" checkStatus={checkStatus} onClose={() => undefined} />)
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(screen.getByText('Menunggu konfirmasi server')).toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(screen.getByText('Pembayaran dibatalkan/kedaluwarsa')).toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000) })
+    expect(checkStatus).toHaveBeenCalledTimes(2)
+  })
   afterEach(() => vi.useRealTimers())
   it('shows the selected purchase and a safe checkout fallback when a QR image is unavailable', async () => {
     const onClose = vi.fn()

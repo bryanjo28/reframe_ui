@@ -105,7 +105,7 @@ export function TopUpCreditsPage({ onBackToCredits, onPaymentComplete }: { onBac
         vaNumber={checkoutOrder.payment?.va_number}
         qrImageUrl={checkoutOrder.qrImageUrl}
         checkoutUrl={checkoutOrder.checkoutUrl}
-        expiresAt={checkoutOrder.payment?.expired_at || checkoutOrder.expiresAt}
+        expiresAt={checkoutOrder.providerExpiresAt || checkoutOrder.payment?.expired_at || checkoutOrder.expiresAt}
         orderId={checkoutOrder.id}
         checkStatus={getPaymentOrderStatus}
         onPaid={(orderId) => { void load(); onPaymentComplete?.(orderId) }}

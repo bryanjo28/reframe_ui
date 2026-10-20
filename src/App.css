@@ -7345,3 +7345,4 @@ body{background-color:#080609;background-image:radial-gradient(circle at 90% 0%,
   .admin-search { flex-basis: 100%; }
   .admin-pagination { align-items: flex-start; flex-direction: column; }
 }
+.payment-order-actions button.payment-detail-paid{color:#62d993;border-color:rgba(98,217,147,.35);background:rgba(98,217,147,.08)}.qris-order-panel dd{overflow-wrap:anywhere;min-width:0}.qris-status.cancelled,.qris-status.failed{color:#ff718f}

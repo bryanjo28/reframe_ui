@@ -18,6 +18,7 @@ vi.mock('../src/components/useToast', () => ({
 
 describe('PaymentsPage QRIS checkout', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     vi.mocked(getPaymentPage).mockResolvedValue({
       packages: [{ id: 'plus-id', code: 'plus', name: 'Top Up Plus', token_amount: 1000, price_idr: 99000 }],
       balance: 20,
@@ -122,7 +123,32 @@ describe('PaymentsPage QRIS checkout', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Cek status Pending Pack' }))
 
     expect(getPaymentOrderStatus).toHaveBeenCalledWith('pending-1')
+    expect(await screen.findByRole('heading', { name: 'Detail transaksi' })).toBeInTheDocument()
     await waitFor(() => expect(getPaymentPage).toHaveBeenCalledTimes(2))
     expect(await screen.findByText('Berhasil', { selector: '.payment-order-status' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Detail Pending Pack' })).toHaveClass('payment-detail-paid')
+    expect(screen.queryByRole('button', { name: 'Bayar nanti' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Buka halaman pembayaran' })).not.toBeInTheDocument()
+  })
+
+  it.each(['qris', 'bni_va'])('reopens an existing %s order after leaving the page', async (method) => {
+    const base = await vi.mocked(getPaymentPage)()
+    vi.mocked(getPaymentPage).mockResolvedValue({ ...base, orders: [{ id: 'existing-1', status: 'pending', amount_idr: 29000, token_amount: 100, provider: 'pakasir', created_at: '2026-10-20T10:00:00Z', paid_at: null, product_name: 'Existing Pack' }] })
+    vi.mocked(getPaymentOrderStatus).mockResolvedValue({ id: 'existing-1', status: 'pending', payment_method: method, providerExpiresAt: new Date(Date.now() + 600000).toISOString(), checkoutUrl: method === 'qris' ? 'https://payments.example/existing-1' : null, payment: { amount: 29500, expired_at: null, qr_string: method === 'qris' ? 'existing-order-qr' : null, va_number: method === 'qris' ? null : '8800123456789' } })
+    const first = render(<PaymentsPage onBackToCredits={() => undefined} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Cek status Existing Pack' }))
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/Rp\s*29\.500/)
+    first.unmount()
+    render(<PaymentsPage onBackToCredits={() => undefined} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Cek status Existing Pack' }))
+    const modal = await screen.findByRole('dialog')
+    if (method === 'qris') {
+      expect(await within(modal).findByRole('img', { name: 'QRIS untuk Existing Pack' })).toHaveAttribute('src', expect.stringMatching(/^data:image/))
+      expect(within(modal).getByRole('link', { name: 'Buka halaman pembayaran' })).toHaveAttribute('href', 'https://payments.example/existing-1')
+    } else {
+      expect(modal).toHaveTextContent('8800123456789')
+      expect(within(modal).queryByRole('link')).not.toBeInTheDocument()
+    }
+    expect(createPaymentOrder).not.toHaveBeenCalled()
   })
 })

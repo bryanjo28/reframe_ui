@@ -387,7 +387,7 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
         qrString={checkoutOrder.payment?.qr_string}
         vaNumber={checkoutOrder.payment?.va_number}
         checkoutUrl={checkoutOrder.checkoutUrl}
-        expiresAt={checkoutOrder.payment?.expired_at}
+        expiresAt={checkoutOrder.providerExpiresAt || checkoutOrder.payment?.expired_at}
         orderId={checkoutOrder.id}
         checkStatus={getPaymentOrderStatus}
         onPaid={() => { void refreshSubscription(); setCheckoutOrder(null); setCheckoutPlan(null) }}
