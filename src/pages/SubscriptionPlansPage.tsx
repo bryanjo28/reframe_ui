@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { QrisCheckoutModal } from '../components/QrisCheckoutModal'
 import { PaymentMethodSelector } from '../components/PaymentMethodSelector'
+import { notifyUsageChanged } from '../services/usage'
 import { createPaymentOrder, getPaymentOrderStatus, getPaymentPage, type CreatedPaymentOrder } from '../services/payments'
 import {
   getCurrentSubscription,
@@ -12,6 +13,7 @@ import {
 
 type SubscriptionPlansPageProps = {
   userId: string
+  onOpenPayments?: () => void
 }
 
 function formatPrice(plan: NormalizedSubscriptionPlan) {
@@ -215,7 +217,7 @@ function CustomPlanCard() {
   )
 }
 
-export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
+export function SubscriptionPlansPage({ userId, onOpenPayments }: SubscriptionPlansPageProps) {
   const [plans, setPlans] = useState<NormalizedSubscriptionPlan[]>([])
   const [currentSubscription, setCurrentSubscription] = useState<NormalizedCurrentSubscription | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -293,6 +295,12 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
     setIsBuying(true)
     try {
       const order = await createPaymentOrder({ planId: checkoutPlan.id, method: selectedMethod })
+      if (order.checkoutAvailable === false) {
+        setErrorMessage(order.message || 'Order tersimpan. Coba lagi checkout dari riwayat pembayaran.')
+        setCheckoutPlan(null)
+        onOpenPayments?.()
+        return
+      }
       setCheckoutOrder(order)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Gagal membuat order pembayaran. Coba lagi.')
@@ -390,8 +398,8 @@ export function SubscriptionPlansPage({ userId }: SubscriptionPlansPageProps) {
         expiresAt={checkoutOrder.providerExpiresAt || checkoutOrder.payment?.expired_at}
         orderId={checkoutOrder.id}
         checkStatus={getPaymentOrderStatus}
-        onPaid={() => { void refreshSubscription(); setCheckoutOrder(null); setCheckoutPlan(null) }}
-        onClose={() => { setCheckoutOrder(null); setCheckoutPlan(null) }}
+        onPaid={() => { notifyUsageChanged(); void refreshSubscription(); setCheckoutOrder(null); setCheckoutPlan(null) }}
+        onClose={() => { setCheckoutOrder(null); setCheckoutPlan(null); onOpenPayments?.() }}
       /> : null}
     </section>
   )

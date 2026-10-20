@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { QrisCheckoutModal } from '../components/QrisCheckoutModal'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
-import { USAGE_UPDATED_EVENT } from '../services/usage'
-import { getPaymentOrderStatus, getPaymentPage, type PaymentPageData, type PaymentOrder, type PaymentOrderDetails } from '../services/payments'
+import { notifyUsageChanged } from '../services/usage'
+import { retryPaymentCheckout, getPaymentOrderStatus, getPaymentPage, type PaymentPageData, type PaymentOrder, type PaymentOrderDetails } from '../services/payments'
 const money = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 const formatDate = (value: string) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 const orderFilters = [['all', 'Semua'], ['pending', 'Pending'], ['paid', 'Berhasil'], ['failed', 'Gagal'], ['expired', 'Kedaluwarsa'], ['cancelled', 'Dibatalkan'], ['refunded', 'Refund']] as const
@@ -26,6 +26,23 @@ export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void 
     finally { setLoading(false) }
   }, [])
   useEffect(() => { void load() }, [load])
+  async function retryCheckout(order: PaymentOrder) {
+    if (checkingOrderId || order.status.toLowerCase() !== 'pending') return
+    setCheckingOrderId(order.id)
+    try {
+      const result = await retryPaymentCheckout(order.id)
+      if (result.checkoutAvailable === false) {
+        toast.error('Checkout belum tersedia', result.message || 'Order tetap tersimpan. Silakan coba lagi.')
+        return
+      }
+      setSelectedOrder({ order, detail: result })
+    } catch (cause) {
+      toast.error('Checkout belum tersedia', cause instanceof Error ? cause.message : 'Order tetap tersimpan. Silakan coba lagi.')
+      await load()
+    } finally {
+      setCheckingOrderId('')
+    }
+  }
   async function refreshPendingOrder(orderId: string) {
     if (checkingOrderId) return
     setCheckingOrderId(orderId)
@@ -35,7 +52,7 @@ export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void 
       const order = data?.orders.find((item) => item.id === orderId)
       if (order) setSelectedOrder({ order, detail: result })
       if (result.status.toLowerCase() !== 'pending') await load()
-      if (result.status.toLowerCase() === 'paid' && order?.status.toLowerCase() === 'pending') window.dispatchEvent(new Event(USAGE_UPDATED_EVENT))
+      if (result.status.toLowerCase() === 'paid' && order?.status.toLowerCase() === 'pending') notifyUsageChanged()
       toast.info('Status pembayaran diperbarui', statusLabels[result.status.toLowerCase()] || result.status)
     } catch (statusError) {
       toast.error('Status belum dapat diperbarui', statusError instanceof Error ? statusError.message : 'Coba lagi.')
@@ -58,7 +75,7 @@ export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void 
               return <div className="payment-order-row" key={order.id}>
                 <div><strong>{title}</strong><small>{formatDate(order.created_at)} Â· {order.id.slice(0, 8).toUpperCase()}</small></div>
                 <span>{money(order.amount_idr)}</span>
-                <div className="payment-order-actions"><b className={`payment-order-status ${status}`}>{statusLabels[status] || order.status}</b><button className={status === 'paid' ? 'payment-detail-paid' : ''} type="button" disabled={Boolean(checkingOrderId)} aria-label={`${status === 'pending' ? 'Cek status' : 'Detail'} ${title}`} onClick={() => void refreshPendingOrder(order.id)}>{checkingOrderId === order.id ? 'Mengecek...' : status === 'pending' ? 'Cek status' : 'Detail'}</button></div>
+                <div className="payment-order-actions"><b className={`payment-order-status ${status}`}>{statusLabels[status] || order.status}</b><button className={status === 'paid' ? 'payment-detail-paid' : ''} type="button" disabled={Boolean(checkingOrderId)} aria-label={`${status === 'pending' ? 'Cek status' : 'Detail'} ${title}`} onClick={() => void refreshPendingOrder(order.id)}>{checkingOrderId === order.id ? 'Memproses...' : status === 'pending' ? 'Cek status' : 'Detail'}</button>{status === 'pending' ? <button type="button" disabled={Boolean(checkingOrderId)} aria-label={`Coba lagi ${title}`} onClick={() => void retryCheckout(order)}>{checkingOrderId === order.id ? 'Memproses...' : 'Coba lagi'}</button> : null}</div>
               </div>
             }) : <p className="payment-empty">Tidak ada pembayaran dengan status ini.</p>}
           </section> : null}
@@ -80,7 +97,7 @@ export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void 
       onStatusChange={(status) => {
         setData((current) => current ? { ...current, orders: current.orders.map((order) => order.id === selectedOrder.order.id ? { ...order, status } : order) } : current)
         if (status !== 'pending') void load()
-        if (status === 'paid') window.dispatchEvent(new Event(USAGE_UPDATED_EVENT))
+        if (status === 'paid') notifyUsageChanged()
       }}
       onClose={() => setSelectedOrder(null)}
     /> : null}

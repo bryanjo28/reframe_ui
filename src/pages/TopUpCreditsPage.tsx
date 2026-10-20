@@ -3,6 +3,7 @@ import { AppIcon } from '../components/AppIcon'
 import { QrisCheckoutModal } from '../components/QrisCheckoutModal'
 import { PaymentMethodSelector } from '../components/PaymentMethodSelector'
 import { useToast } from '../components/useToast'
+import { notifyUsageChanged } from '../services/usage'
 import { createPaymentOrder, getPaymentOrderStatus, getPaymentPage, type CreatedPaymentOrder, type PaymentPageData, type TokenPackage } from '../services/payments'
 
 const money = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
@@ -15,7 +16,7 @@ function packageBenefit(pack: TokenPackage) {
   return 'Kapasitas terbesar untuk produksi intensif.'
 }
 
-export function TopUpCreditsPage({ onBackToCredits, onPaymentComplete }: { onBackToCredits: () => void; onPaymentComplete?: (orderId: string) => void }) {
+export function TopUpCreditsPage({ onBackToCredits, onPaymentComplete, onOpenPayments }: { onBackToCredits: () => void; onPaymentComplete?: (orderId: string) => void; onOpenPayments?: () => void }) {
   const [data, setData] = useState<PaymentPageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState(false)
@@ -51,6 +52,11 @@ export function TopUpCreditsPage({ onBackToCredits, onPaymentComplete }: { onBac
     setBuying(true)
     try {
       const order = await createPaymentOrder({ packageId: selectedPackage.id, method: selectedMethod })
+      if (order.checkoutAvailable === false) {
+        toast.info('Order tersimpan', order.message || 'Checkout belum tersedia. Coba lagi dari riwayat pembayaran.')
+        onOpenPayments?.()
+        return
+      }
       toast.info('Order pembayaran dibuat', order.message || 'Silakan selesaikan pembayaran.')
       setCheckoutOrder(order)
     } catch (buyError) {
@@ -108,8 +114,8 @@ export function TopUpCreditsPage({ onBackToCredits, onPaymentComplete }: { onBac
         expiresAt={checkoutOrder.providerExpiresAt || checkoutOrder.payment?.expired_at || checkoutOrder.expiresAt}
         orderId={checkoutOrder.id}
         checkStatus={getPaymentOrderStatus}
-        onPaid={(orderId) => { void load(); onPaymentComplete?.(orderId) }}
-        onClose={() => setCheckoutOrder(null)}
+        onPaid={(orderId) => { notifyUsageChanged(); void load(); onPaymentComplete?.(orderId) }}
+        onClose={() => { setCheckoutOrder(null); onOpenPayments?.() }}
       /> : null}
     </section>
   )

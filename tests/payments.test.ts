@@ -1,5 +1,13 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createPaymentOrder, getNotifications, getPaymentPage, markPaymentNotificationRead } from '../src/services/payments'
+import { createPaymentOrder, retryPaymentCheckout, getNotifications, getPaymentPage, markPaymentNotificationRead } from '../src/services/payments'
+
+it('retries checkout on the existing order with authorization', async () => {
+  localStorage.setItem('alurin.authToken', 'payment-token')
+  const request = vi.fn(async () => new Response(JSON.stringify({ data: { id: 'saved-order', checkoutAvailable: true } }), { status: 200 }))
+  vi.stubGlobal('fetch', request)
+  expect(await retryPaymentCheckout('saved-order')).toMatchObject({ id: 'saved-order', checkoutAvailable: true })
+  expect(request).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/api/payments/orders/saved-order/checkout' }), expect.objectContaining({ method: 'POST', headers: expect.objectContaining({ Authorization: 'Bearer payment-token' }) }))
+})
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear() })
 

@@ -18,6 +18,25 @@ vi.mock('../src/services/payments', () => ({
 }))
 
 describe('SubscriptionPlansPage', () => {
+  it('opens history when the subscription order is saved without checkout', async () => {
+    const onOpenPayments = vi.fn()
+    vi.mocked(createPaymentOrder).mockResolvedValueOnce({ id: 'saved-plan', status: 'pending', credits: 600, amount_idr: 59000, payment_method: 'qris', checkoutAvailable: false, checkoutUrl: null })
+    render(<SubscriptionPlansPage userId="user-1" onOpenPayments={onOpenPayments} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Buy Creator' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Bayar sekarang' }))
+    expect(onOpenPayments).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+  it.each(['Tutup pembayaran', 'Bayar nanti'])('opens history after subscription checkout: %s', async (action) => {
+    const onOpenPayments = vi.fn()
+    render(<SubscriptionPlansPage userId="user-1" onOpenPayments={onOpenPayments} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Buy Creator' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Bayar sekarang' }))
+    await screen.findByRole('dialog', { name: 'Pembayaran BNI Virtual Account' })
+    await userEvent.click(screen.getByRole('button', { name: action }))
+    expect(onOpenPayments).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
   beforeEach(() => {
     vi.mocked(getCurrentSubscription).mockResolvedValue(null)
     vi.mocked(listSubscriptionPlans).mockResolvedValue([

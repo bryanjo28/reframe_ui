@@ -877,13 +877,13 @@ function AppShell() {
                 onReviewContent={() => handleNavigate('content-bank')}
               />
             ) : activePage === 'subscription-plans' ? (
-              <SubscriptionPlansPage userId={currentUser?.id || ''} />
+              <SubscriptionPlansPage userId={currentUser?.id || ''} onOpenPayments={() => handleNavigate('payments')} />
             ) : activePage === 'ai-credits' ? (
               <AiCreditsPage onTopUp={() => handleNavigate('top-up-credits')} onViewPlans={() => handleNavigate('subscription-plans')} />
             ) : activePage === 'payments' ? (
               <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} />
             ) : activePage === 'top-up-credits' ? (
-              <TopUpCreditsPage onBackToCredits={() => handleNavigate('ai-credits')} onPaymentComplete={() => handleNavigate('ai-credits')} />
+              <TopUpCreditsPage onBackToCredits={() => handleNavigate('ai-credits')} onPaymentComplete={() => handleNavigate('ai-credits')} onOpenPayments={() => handleNavigate('payments')} />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage onStatusChange={(status) => {
                 setThreadsStatus(status)

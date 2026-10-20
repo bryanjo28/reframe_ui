@@ -25,7 +25,7 @@ export async function getPaymentPage(){
 }
 export type PaymentDetails={va_number:string|null;total_payment?:number;amount?:number;expired_at:string|null;qr_string:string|null;txn_id?:string;payment_method?:string}
 export type PaymentOrderDetails={id?:string;status:string;credited?:boolean;payment_method?:string;providerExpiresAt?:string|null;checkoutUrl?:string|null;payment?:PaymentDetails|null}
-export type CreatedPaymentOrder={id:string;message?:string;status:string;credits:number;amount_idr:number;payment_method:string;checkoutAvailable:boolean;checkoutUrl:string|null;payment:PaymentDetails;qrImageUrl?:string|null;expiresAt?:string|null;providerExpiresAt?:string|null}
+export type CreatedPaymentOrder={id:string;message?:string;status:string;credits:number;amount_idr:number;payment_method:string;checkoutAvailable:boolean;checkoutUrl:string|null;payment?:PaymentDetails|null;qrImageUrl?:string|null;expiresAt?:string|null;providerExpiresAt?:string|null}
 export type CreatePaymentOrderInput=({packageId:string;planId?:never}|{planId:string;packageId?:never})&{method:string}
 
 export async function createPaymentOrder(
@@ -91,6 +91,7 @@ export async function createPaymentOrder(
 }
 
 export async function getPaymentOrderStatus(id:string){return await payload(await fetch(buildApiUrl(`/api/payments/orders/${encodeURIComponent(id)}`),{headers:headers()})) as PaymentOrderDetails}
+export async function retryPaymentCheckout(id:string){return await payload(await fetch(buildApiUrl(`/api/payments/orders/${encodeURIComponent(id)}/checkout`),{method:'POST',headers:headers()})) as CreatedPaymentOrder}
 export async function markPaymentNotificationRead(id:string){await payload(await fetch(buildApiUrl(`/api/payments/notifications/${id}/read`),{method:'PATCH',headers:headers()}))}
 
 export async function getNotifications(): Promise<PaymentNotification[]> {
