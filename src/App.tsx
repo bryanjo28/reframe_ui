@@ -912,7 +912,7 @@ function AppShell() {
             ) : activePage === 'ai-credits' ? (
               <AiCreditsPage onTopUp={() => handleNavigate('top-up-credits')} onViewPlans={() => handleNavigate('subscription-plans')} />
             ) : activePage === 'payments' ? (
-              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} />
+              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} onNewPayment={(productType) => handleNavigate(productType === 'subscription' ? 'subscription-plans' : 'top-up-credits')} />
             ) : activePage === 'top-up-credits' ? (
               <TopUpCreditsPage onBackToCredits={() => handleNavigate('ai-credits')} onPaymentComplete={() => handleNavigate('ai-credits')} onOpenPayments={() => handleNavigate('payments')} />
             ) : activePage === 'connecting-apps' ? (

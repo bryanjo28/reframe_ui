@@ -2,7 +2,7 @@ import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
 import { createApiResponseError, SESSION_EXPIRED_EVENT } from '../utils/apiError'
 export type TokenPackage={id:string;code:string;name:string;token_amount:number;price_idr:number}
-export type PaymentOrder={id:string;amount_idr:number;token_amount:number;status:string;provider:string|null;payment_method?:string|null;created_at:string;paid_at:string|null;product_name?:string;product_type?:string}
+export type PaymentOrder={id:string;amount_idr:number;token_amount:number;status:string;provider:string|null;payment_method?:string|null;created_at:string;paid_at:string|null;product_name?:string;product_type?:string;checkoutAvailable?:boolean}
 export type PaymentNotification={id:string;type:string;title:string;message:string;read_at:string|null;created_at:string}
 export type TokenLedgerItem={id:string;amount?:number;credits_delta?:number;balance_after:number;kind?:string;transaction_type?:string;source_type?:string|null;description?:string;created_at:string}
 export type UsageHistoryItem={request_id:string;feature:string;total_tokens:number;credits_charged:number;status:string;created_at:string}
@@ -24,7 +24,7 @@ export async function getPaymentPage(){
   return {...data,notifications:Array.isArray(data.notifications)?data.notifications:[],ledger:Array.isArray(data.ledger)?data.ledger:[],usageHistory:Array.isArray(data.usageHistory)?data.usageHistory:[],paymentMethods:Array.isArray(data.paymentMethods)&&data.paymentMethods.length?data.paymentMethods:['qris']}
 }
 export type PaymentDetails={va_number:string|null;total_payment?:number;amount?:number;expired_at:string|null;qr_string:string|null;txn_id?:string;payment_method?:string}
-export type PaymentOrderDetails={id?:string;status:string;credited?:boolean;payment_method?:string;providerExpiresAt?:string|null;checkoutUrl?:string|null;payment?:PaymentDetails|null}
+export type PaymentOrderDetails={id?:string;checkoutAvailable?:boolean;status:string;credited?:boolean;payment_method?:string;providerExpiresAt?:string|null;checkoutUrl?:string|null;payment?:PaymentDetails|null}
 export type CreatedPaymentOrder={id:string;message?:string;status:string;credits:number;amount_idr:number;payment_method:string;checkoutAvailable:boolean;checkoutUrl:string|null;payment?:PaymentDetails|null;qrImageUrl?:string|null;expiresAt?:string|null;providerExpiresAt?:string|null}
 export type CreatePaymentOrderInput=({packageId:string;planId?:never}|{planId:string;packageId?:never})&{method:string}
 
