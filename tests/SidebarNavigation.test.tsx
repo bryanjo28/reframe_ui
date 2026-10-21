@@ -61,10 +61,17 @@ test('shows current AI credit usage against the active plan allowance', async ()
       } } } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     if (pathname === '/api/subscriptions/me') {
-      return new Response(JSON.stringify({ data: { planKey: 'pro', planName: 'Pro' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ data: {
+        planKey: 'pro',
+        planName: 'Pro',
+        plan: { id: 'starter-plan', code: 'starter', name: 'Starter', monthlyAiCredits: 200 },
+      } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     if (pathname === '/api/subscription-plans') {
-      return new Response(JSON.stringify({ data: [{ id: 'pro', code: 'pro', name: 'Pro', monthlyAiCredits: 1200 }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ data: [
+        { id: 'starter-plan', code: 'starter', name: 'Starter', monthlyAiCredits: 200 },
+        { id: 'pro', code: 'pro', name: 'Pro', monthlyAiCredits: 1200 },
+      ] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     return new Response(null, { status: 404 })
   }))
@@ -87,5 +94,6 @@ test('shows current AI credit usage against the active plan allowance', async ()
   )
 
   expect(await screen.findByText('AI Credit Usage')).toBeInTheDocument()
-  expect(await screen.findByText('12 / 1.200')).toBeInTheDocument()
+  expect(await screen.findByText('12 / 200')).toBeInTheDocument()
+  expect(screen.getByText('Starter dipakai sebagai batas penggunaan saat ini.')).toBeInTheDocument()
 })

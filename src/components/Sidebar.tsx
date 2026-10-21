@@ -167,7 +167,7 @@ export function Sidebar({
           : null
 
         setUsedCredits(summary?.credits.usedThisMonth ?? null)
-        setCreditLimit(activePlan?.monthlyAiCredits ?? null)
+        setCreditLimit(currentSubscription?.monthlyAiCredits ?? activePlan?.monthlyAiCredits ?? null)
         setPlanName(currentSubscription?.planName || activePlan?.name || 'Current plan')
         setPlanKey(activePlan?.key || currentSubscription?.planKey || '')
       } catch {
