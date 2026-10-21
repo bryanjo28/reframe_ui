@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { AppIcon } from '../../components/AppIcon'
 import { buildApiHeaders, buildApiUrl } from '../../config/api'
 import { getCurrentAuthToken } from '../../services/authService'
 
-type AdminSection = 'overview' | 'users' | 'profitability' | 'transactions' | 'ai-usage' | 'scheduled-posts' | 'audit-logs' | 'error-logs'
+type AdminSection = 'overview' | 'users' | 'profitability' | 'transactions' | 'ai-usage' | 'scheduled-posts' | 'audit-logs' | 'error-logs' | 'feedback' | 'referrals' | 'subscription-pricing' | 'subscription-financials'
 type AdminOverview = {
   metrics: {
     registeredUsers?: number
@@ -13,6 +13,13 @@ type AdminOverview = {
     payingUsers?: number
     paidTopUpRevenueIdr?: number
     monthlyRecurringRevenueIdr?: number | null
+    subscriptionCashCollectedIdr?: number
+    recognizedSubscriptionRevenueIdr?: number
+    remainingServiceObligationIdr?: number
+    monthlySubscriptionCreditsGranted?: number
+    subscriptionActualAiCostUsd?: number
+    subscriptionEstimatedAiCostIdr?: number
+    estimatedSubscriptionContributionIdr?: number
     estimatedContributionBeforeGatewayFeesIdr?: number
     freeToPaidConversionRate?: number | null
     storedProviderCostUsdRateUnverified?: number
@@ -37,16 +44,28 @@ type AdminOverview = {
   }
   generatedAt: string
   trends?: { daily?: AdminRow[]; revenueByProduct?: AdminRow[]; aiByFeature?: AdminRow[]; activeSubscribersByPlan?: AdminRow[] }
+  subscriptionFinancials?: { setupRequired?: boolean; metrics?: AdminRow }
   coverage?: Record<string, boolean>
   reportingSetupRequired?: boolean
 }
 type AdminRow = Record<string, unknown>
 type AdminList = { items: AdminRow[]; total: number; page: number; limit: number; truncated?: boolean }
+type ReferralAdminData = AdminList & { config: AdminRow; metrics: AdminRow }
+type SubscriptionPricingConfig = { defaultDurationMonths: number; enabledDurations: number[]; expiryReminderDays: number[]; renewalPolicy: string; plans: Record<string, { prices: Record<string, number>; monthlyAiCredits: number }> }
+type SubscriptionPricingData = { version: number; draft: SubscriptionPricingConfig; published: SubscriptionPricingConfig; publishedAt: string; updatedAt: string; impact: { changed: boolean; fromVersion: number; proposedVersion: number } }
+type SubscriptionFinancials = { asOf: string; metrics: AdminRow; contracts: AdminRow[] }
 type Payload<T> = { data?: T; message?: string }
 
 const metricLabels: Array<[keyof AdminOverview['metrics'], string, string, 'number' | 'currency' | 'usd' | 'percent']> = [
   ['paidTopUpRevenueIdr', 'Recorded top-up revenue', 'Pembayaran top-up berstatus berhasil', 'currency'],
   ['monthlyRecurringRevenueIdr', 'MRR', 'Riwayat pembayaran subscription belum tersedia', 'currency'],
+  ['subscriptionCashCollectedIdr', 'Subscription cash collected', 'Kas masuk dari QRIS subscription terverifikasi', 'currency'],
+  ['recognizedSubscriptionRevenueIdr', 'Recognized subscription revenue', 'Dialokasikan sesuai masa layanan', 'currency'],
+  ['remainingServiceObligationIdr', 'Remaining service obligation', 'Nilai periode layanan yang belum diberikan', 'currency'],
+  ['monthlySubscriptionCreditsGranted', 'Subscription credits granted', 'Kredit bulanan yang tercatat di ledger', 'number'],
+  ['subscriptionActualAiCostUsd', 'Stored subscription AI cost', 'USD tersimpan di log penggunaan', 'usd'],
+  ['subscriptionEstimatedAiCostIdr', 'Estimated subscription AI cost', 'Estimasi internal dari log', 'currency'],
+  ['estimatedSubscriptionContributionIdr', 'Estimated subscription contribution', 'Recognized revenue less estimated AI cost', 'currency'],
   ['estimatedContributionBeforeGatewayFeesIdr', 'Estimated contribution', 'Top-up less estimated AI cost; before fees', 'currency'],
   ['estimatedAiCostIdr', 'Estimated AI cost', 'Kurs dan tarif perlu verifikasi', 'currency'],
   ['payingUsers', 'Top-up payers', 'Pengguna dengan top-up sukses pada periode', 'number'],
@@ -81,6 +100,10 @@ const sections: Array<[AdminSection, string, string]> = [
   ['scheduled-posts', 'Scheduled posts', 'Antrean dan hasil publish'],
   ['audit-logs', 'Audit logs', 'Riwayat tindakan admin'],
   ['error-logs', 'Error logs', 'Error server dan API'],
+  ['feedback', 'Feedback', 'Masukan dari pengguna'],
+  ['referrals', 'Referrals', 'Program referral, performa, dan validasi reward'],
+  ['subscription-pricing', 'Subscription plans', 'Harga multi-durasi, credits bulanan, dan reminder'],
+  ['subscription-financials', 'Subscription finance', 'Kas, revenue diakui, kewajiban layanan, dan biaya AI'],
 ]
 
 function formatNumber(value: unknown) {
@@ -125,6 +148,18 @@ async function adminRequest<T>(path: string) {
   return payload.data
 }
 
+async function adminMutation<T>(path: string, method: 'PATCH' | 'POST', body?: unknown) {
+  const token = getCurrentAuthToken()
+  const response = await fetch(buildApiUrl(path), {
+    method,
+    headers: buildApiHeaders({ additionalHeaders: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json' } }),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const payload = (await response.json()) as Payload<T>
+  if (!response.ok) throw new Error(payload.message || 'Perubahan admin gagal disimpan.')
+  return payload.data
+}
+
 function value(row: AdminRow, key: string) {
   const item = row[key]
   return typeof item === 'string' || typeof item === 'number' ? item : '—'
@@ -164,10 +199,6 @@ function TrendChart({ title, rows, valueKey, compareKey, unit = 'number' }: { ti
   })}</div><div className="admin-chart-scale"><span>{format(0)}</span><span>{format(maxValue)}</span></div></article>
 }
 
-function UnavailableChart({ title, message }: { title: string; message: string }) {
-  return <article className="panel admin-chart-card"><h3>{title}</h3><p className="admin-data-note">{message}</p></article>
-}
-
 function reportingWindow(days: number) {
   const end = new Date()
   const start = new Date()
@@ -193,6 +224,13 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState('highest_revenue')
   const [plan, setPlan] = useState('')
+  const [referralData, setReferralData] = useState<ReferralAdminData | null>(null)
+  const [referralSaving, setReferralSaving] = useState(false)
+  const [referralActionError, setReferralActionError] = useState('')
+  const [subscriptionPricing, setSubscriptionPricing] = useState<SubscriptionPricingData | null>(null)
+  const [pricingSaving, setPricingSaving] = useState(false)
+  const [pricingActionError, setPricingActionError] = useState('')
+  const [subscriptionFinancials, setSubscriptionFinancials] = useState<SubscriptionFinancials | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -205,6 +243,17 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
         if (range.end) params.set('to', range.end)
         const data = await adminRequest<AdminOverview>(`/api/admin/overview?${params.toString()}`)
         setOverview(data || null)
+      } else if (section === 'subscription-pricing') {
+        const data = await adminRequest<SubscriptionPricingData>('/api/admin/subscription-pricing')
+        setSubscriptionPricing(data || null)
+      } else if (section === 'subscription-financials') {
+        const range = isoRange(from, to)
+        const params = new URLSearchParams()
+        if (range.start) params.set('from', range.start)
+        if (range.end) params.set('to', range.end)
+        const data = await adminRequest<SubscriptionFinancials>(`/api/admin/subscription-financials?${params.toString()}`)
+        setSubscriptionFinancials(data || null)
+        setList({ items: data?.contracts || [], total: data?.contracts?.length || 0, page: 1, limit: 10000 })
       } else {
         const params = new URLSearchParams({ page: String(page), limit: '25' })
         if (query.trim()) params.set('query', query.trim())
@@ -222,6 +271,7 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
         } else {
           const data = await adminRequest<AdminList>(`/api/admin/${section}?${params.toString()}`)
           setList(data || { items: [], total: 0, page, limit: 25 })
+          if (section === 'referrals') setReferralData(data as ReferralAdminData || null)
           setUserDetail(null)
         }
       }
@@ -242,10 +292,75 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
     setSection('users')
   }
 
+  const saveReferralSettings = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!referralData) return
+    setReferralSaving(true)
+    setReferralActionError('')
+    try {
+      const form = new FormData(event.currentTarget)
+      await adminMutation('/api/admin/referral-settings', 'PATCH', {
+        enabled: form.get('enabled') === 'on', visible: form.get('visible') === 'on',
+        referrerBonusCredits: Number(form.get('referrerBonusCredits')), referredBonusCredits: Number(form.get('referredBonusCredits')),
+        attributionWindowDays: Number(form.get('attributionWindowDays')), validationDays: Number(form.get('validationDays')),
+        rewardExpirationDays: Number(form.get('rewardExpirationDays')),
+        eligiblePlanCodes: ['starter', 'creator', 'pro'].filter((item) => form.get(`plan-${item}`) === 'on'),
+      })
+      await load()
+    } catch (actionError) { setReferralActionError(actionError instanceof Error ? actionError.message : 'Pengaturan referral gagal disimpan.') }
+    finally { setReferralSaving(false) }
+  }
+
+  const rejectReferral = async (row: AdminRow) => {
+    const reason = window.prompt('Alasan menolak referral ini (minimal 5 karakter):')
+    if (!reason) return
+    setReferralActionError('')
+    try { await adminMutation(`/api/admin/referrals/${encodeURIComponent(String(row.id))}/reject`, 'POST', { reason }); await load() }
+    catch (actionError) { setReferralActionError(actionError instanceof Error ? actionError.message : 'Referral gagal ditolak.') }
+  }
+
+  const processDueReferrals = async () => {
+    setReferralActionError('')
+    try { const result = await adminMutation<{ processed: number }>('/api/admin/referrals/process-due', 'POST'); window.alert(`${result?.processed || 0} referral diproses.`); await load() }
+    catch (actionError) { setReferralActionError(actionError instanceof Error ? actionError.message : 'Reward referral gagal diproses.') }
+  }
+
+  const updatePricingDraft = (update: (draft: SubscriptionPricingConfig) => SubscriptionPricingConfig) => {
+    setSubscriptionPricing((current) => current ? { ...current, draft: update(current.draft), impact: { ...current.impact, changed: true } } : current)
+  }
+
+  const savePricingDraft = async () => {
+    if (!subscriptionPricing) return
+    setPricingSaving(true); setPricingActionError('')
+    try {
+      const next = await adminMutation<SubscriptionPricingData>('/api/admin/subscription-pricing/draft', 'PATCH', { config: subscriptionPricing.draft })
+      if (next) setSubscriptionPricing(next)
+    } catch (actionError) { setPricingActionError(actionError instanceof Error ? actionError.message : 'Draft harga gagal disimpan.') }
+    finally { setPricingSaving(false) }
+  }
+
+  const publishPricing = async () => {
+    if (!subscriptionPricing || !window.confirm('Publikasikan harga dan jatah credits ini? Order baru akan langsung memakai konfigurasi terbaru.')) return
+    setPricingSaving(true); setPricingActionError('')
+    try {
+      const next = await adminMutation<SubscriptionPricingData>('/api/admin/subscription-pricing/publish', 'POST')
+      if (next) setSubscriptionPricing(next)
+    } catch (actionError) { setPricingActionError(actionError instanceof Error ? actionError.message : 'Konfigurasi gagal dipublikasikan.') }
+    finally { setPricingSaving(false) }
+  }
+
   const columns: Array<[string, string, (row: AdminRow) => ReactNode]> = section === 'profitability' ? [
     ['user', 'User', (row) => <><strong>{value(row, 'full_name') || value(row, 'account_name')}</strong><small>{value(row, 'account_name')}</small></>],
     ['plan_name', 'Plan', (row) => value(row, 'plan_name')],
-    ['subscription_paid', 'Subscription paid', () => 'Unavailable'],
+    ['acquisition_source', 'Acquisition', (row) => <><StatusBadge status={row.acquisition_source} />{row.referrer_user_id ? <small>Referral status: {String(row.referral_status || '').replaceAll('_', ' ')}</small> : null}</>],
+    ['referral_credits_issued', 'Referral credits issued', (row) => formatNumber(row.referral_credits_issued)],
+    ['referral_credits_available', 'Referral credits available', (row) => formatNumber(row.referral_credits_available)],
+    ['referral_reward_cost_idr_estimate', 'Est. reward cost', (row) => formatCurrency(row.referral_reward_cost_idr_estimate)],
+    ['subscription_cash_collected_idr', 'Subscription cash', (row) => formatCurrency(row.subscription_cash_collected_idr)],
+    ['subscription_recognized_revenue_idr', 'Recognized revenue', (row) => formatCurrency(row.subscription_recognized_revenue_idr)],
+    ['remaining_service_obligation_idr', 'Service obligation', (row) => formatCurrency(row.remaining_service_obligation_idr)],
+    ['subscription_duration_months', 'Max term', (row) => row.subscription_duration_months ? `${value(row, 'subscription_duration_months')} mo` : '—'],
+    ['monthly_credits_granted', 'Subscription credits', (row) => formatNumber(row.monthly_credits_granted)],
     ['top_up_paid_idr', 'Top-up paid', (row) => formatCurrency(row.top_up_paid_idr)],
     ['known_net_revenue_idr', 'Known net revenue', (row) => formatCurrency(row.known_net_revenue_idr)],
     ['credits_granted', 'Credits granted', (row) => formatNumber(row.credits_granted)], ['credits_used', 'Credits used', (row) => formatNumber(row.credits_used)],
@@ -288,6 +403,35 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
     ['created_at', 'Time', (row) => formatDate(row.created_at)], ['admin_user_id', 'Admin ID', (row) => <code>{value(row, 'admin_user_id')}</code>],
     ['action', 'Action', (row) => value(row, 'action')], ['target_type', 'Target', (row) => `${value(row, 'target_type')} / ${value(row, 'target_id')}`],
     ['reason', 'Reason', (row) => value(row, 'reason')], ['result_status', 'Result', (row) => <StatusBadge status={row.result_status} />],
+  ] : section === 'feedback' ? [
+    ['created_at', 'Submitted', (row) => formatDate(row.created_at)],
+    ['user_name', 'User', (row) => <><strong>{value(row, 'user_name')}</strong><small>{value(row, 'user_email')}</small></>],
+    ['message', 'Feedback', (row) => <span className="admin-feedback-preview">{String(row.message || '')}</span>],
+    ['page_path', 'Page', (row) => value(row, 'page_path')],
+  ] : section === 'referrals' ? [
+    ['registeredAt', 'Terdaftar', (row) => formatDate(row.registeredAt)],
+    ['referrer', 'Pengundang', (row) => <strong>{value(row, 'referrer')}</strong>],
+    ['referred', 'Pengguna baru', (row) => <strong>{value(row, 'referred')}</strong>],
+    ['referralCode', 'Kode', (row) => <code>{value(row, 'referralCode')}</code>],
+    ['subscriptionPlan', 'Paket pertama', (row) => value(row, 'subscriptionPlan')],
+    ['paymentStatus', 'Pembayaran', (row) => <StatusBadge status={row.paymentStatus} />],
+    ['paymentAmountIdr', 'Nominal', (row) => row.paymentAmountIdr == null ? '—' : formatCurrency(row.paymentAmountIdr)],
+    ['rewardStatus', 'Reward', (row) => <><StatusBadge status={row.rewardStatus} />{row.reviewRequired ? <small>Perlu ditinjau</small> : null}</>],
+    ['rewardCredits', 'Bonus', (row) => row.rewardCredits ? `${formatNumber((row.rewardCredits as AdminRow).referrer)} / ${formatNumber((row.rewardCredits as AdminRow).referred)}` : '—'],
+    ['action', 'Tindakan', (row) => ['registered', 'awaiting_payment', 'pending_validation'].includes(String(row.rewardStatus)) ? <button className="ghost-button" type="button" onClick={(event) => { event.stopPropagation(); void rejectReferral(row) }}>Tolak</button> : '—'],
+  ] : section === 'subscription-financials' ? [
+    ['user_name', 'User', (row) => <><strong>{value(row, 'user_name') || value(row, 'user_id')}</strong><small>{value(row, 'user_id')}</small></>],
+    ['plan_name', 'Plan', (row) => value(row, 'plan_name')], ['duration_months', 'Duration', (row) => `${formatNumber(row.duration_months)} months`],
+    ['payment_amount_idr', 'Cash paid', (row) => formatCurrency(row.payment_amount_idr)], ['paid_at', 'Paid at', (row) => formatDate(row.paid_at)],
+    ['payment_status', 'Verification', (row) => <><StatusBadge status={row.payment_status} /><small>{value(row, 'payment_verification_source') || '—'}</small></>],
+    ['starts_at', 'Service start', (row) => formatDate(row.starts_at)], ['ends_at', 'Service end', (row) => formatDate(row.ends_at)],
+    ['monthly_credits', 'Credits / month', (row) => formatNumber(row.monthly_credits)], ['monthly_credits_granted', 'Credits granted', (row) => formatNumber(row.monthly_credits_granted)],
+    ['credits_used', 'Credits used', (row) => formatNumber(row.credits_used)], ['total_tokens', 'Tokens', (row) => formatNumber(row.total_tokens)],
+    ['actual_ai_cost_usd', 'Stored AI cost (USD)', (row) => `$${Number(row.actual_ai_cost_usd || 0).toFixed(4)}`],
+    ['estimated_ai_cost_idr', 'Est. AI cost', (row) => formatEstimatedCostIdr(row.estimated_ai_cost_idr)],
+    ['recognized_revenue_idr', 'Recognized revenue', (row) => formatCurrency(row.recognized_revenue_idr)],
+    ['remaining_service_obligation_idr', 'Service obligation', (row) => formatCurrency(row.remaining_service_obligation_idr)],
+    ['estimated_contribution_profit_idr', 'Est. contribution*', (row) => formatCurrency(row.estimated_contribution_profit_idr)],
   ] : [
     ['created_at', 'Time', (row) => formatDate(row.created_at)], ['status_code', 'HTTP', (row) => <StatusBadge status={row.status_code} />],
     ['method_path', 'Request', (row) => <><strong>{value(row, 'method')} {value(row, 'path')}</strong><small>{value(row, 'error_name')}</small></>],
@@ -312,13 +456,13 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
         <div className="admin-main">
           <header className="admin-section-heading"><div><p className="eyebrow">Operations</p><h2>{sections.find(([key]) => key === section)?.[1]}</h2></div><button className="ghost-button" type="button" onClick={() => void load()} disabled={loading}>Muat ulang</button></header>
 
-          {section !== 'overview' && section !== 'audit-logs' ? <div className="panel admin-filters">
-            <label className="admin-search"><span className="sr-only">Cari</span><input value={query} onChange={(event) => { setPage(1); setQuery(event.target.value) }} placeholder={section === 'users' ? 'Cari nama atau account name' : section === 'error-logs' ? 'Cari kode error atau request ID' : 'Cari user, order atau request'} /></label>
+          {section !== 'overview' && section !== 'audit-logs' && section !== 'subscription-pricing' && section !== 'subscription-financials' ? <div className="panel admin-filters">
+            <label className="admin-search"><span className="sr-only">Cari</span><input value={query} onChange={(event) => { setPage(1); setQuery(event.target.value) }} placeholder={section === 'users' ? 'Cari nama atau account name' : section === 'error-logs' ? 'Cari kode error atau request ID' : section === 'feedback' ? 'Cari nama, email, atau feedback' : 'Cari user, order atau request'} /></label>
             {section === 'profitability' ? <>
               <label><span>Paket</span><select value={plan} onChange={(event) => { setPage(1); setPlan(event.target.value) }}><option value="">Semua paket</option>{['free', 'starter', 'creator', 'pro'].map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
               <label><span>Urutkan</span><select value={sort} onChange={(event) => { setPage(1); setSort(event.target.value) }}>{[['highest_revenue','Revenue tertinggi'],['highest_ai_cost','Biaya AI tertinggi'],['highest_token_usage','Token tertinggi'],['highest_credit_usage','Kredit tertinggi'],['lowest_profit','Profit terendah'],['highest_profit','Profit tertinggi'],['negative_profit','Profit negatif']].map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
             </> : null}
-            {section !== 'users' && section !== 'profitability' ? <label><span>Status</span><select value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}><option value="">Semua status</option>{(section === 'transactions' ? ['pending', 'paid', 'failed', 'expired', 'cancelled', 'refunded'] : section === 'ai-usage' ? ['success', 'failed'] : section === 'error-logs' ? ['500', '502', '503', '504', '599'] : ['scheduled', 'processing', 'success', 'published', 'failed', 'uncertain', 'cancelled']).map((item) => <option key={item} value={item}>{item}</option>)}</select></label> : null}
+            {section !== 'users' && section !== 'profitability' && section !== 'feedback' ? <label><span>Status</span><select value={status} onChange={(event) => { setPage(1); setStatus(event.target.value) }}><option value="">Semua status</option>{(section === 'transactions' ? ['pending', 'paid', 'failed', 'expired', 'cancelled', 'refunded'] : section === 'ai-usage' ? ['success', 'failed'] : section === 'error-logs' ? ['500', '502', '503', '504', '599'] : section === 'referrals' ? ['awaiting_payment', 'pending_validation', 'rewarded', 'rejected', 'canceled'] : ['scheduled', 'processing', 'success', 'published', 'failed', 'uncertain', 'cancelled']).map((item) => <option key={item} value={item}>{item.replaceAll('_', ' ')}</option>)}</select></label> : null}
             {section !== 'users' ? <><label><span>Dari</span><input type="date" value={from} onChange={(event) => { setPage(1); setFrom(event.target.value) }} /></label><label><span>Sampai</span><input type="date" value={to} onChange={(event) => { setPage(1); setTo(event.target.value) }} /></label></> : null}
           </div> : null}
 
@@ -327,13 +471,50 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
           {section === 'overview' ? <div className="panel admin-filters admin-date-presets"><div className="admin-range-presets"><button type="button" className="ghost-button" onClick={() => { const w = reportingWindow(1); setFrom(w.from); setTo(w.to) }}>Hari ini</button><button type="button" className="ghost-button" onClick={() => { const w = reportingWindow(7); setFrom(w.from); setTo(w.to) }}>7 hari</button><button type="button" className="ghost-button" onClick={() => { const w = reportingWindow(30); setFrom(w.from); setTo(w.to) }}>30 hari</button></div><label><span>Dari</span><input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label><span>Sampai</span><input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label></div> : null}
           {!loading && !error && section === 'overview' && overview ? <>
             <div className="admin-metric-grid">{metricLabels.map(([key, label, description, kind]) => <article className="panel admin-metric-card" key={key}><span className="admin-metric-label">{label}</span><strong>{formatMetric(overview.metrics[key], kind)}</strong><small>{description}</small></article>)}</div>
-            <div className="panel admin-data-note-box"><strong>Coverage dan kualitas data</strong><p>{overview.reportingSetupRequired ? 'Agregasi analytics belum tersedia sampai skrip admin_monitoring_setup.sql diterapkan ke database.' : 'Revenue di sini hanya top-up sukses yang tersimpan. Subscription revenue/MRR, biaya gateway, kurs historis, dan last-active tidak tersedia. Biaya AI IDR merupakan estimasi internal, bukan biaya aktual provider.'}</p><span>Snapshot {formatDate(overview.generatedAt)}</span></div>
-            {overview.trends ? <div className="admin-chart-grid"><TrendChart title="Revenue trend (top-ups only)" rows={overview.trends.daily || []} valueKey="revenueIdr" unit="currency" /><TrendChart title="AI cost trend (internal estimate)" rows={overview.trends.daily || []} valueKey="estimatedAiCostIdr" unit="currency" /><TrendChart title="Revenue vs AI cost" rows={overview.trends.daily || []} valueKey="revenueIdr" compareKey="estimatedAiCostIdr" unit="currency" /><TrendChart title="User growth" rows={overview.trends.daily || []} valueKey="newUsers" /><UnavailableChart title="Revenue by subscription plan" message="Subscription payment history is not stored as a canonical financial ledger. Subscription revenue breakdown is unavailable." /><TrendChart title="AI usage by feature" rows={overview.trends.aiByFeature || []} valueKey="tokens" /></div> : null}
+            <div className="panel admin-data-note-box"><strong>Coverage dan kualitas data</strong><p>{overview.subscriptionFinancials?.setupRequired ? 'Migration multi-duration belum diterapkan; metrik keuangan subscription menampilkan nol sampai setup database selesai.' : overview.reportingSetupRequired ? 'Agregasi analytics belum tersedia sampai skrip admin_monitoring_setup.sql diterapkan ke database.' : 'Cash, revenue yang diakui, dan service obligation berasal dari kontrak subscription. Biaya AI IDR merupakan estimasi internal; pembayaran legacy tanpa kontrak dan refund yang tak tercatat tidak direkonstruksi.'}</p><span>Snapshot {formatDate(overview.generatedAt)}</span></div>
+            {overview.trends ? <div className="admin-chart-grid"><TrendChart title="Revenue trend (top-ups only)" rows={overview.trends.daily || []} valueKey="revenueIdr" unit="currency" /><TrendChart title="AI cost trend (internal estimate)" rows={overview.trends.daily || []} valueKey="estimatedAiCostIdr" unit="currency" /><TrendChart title="Top-up revenue vs AI cost" rows={overview.trends.daily || []} valueKey="revenueIdr" compareKey="estimatedAiCostIdr" unit="currency" /><TrendChart title="User growth" rows={overview.trends.daily || []} valueKey="newUsers" /><SubscriptionFinanceSummary metrics={overview.subscriptionFinancials?.metrics} setupRequired={overview.subscriptionFinancials?.setupRequired} /><TrendChart title="AI usage by feature" rows={overview.trends.aiByFeature || []} valueKey="tokens" /></div> : null}
           </> : null}
-          {section === 'profitability' && !loading && !error && list ? <p className="admin-data-note">* Kontribusi dihitung dari top-up tercatat dikurangi estimasi biaya AI IDR. Angka USD tersimpan dihitung memakai tarif internal yang belum diverifikasi terhadap tagihan provider; model SumoPod belum dikonfigurasi di environment backend saat audit. Pendapatan subscription, refund, biaya gateway, dan kurs historis tidak tersedia, jadi ini bukan profit total atau margin aktual.</p> : null}
+          {section === 'profitability' && !loading && !error && list ? <p className="admin-data-note">* Kolom subscription memakai kontrak berbayar yang tercatat. Revenue yang diakui dialokasikan sepanjang layanan; biaya AI IDR tetap estimasi internal, refund dan gateway fees yang tidak tersimpan tidak direkonstruksi.</p> : null}
+          {section === 'subscription-financials' && !loading && !error && subscriptionFinancials ? <>
+            <div className="admin-metric-grid">{[['Kas subscription', subscriptionFinancials.metrics.subscriptionCashCollectedIdr], ['Revenue diakui', subscriptionFinancials.metrics.recognizedSubscriptionRevenueIdr], ['Service obligation', subscriptionFinancials.metrics.remainingServiceObligationIdr], ['Credits bulanan tercatat', subscriptionFinancials.metrics.monthlySubscriptionCreditsGranted], ['AI cost tersimpan (USD)', subscriptionFinancials.metrics.subscriptionActualAiCostUsd], ['Estimasi AI cost', subscriptionFinancials.metrics.subscriptionEstimatedAiCostIdr], ['Kontribusi estimasi', subscriptionFinancials.metrics.estimatedSubscriptionContributionIdr]].map(([label, value]) => <article className="panel admin-metric-card" key={String(label)}><span className="admin-metric-label">{String(label)}</span><strong>{String(label).includes('Credits') ? formatNumber(value) : String(label).includes('USD') ? `$${Number(value || 0).toFixed(4)}` : formatCurrency(value)}</strong></article>)}</div>
+            <p className="admin-data-note">Revenue dialokasikan harian selama masa layanan; AI cost tersimpan berasal dari log aplikasi dan biaya IDR merupakan estimasi internal. Data pembayaran historis yang tidak memiliki subscription contract tidak direkonstruksi.</p>
+          </> : null}
+          {section === 'referrals' && !loading && !error && referralData ? <>
+            <div className="admin-metric-grid">
+              {[["Klik", referralData.metrics.referralClicks], ["Pendaftaran", referralData.metrics.registrations], ["Reward berhasil", referralData.metrics.successful], ["Menunggu validasi", referralData.metrics.pending], ["Ditolak", referralData.metrics.rejected], ["Kredit bonus", referralData.metrics.rewardCreditsGranted], ["Estimasi biaya kredit", formatCurrency(referralData.metrics.estimatedRewardCostIdr)], ["Konversi klik", `${formatNumber(referralData.metrics.conversionRate)}%`]].map(([label, metric]) => <article className="panel admin-metric-card" key={String(label)}><span className="admin-metric-label">{String(label)}</span><strong>{String(typeof metric === 'string' ? metric : formatNumber(metric))}</strong></article>)}
+            </div>
+            <form className="panel admin-filters admin-referral-settings" onSubmit={(event) => void saveReferralSettings(event)}>
+              <h3>Pengaturan program referral</h3>
+              <label className="admin-check-label"><input type="checkbox" name="enabled" defaultChecked={Boolean(referralData.config.enabled)} /> Program aktif</label>
+              <label className="admin-check-label"><input type="checkbox" name="visible" defaultChecked={Boolean(referralData.config.visible)} /> Tampilkan referral di aplikasi</label>
+              {[['referrerBonusCredits','Bonus pengundang'],['referredBonusCredits','Bonus pengguna baru'],['attributionWindowDays','Masa atribusi (hari)'],['validationDays','Masa validasi (hari)'],['rewardExpirationDays','Masa berlaku kredit (hari)']].map(([name,label]) => <label key={name}><span>{label}</span><input type="number" min={name.endsWith('Credits') ? 0 : 1} max={name.endsWith('Credits') ? 100000 : 365} name={name} defaultValue={Number(referralData.config[name])} required /></label>)}
+              <fieldset><legend>Paket yang memenuhi syarat</legend>{['starter','creator','pro'].map((item) => <label className="admin-check-label" key={item}><input type="checkbox" name={`plan-${item}`} defaultChecked={(referralData.config.eligiblePlanCodes as string[] || []).includes(item)} /> {item}</label>)}</fieldset>
+              <button className="primary-button" type="submit" disabled={referralSaving}>{referralSaving ? 'Menyimpan…' : 'Simpan pengaturan'}</button>
+              <button className="ghost-button" type="button" onClick={() => void processDueReferrals()}>Proses reward yang jatuh tempo</button>
+            </form>
+            <p className="admin-data-note">Estimasi biaya reward memakai perkiraan internal Rp50 per AI Credit. Kredit referral berlaku untuk penggunaan AI dan tidak membuka fitur paket berbayar.</p>
+            {referralActionError ? <div className="panel admin-message admin-message-error" role="alert">{referralActionError}</div> : null}
+          </> : null}
+          {section === 'subscription-pricing' && !loading && !error && subscriptionPricing ? <section className="panel admin-pricing-editor">
+            <div className="admin-pricing-summary"><div><p className="eyebrow">Versi live {subscriptionPricing.version}</p><h3>Harga paket dan jatah bulanan</h3><p>Perubahan draft belum dipakai user sampai dipublikasikan. Order baru akan menyimpan snapshot harga dan versi konfigurasi saat dibuat.</p></div><span className={`admin-status ${subscriptionPricing.impact.changed ? 'pending' : 'success'}`}>{subscriptionPricing.impact.changed ? 'Draft berubah' : 'Draft sama dengan live'}</span></div>
+            <div className="admin-pricing-global">
+              <label><span>Durasi default</span><select value={subscriptionPricing.draft.defaultDurationMonths} onChange={(event) => updatePricingDraft((draft) => ({ ...draft, defaultDurationMonths: Number(event.target.value) }))}>{[1, 3, 12].filter((month) => subscriptionPricing.draft.enabledDurations.includes(month)).map((month) => <option key={month} value={month}>{month === 12 ? '1 tahun' : `${month} bulan`}</option>)}</select></label>
+              <fieldset><legend>Durasi yang tersedia</legend>{[1, 3, 12].map((month) => <label className="admin-check-label" key={month}><input type="checkbox" checked={subscriptionPricing.draft.enabledDurations.includes(month)} onChange={(event) => updatePricingDraft((draft) => ({ ...draft, enabledDurations: event.target.checked ? [...draft.enabledDurations, month].sort((a,b)=>a-b) : draft.enabledDurations.filter((value) => value !== month) }))} /> {month === 12 ? '1 tahun' : `${month} bulan`}</label>)}</fieldset>
+            </div>
+            <div className="admin-plan-pricing-grid">{['starter', 'creator', 'pro'].map((code) => {
+              const plan = subscriptionPricing.draft.plans[code]
+              if (!plan) return null
+              return <article className="admin-plan-pricing-card" key={code}><h4>{code[0].toUpperCase() + code.slice(1)}</h4><label><span>AI Credits / bulan</span><input type="number" min="1" max="100000" value={plan.monthlyAiCredits} onChange={(event) => updatePricingDraft((draft) => ({ ...draft, plans: { ...draft.plans, [code]: { ...draft.plans[code], monthlyAiCredits: Number(event.target.value) } } }))} /></label><div className="admin-prices-grid">{[1, 3, 12].map((month) => <label key={month}><span>{month === 12 ? '12 bulan' : `${month} bulan`} · total dibayar</span><input type="number" min="500" step="500" value={plan.prices[String(month)]} onChange={(event) => updatePricingDraft((draft) => ({ ...draft, plans: { ...draft.plans, [code]: { ...draft.plans[code], prices: { ...draft.plans[code].prices, [String(month)]: Number(event.target.value) } } } }))} /></label>)}</div></article>
+            })}</div>
+            <fieldset className="admin-reminder-options"><legend>Reminder masa aktif berakhir</legend>{[7, 3, 1].map((days) => <label className="admin-check-label" key={days}><input type="checkbox" checked={subscriptionPricing.draft.expiryReminderDays.includes(days)} onChange={(event) => updatePricingDraft((draft) => ({ ...draft, expiryReminderDays: event.target.checked ? [...draft.expiryReminderDays, days].sort((a,b)=>b-a) : draft.expiryReminderDays.filter((value) => value !== days) }))} /> {days} hari sebelumnya</label>)}</fieldset>
+            <div className="admin-impact-preview"><strong>Impact preview</strong><span>{subscriptionPricing.impact.changed ? `Publish akan membuat konfigurasi versi ${subscriptionPricing.impact.proposedVersion} berlaku untuk order baru.` : `Konfigurasi live versi ${subscriptionPricing.version} tetap berlaku.`}</span><small>Pembayaran lama, harga snapshot, dan periode credits yang sudah dibuat tidak berubah. Perubahan paket di tengah masa aktif dibatasi; renewal paket yang sama diperbolehkan.</small></div>
+            {pricingActionError ? <div className="panel admin-message admin-message-error" role="alert">{pricingActionError}</div> : null}
+            <div className="admin-pricing-actions"><button className="ghost-button" type="button" disabled={pricingSaving} onClick={() => void savePricingDraft()}>{pricingSaving ? 'Menyimpan…' : 'Save Draft'}</button><button className="primary-button" type="button" disabled={pricingSaving || !subscriptionPricing.impact.changed} onClick={() => void publishPricing()}>{pricingSaving ? 'Memproses…' : 'Publish'}</button></div>
+            <p className="admin-data-note">Durasi berbayar ditagih sekali melalui QRIS. AI Credits selalu diberikan per bulan dan kredit top-up maupun referral tetap mengikuti aturan expiry masing-masing.</p>
+          </section> : null}
           {!loading && !error && section === 'users' && selectedUserId && userDetail ? <UserDetailView detail={userDetail} onBack={() => { setSelectedUserId(''); setUserDetail(null) }} /> : null}
-          {!loading && !error && section !== 'overview' && list && !(section === 'users' && selectedUserId) ? <>
-            <AdminTable key={section} columns={columns} rows={list.items} sortableKeys={section === 'users' ? ['created_at', 'lastLoginAt'] : section === 'ai-usage' ? ['estimatedCostIdr'] : section === 'scheduled-posts' ? ['scheduledAt'] : []} empty={section === 'error-logs' ? 'Belum ada error server yang tercatat.' : 'Belum ada data untuk filter ini.'} onSelect={section === 'users' ? openUser : undefined} />
+          {!loading && !error && section !== 'overview' && section !== 'subscription-pricing' && list && !(section === 'users' && selectedUserId) ? <>
+            <AdminTable key={section} columns={columns} rows={list.items} sortableKeys={section === 'users' ? ['created_at', 'lastLoginAt'] : section === 'ai-usage' ? ['estimatedCostIdr'] : section === 'scheduled-posts' || section === 'feedback' ? ['created_at'] : []} empty={section === 'error-logs' ? 'Belum ada error server yang tercatat.' : section === 'feedback' ? 'Belum ada feedback dari pengguna.' : 'Belum ada data untuk filter ini.'} onSelect={section === 'users' ? openUser : undefined} />
             {list.truncated ? <p className="admin-data-note">Daftar users dibatasi pada 100.000 profil untuk menjaga penggunaan database.</p> : null}
             <div className="admin-pagination"><span>{formatNumber(list.total)} records</span><div><button className="ghost-button" type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>Sebelumnya</button><span>Halaman {page}</span><button className="ghost-button" type="button" onClick={() => setPage((current) => current + 1)} disabled={page * list.limit >= list.total}>Berikutnya</button></div></div>
           </> : null}
@@ -342,6 +523,18 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
       </div>
     </section>
   )
+}
+
+function SubscriptionFinanceSummary({ metrics, setupRequired }: { metrics?: AdminRow; setupRequired?: boolean }) {
+  return <article className="panel admin-chart-card">
+    <div className="admin-chart-heading"><div><strong>Subscription finance</strong><span>Kontrak layanan terverifikasi</span></div></div>
+    {setupRequired ? <p className="admin-data-note">Migration subscription finance belum diterapkan.</p> : <div className="admin-metric-grid">
+      <div><span className="admin-metric-label">Kas terkumpul</span><strong>{formatCurrency(metrics?.subscriptionCashCollectedIdr)}</strong></div>
+      <div><span className="admin-metric-label">Revenue diakui</span><strong>{formatCurrency(metrics?.recognizedSubscriptionRevenueIdr)}</strong></div>
+      <div><span className="admin-metric-label">Kewajiban layanan</span><strong>{formatCurrency(metrics?.remainingServiceObligationIdr)}</strong></div>
+    </div>}
+    <p className="admin-data-note">Lihat rincian kontrak di menu Subscription finance.</p>
+  </article>
 }
 
 function UserDetailView({ detail, onBack }: { detail: AdminRow; onBack: () => void }) {
@@ -360,7 +553,7 @@ function UserDetailView({ detail, onBack }: { detail: AdminRow; onBack: () => vo
     <div className="admin-metric-grid admin-user-detail-metrics">
       {[["Terdaftar", formatDate(profile.created_at)], ["Status paket", value(summary, 'plan_name')], ["Top-up tercatat", formatCurrency(summary.known_net_revenue_idr)], ["Estimasi biaya AI", formatCurrency(summary.estimated_ai_cost_idr)], ["Kontribusi estimasi*", formatCurrency(summary.estimated_contribution_before_gateway_fees_idr)], ["Margin", summary.estimated_margin_before_gateway_fees_pct == null ? 'N/A' : `${value(summary, 'estimated_margin_before_gateway_fees_pct')}%`], ["Kredit tersedia", formatNumber(credits.totalAvailable)], ["Kredit terpakai", formatNumber(summary.credits_used)], ["Token tercatat", formatNumber(summary.total_tokens)], ["Persona / pilar", `${formatNumber(activity.personaCount)} / ${formatNumber(activity.pillarCount)}`], ["Topik / konten", `${formatNumber(activity.topicCount)} / ${formatNumber(activity.generatedContentCount)}`], ["Jadwal post", formatNumber(activity.scheduledPostCount)]].map(([label, metric]) => <article className="panel admin-metric-card" key={String(label)}><span className="admin-metric-label">{label}</span><strong>{metric}</strong></article>)}
     </div>
-    <p className="admin-data-note">* Estimasi memakai top-up yang tercatat dan estimasi biaya AI IDR. Data subscription revenue, biaya gateway, refunds lengkap, dan kurs historis belum tersedia.</p>
+    <p className="admin-data-note">* Revenue subscription memakai kontrak berbayar yang tercatat dan dialokasikan sepanjang masa layanan. Biaya AI IDR merupakan estimasi internal; refund dan gateway fees yang tidak tersimpan tidak direkonstruksi.</p>
     <div className="admin-user-history-grid">
       <section><h3>AI requests terbaru</h3><AdminTable columns={miniColumns([['created_at','Waktu',(row)=>formatDate(row.created_at)],['feature','Fitur',(row)=>value(row,'feature')],['model','Model',(row)=>value(row,'model')],['total_tokens','Token',(row)=>formatNumber(row.total_tokens)],['status','Status',(row)=><StatusBadge status={row.status}/>]])} rows={ai} empty="Belum ada riwayat AI." /></section>
       <section><h3>Transaksi terbaru</h3><AdminTable columns={miniColumns([['created_at','Waktu',(row)=>formatDate(row.paid_at || row.created_at)],['amount_idr','Nominal',(row)=>formatCurrency(row.amount_idr)],['provider','Provider',(row)=>value(row,'provider')],['status','Status',(row)=><StatusBadge status={row.status}/>]])} rows={payments} empty="Belum ada transaksi." /></section>

@@ -13,6 +13,9 @@ export type RegisterCredentials = {
   fullName: string
   accountName: string
   password: string
+  acceptedTermsVersion: string
+  acceptedPrivacyNoticeVersion: string
+  referralToken?: string
 }
 
 export type AuthUser = {

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PaymentsPage } from '../src/pages/PaymentsPage'
 import { TopUpCreditsPage } from '../src/pages/TopUpCreditsPage'
+import { PaymentMethodSelector } from '../src/components/PaymentMethodSelector'
 import { createPaymentOrder, retryPaymentCheckout, getPaymentOrderStatus, getPaymentPage } from '../src/services/payments'
 import { USAGE_UPDATED_EVENT } from '../src/services/usage'
 
@@ -23,7 +24,7 @@ describe('PaymentsPage QRIS checkout', () => {
     const onUsageUpdated = vi.fn()
     window.addEventListener(USAGE_UPDATED_EVENT, onUsageUpdated)
     render(<TopUpCreditsPage onBackToCredits={() => undefined} />)
-    await userEvent.click(await screen.findByRole('button', { name: /Lanjut Pembayaran/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /Lanjutkan Pembayaran/i }))
     await screen.findByRole('dialog')
     vi.mocked(getPaymentOrderStatus).mockResolvedValue({ status: 'paid' })
     try {
@@ -35,7 +36,7 @@ describe('PaymentsPage QRIS checkout', () => {
   it.each(['Tutup pembayaran', 'Bayar nanti'])('opens history after top-up checkout: %s', async (action) => {
     const onOpenPayments = vi.fn()
     render(<TopUpCreditsPage onBackToCredits={() => undefined} onOpenPayments={onOpenPayments} />)
-    await userEvent.click(await screen.findByRole('button', { name: /Lanjut Pembayaran/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /Lanjutkan Pembayaran/i }))
     await userEvent.click(await screen.findByRole('button', { name: action }))
     expect(onOpenPayments).toHaveBeenCalledOnce()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -45,7 +46,7 @@ describe('PaymentsPage QRIS checkout', () => {
     const onOpenPayments = vi.fn()
     vi.mocked(createPaymentOrder).mockResolvedValueOnce({ id: 'saved-order', status: 'pending', checkoutAvailable: false, checkoutUrl: null, amount_idr: 99000, credits: 1000, payment_method: 'qris' })
     render(<TopUpCreditsPage onBackToCredits={() => undefined} onOpenPayments={onOpenPayments} />)
-    await userEvent.click(await screen.findByRole('button', { name: /Lanjut Pembayaran/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /Lanjutkan Pembayaran/i }))
     await waitFor(() => expect(onOpenPayments).toHaveBeenCalledOnce())
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -95,7 +96,7 @@ describe('PaymentsPage QRIS checkout', () => {
         va_number: null,
         total_payment: 100500,
         expired_at: '2026-10-19T12:00:00.000Z',
-        qr_string: '00020101021226670016COM.NOBUBANK.WWW',
+        qr_string: null,
       },
     })
     vi.mocked(getPaymentOrderStatus).mockResolvedValue({ status: 'pending' })
@@ -104,7 +105,7 @@ describe('PaymentsPage QRIS checkout', () => {
   it('shows the order QRIS instead of navigating away after top-up checkout', async () => {
     render(<TopUpCreditsPage onBackToCredits={() => undefined} />)
 
-    await userEvent.click(await screen.findByRole('button', { name: /Lanjut Pembayaran/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /Lanjutkan Pembayaran/i }))
 
     const checkout = await screen.findByRole('dialog', { name: 'Pembayaran QRIS' })
     expect(screen.getByRole('img', { name: 'QRIS untuk Top Up Plus' })).toHaveAttribute(
@@ -117,8 +118,9 @@ describe('PaymentsPage QRIS checkout', () => {
   it('lets the user choose a backend-provided VA method before paying', async () => {
     render(<TopUpCreditsPage onBackToCredits={() => undefined} />)
 
+    await userEvent.click(await screen.findByRole('radio', { name: /Virtual Account/i }))
     await userEvent.click(await screen.findByRole('radio', { name: /BNI Virtual Account/i }))
-    await userEvent.click(screen.getByRole('button', { name: /Lanjut Pembayaran/i }))
+    await userEvent.click(screen.getByRole('button', { name: /Lanjutkan Pembayaran/i }))
 
     expect(createPaymentOrder).toHaveBeenCalledWith({ packageId: 'plus-id', method: 'bni_va' })
   })
@@ -145,7 +147,7 @@ describe('PaymentsPage QRIS checkout', () => {
     const history = await screen.findByRole('region', { name: 'Riwayat pembayaran' })
     expect(screen.queryByRole('radiogroup', { name: 'Paket top up AI Credits' })).not.toBeInTheDocument()
     expect(screen.queryByRole('radiogroup', { name: 'Metode pembayaran' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Lanjut Pembayaran/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Lanjutkan Pembayaran/i })).not.toBeInTheDocument()
     for (const label of ['Semua', 'Pending', 'Berhasil', 'Gagal', 'Kedaluwarsa', 'Dibatalkan', 'Refund']) {
       expect(within(history).getByRole('button', { name: label })).toBeInTheDocument()
     }
@@ -157,6 +159,41 @@ describe('PaymentsPage QRIS checkout', () => {
     await userEvent.click(within(history).getByRole('button', { name: 'Refund' }))
     expect(within(history).getByText('Refunded Pack')).toBeInTheDocument()
     expect(within(history).queryByText('Paid Pack')).not.toBeInTheDocument()
+  })
+
+  it('prefers QRIS and reveals available bank choices only after selecting Virtual Account', async () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<PaymentMethodSelector methods={['qris', 'bni_va', 'bri_va']} value="qris" onChange={onChange} />)
+
+    expect(screen.getByRole('radio', { name: 'QRIS' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByRole('radio', { name: 'BNI Virtual Account' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Virtual Account' }))
+    expect(onChange).toHaveBeenCalledWith('bni_va')
+    rerender(<PaymentMethodSelector methods={['qris', 'bni_va', 'bri_va']} value="bni_va" onChange={onChange} />)
+
+    expect(screen.getByRole('radiogroup', { name: 'Pilih bank' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'BNI Virtual Account' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'BRI Virtual Account' })).toBeInTheDocument()
+  })
+
+  it('updates the order summary from the selected backend package', async () => {
+    vi.mocked(getPaymentPage).mockResolvedValueOnce({
+      packages: [
+        { id: 'mini-id', code: 'mini', name: 'Mini', token_amount: 100, price_idr: 15000 },
+        { id: 'basic-id', code: 'basic', name: 'Basic', token_amount: 250, price_idr: 29000 },
+        { id: 'plus-id', code: 'plus', name: 'Plus', token_amount: 500, price_idr: 49000 },
+        { id: 'max-id', code: 'max', name: 'Max', token_amount: 1000, price_idr: 89000 },
+      ],
+      balance: 0, subscriptionBalance: 0, topUpBalance: 0, orders: [], notifications: [], ledger: [], usageHistory: [], paymentMethods: ['qris'],
+    })
+
+    render(<TopUpCreditsPage onBackToCredits={() => undefined} />)
+    const summary = await screen.findByRole('region', { name: 'Ringkasan order' })
+    expect(summary).toHaveTextContent('Rp 15.000')
+    await userEvent.click(screen.getByRole('radio', { name: 'Basic, 250 AI Credits' }))
+    expect(summary).toHaveTextContent('250 AI Credits')
+    expect(summary).toHaveTextContent('Rp 29.000')
   })
 
   it('refreshes a pending order status from the server', async () => {

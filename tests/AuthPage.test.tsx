@@ -29,6 +29,7 @@ describe('AuthPage', () => {
     await user.type(screen.getByRole('textbox', { name: 'Email' }), '  BryanJo2324@GMAIL.COM  ')
     await user.type(screen.getByLabelText('Password'), 'Password123')
     await user.type(screen.getByLabelText('Konfirmasi Password'), 'Password123')
+    await user.click(screen.getByRole('checkbox'))
     await user.click(screen.getByRole('button', { name: 'Register' }))
 
     expect(registerSpy).toHaveBeenCalledWith({
@@ -36,6 +37,8 @@ describe('AuthPage', () => {
       accountName: 'bryanjon',
       email: 'bryanjo2324@gmail.com',
       password: 'Password123',
+      acceptedTermsVersion: '2026-10-20',
+      acceptedPrivacyNoticeVersion: '2026-10-20',
     })
   })
 

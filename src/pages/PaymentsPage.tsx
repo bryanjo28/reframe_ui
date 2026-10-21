@@ -71,9 +71,9 @@ export function PaymentsPage({ onBackToCredits }: { onBackToCredits: () => void 
             <div className="payment-order-filters" aria-label="Filter status pembayaran">{orderFilters.map(([value, label]) => <button className={orderFilter === value ? 'active' : ''} type="button" aria-pressed={orderFilter === value} onClick={() => setOrderFilter(value)} key={value}>{label}</button>)}</div>
             {filteredOrders.length ? filteredOrders.map((order) => {
               const status = order.status.toLowerCase()
-              const title = order.product_name || `${(order.token_amount || 0).toLocaleString('id-ID')} AI Credits`
+              const title = order.product_name || (order.order_type === 'subscription' ? `Subscription · ${order.duration_months || 1} bulan` : `${(order.token_amount || 0).toLocaleString('id-ID')} AI Credits`)
               return <div className="payment-order-row" key={order.id}>
-                <div><strong>{title}</strong><small>{formatDate(order.created_at)} Â· {order.id.slice(0, 8).toUpperCase()}</small></div>
+                <div><strong>{title}</strong><small>{order.order_type === 'subscription' ? `${(order.monthly_credits || 0).toLocaleString('id-ID')} AI Credits / bulan · bayar sekali` : 'Top up AI Credits'} · {formatDate(order.created_at)} · {order.id.slice(0, 8).toUpperCase()}</small></div>
                 <span>{money(order.amount_idr)}</span>
                 <div className="payment-order-actions"><b className={`payment-order-status ${status}`}>{statusLabels[status] || order.status}</b><button className={status === 'paid' ? 'payment-detail-paid' : ''} type="button" disabled={Boolean(checkingOrderId)} aria-label={`${status === 'pending' ? 'Cek status' : 'Detail'} ${title}`} onClick={() => void refreshPendingOrder(order.id)}>{checkingOrderId === order.id ? 'Memproses...' : status === 'pending' ? 'Cek status' : 'Detail'}</button>{status === 'pending' ? <button type="button" disabled={Boolean(checkingOrderId)} aria-label={`Coba lagi ${title}`} onClick={() => void retryCheckout(order)}>{checkingOrderId === order.id ? 'Memproses...' : 'Coba lagi'}</button> : null}</div>
               </div>

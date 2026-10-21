@@ -3,14 +3,15 @@ import { AppIcon } from '../components/AppIcon'
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
 import type { PersonaConfigRecord } from '../services/personaConfigs'
 import type { NavKey } from '../types/navigation'
+import type { UiLanguage } from '../utils/uiLanguage'
 import { CreateContentPillarPage } from './CreateContentPillarPage'
 import { CreatePersonaPage } from './CreatePersonaPage'
 
 type PersonalizeTab = 'persona' | 'content-pillar'
-type Props = { personaConfig: PersonaConfigRecord | null; onPersonaSaved?: (config: PersonaConfigRecord) => void; onPillarSaved?: () => void; initialTab?: PersonalizeTab; onNavigate?: (page: NavKey) => void; tourStep?: number | null }
+type Props = { personaConfig: PersonaConfigRecord | null; onPersonaSaved?: (config: PersonaConfigRecord) => void; onPillarSaved?: () => void; initialTab?: PersonalizeTab; onNavigate?: (page: NavKey) => void; tourStep?: number | null; language: UiLanguage }
 const valueOf = (record: Record<string, unknown> | null, keys: string[]) => keys.map((key) => record?.[key]).find((value) => typeof value === 'string' && value.trim()) as string || ''
 
-export function PersonalizePage({ personaConfig, onPersonaSaved, onPillarSaved, initialTab, onNavigate, tourStep }: Props) {
+export function PersonalizePage({ personaConfig, onPersonaSaved, onPillarSaved, initialTab, onNavigate, tourStep, language }: Props) {
   const [activeTab, setActiveTab] = useState<PersonalizeTab | null>(initialTab ?? null)
   const [pillars, setPillars] = useState<ContentPillarRecord[]>([])
   const [brainReady, setBrainReady] = useState(false)
@@ -20,7 +21,7 @@ export function PersonalizePage({ personaConfig, onPersonaSaved, onPillarSaved, 
 
   useEffect(() => { if (personaConfig) void listContentPillars().then(setPillars).catch(() => setPillars([])) }, [personaConfig])
 
-  if (isInitialSetup) return <CreatePersonaPage personaConfig={personaConfig} isInitialSetup onSaved={(config) => onPersonaSaved?.(config)} />
+  if (isInitialSetup) return <CreatePersonaPage personaConfig={personaConfig} isInitialSetup language={language} onSaved={(config) => onPersonaSaved?.(config)} />
   if (brainReady) return <section className="brain-ready-wrap"><section className="brain-ready panel"><span className="brain-ready-icon"><AppIcon name="check" /></span><p className="eyebrow">Content Brain</p><h1>Content Brain kamu sudah siap ✓</h1><p>alurin sekarang sudah punya dasar untuk membantu membuat ide dan kontenmu.</p><button className="primary-button" data-tour-step={tourStep === 4 ? 4 : undefined} type="button" onClick={() => onNavigate?.('generate-topic')}>Cari Ide Pertama</button></section></section>
 
   return <section className="persona-page">
@@ -34,7 +35,7 @@ export function PersonalizePage({ personaConfig, onPersonaSaved, onPillarSaved, 
       <p className="brain-footnote">Perubahan pada Content Brain akan digunakan oleh flow generasi yang sudah ada untuk ide dan konten berikutnya.</p>
     </> : <>
       {!isPillarSetup && !isTutorialPersonaStep ? <div className="personalize-context-bar"><div><p className="eyebrow">Editing</p><strong>{activeTab === 'persona' ? 'Persona' : 'Content Pillars'}</strong></div><button type="button" className="ghost-button" onClick={() => setActiveTab(null)}>Back to Content Brain</button></div> : null}
-      {activeTab === 'persona' ? <CreatePersonaPage personaConfig={personaConfig} isInitialSetup={isTutorialPersonaStep} onSaved={(config) => onPersonaSaved?.(config)} /> : <CreateContentPillarPage isInitialSetup={isPillarSetup} onSaved={(pillar) => { setPillars((current) => [pillar, ...current.filter((item) => item.id !== pillar.id)]); if (isPillarSetup) { setBrainReady(true); onPillarSaved?.() } }} />}
+      {activeTab === 'persona' ? <CreatePersonaPage personaConfig={personaConfig} isInitialSetup={isTutorialPersonaStep} language={language} onSaved={(config) => onPersonaSaved?.(config)} /> : <CreateContentPillarPage isInitialSetup={isPillarSetup} language={language} onSaved={(pillar) => { setPillars((current) => [pillar, ...current.filter((item) => item.id !== pillar.id)]); if (isPillarSetup) { setBrainReady(true); onPillarSaved?.() } }} />}
     </>}
   </section>
 }

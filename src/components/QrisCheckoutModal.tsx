@@ -90,13 +90,16 @@ export function QrisCheckoutModal({ open, title, description, amount, totalPayme
         </div>
         <div className="qris-order-panel">
           <div><p className="eyebrow">Ringkasan order</p><h3>{title}</h3><p>{description}</p></div>
-          <dl>{orderId ? <div><dt>ID transaksi</dt><dd>{orderId}</dd></div> : null}<div><dt>Total pembayaran</dt><dd>{money(totalPayment ?? amount)}</dd></div><div><dt>Metode</dt><dd>{methodLabel}</dd></div></dl>
+          <dl>{orderId ? <div><dt>ID transaksi</dt><dd>{orderId}</dd></div> : null}<div><dt>Metode</dt><dd>{methodLabel}</dd></div></dl>
           {pending ? <ol className="qris-instructions">{isQris ? <><li>Buka aplikasi bank atau e-wallet.</li><li>Pilih menu scan QRIS dan arahkan ke kode.</li><li>Konfirmasi nominal, lalu selesaikan pembayaran.</li></> : <><li>Buka aplikasi atau ATM bank tujuan.</li><li>Pilih transfer ke virtual account.</li><li>Masukkan nomor VA dan bayar sesuai total.</li></>}</ol> : null}
           {pending && checkoutUrl && isQris ? <a className="primary-button qris-checkout-link" href={checkoutUrl}>Buka halaman pembayaran</a> : null}
           {pending ? <p>Pembayaran dapat dibuka kembali melalui Riwayat pembayaran.</p> : null}
-          <button className="ghost-button qris-close-action" type="button" onClick={onClose}>{pending ? 'Bayar nanti' : 'Tutup'}</button>
         </div>
       </div>
+      <footer className="qris-modal-footer">
+        <div className="payment-checkout-footer-total"><span>Total pembayaran</span><strong>{money(totalPayment ?? amount)}</strong></div>
+        <button className="ghost-button qris-close-action" type="button" onClick={onClose}>{pending ? 'Bayar nanti' : 'Tutup'}</button>
+      </footer>
     </section>
   </div>
 }

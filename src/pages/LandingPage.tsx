@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AppIcon } from '../components/AppIcon'
 import { BrandLogo } from '../components/BrandLogo'
 import { MARKETING_PLANS, type MarketingPlan } from '../config/marketingPlans'
+import { getReferralProgramConfig, type ReferralConfig } from '../services/referrals'
 
 const features = [
   { icon: 'user', title: 'AI Persona', copy: 'Simpan karakter, sudut pandang, dan gaya komunikasi yang ingin kamu pakai.' },
@@ -75,6 +76,7 @@ function PricingCard({ plan }: { plan: MarketingPlan }) {
 
 export function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [referralConfig, setReferralConfig] = useState<ReferralConfig | null>(null)
   const pageRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -82,6 +84,8 @@ export function LandingPage() {
     document.title = 'Alurin — Ide ngalir, konten terbit.'
     return () => document.documentElement.removeAttribute('data-theme')
   }, [])
+
+  useEffect(() => { void getReferralProgramConfig().then(setReferralConfig).catch(() => setReferralConfig(null)) }, [])
 
   useEffect(() => {
     const revealElements = pageRef.current?.querySelectorAll<HTMLElement>('.landing-reveal')
@@ -103,7 +107,7 @@ export function LandingPage() {
 
     revealElements.forEach((element) => observer.observe(element))
     return () => observer.disconnect()
-  }, [])
+  }, [referralConfig])
 
   return (
     <div className="landing-page" ref={pageRef}>
@@ -135,6 +139,8 @@ export function LandingPage() {
         <section className="landing-section landing-pricing landing-reveal" id="harga"><div className="landing-section-head"><span>HARGA</span><h2>Mulai gratis, bertumbuh sesuai kebutuhan.</h2><p>Semua paket bisa Generate Topic dan Content selama AI Credits tersedia.</p></div><div className="landing-price-grid">{MARKETING_PLANS.map((plan) => <PricingCard plan={plan} key={plan.code} />)}</div><p className="landing-price-note"><AppIcon name="info" /> Paket berbayar memiliki Schedule Post tanpa kuota bulanan dari Alurin, dengan tetap mengikuti batas Threads API.</p></section>
 
         <section className="landing-section landing-faq landing-reveal" id="faq"><div className="landing-section-head"><span>FAQ</span><h2>Pertanyaan yang sering muncul.</h2></div><div className="landing-faq-list">{faqs.map(([question, answer]) => <details key={question}><summary>{question}<span><AppIcon name="plus" /></span></summary><p>{answer}</p></details>)}</div></section>
+
+        {referralConfig?.enabled && referralConfig.visible ? <section className="landing-section landing-referral landing-reveal"><div><span>REFERRAL PROGRAM</span><h2>Ajak Teman, Dapat Bonus AI Credits!</h2><p>Bagikan Alurin ke temanmu. Kalian berdua bisa mendapatkan bonus credits setelah temanmu berlangganan untuk pertama kalinya. Pengajak mendapat {referralConfig.referrerBonusCredits} credits dan temanmu {referralConfig.referredBonusCredits} credits setelah periode validasi pembayaran.</p><MarketingButton href="/register">Ajak Teman Sekarang <AppIcon name="chevron-right" /></MarketingButton></div></section> : null}
 
         <section className="landing-final-cta landing-reveal"><div><span>SIAP MULAI?</span><h2>Konten Threads nggak harus bikin pusing.</h2><p>Mulai dari satu ide, biarkan Alurin bantu kamu bikin konten lebih konsisten.</p><MarketingButton href="/register">Mulai Gratis Sekarang <AppIcon name="chevron-right" /></MarketingButton></div></section>
       </main>

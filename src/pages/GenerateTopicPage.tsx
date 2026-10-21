@@ -8,9 +8,12 @@ import { createContentTopic, generateContentTopics } from '../services/contentTo
 import { listContentPillars, type ContentPillarRecord } from '../services/contentPillars'
 import { listPersonaConfigs, type PersonaConfigRecord } from '../services/personaConfigs'
 import { getCurrentSubscription } from '../services/subscriptionPlans'
+import type { UiLanguage } from '../utils/uiLanguage'
+import { translateUiText } from '../utils/uiLanguage'
 
 type GenerateTopicPageProps = {
   userId: string
+  language: UiLanguage
   onContinueToContent?: () => void
   tourStep?: number | null
   onTopicsGenerated?: () => void
@@ -260,7 +263,7 @@ function PillarCard({
   )
 }
 
-export function GenerateTopicPage({ userId, onContinueToContent, onUpgrade }: GenerateTopicPageProps) {
+export function GenerateTopicPage({ userId, onContinueToContent, onUpgrade, language }: GenerateTopicPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [contentPillars, setContentPillars] = useState<ContentPillarRecord[]>([])
   const [personas, setPersonas] = useState<PersonaConfigRecord[]>([])
@@ -610,7 +613,7 @@ export function GenerateTopicPage({ userId, onContinueToContent, onUpgrade }: Ge
       {statusMessage ? (
         <div className={`integration-note ${statusTone === 'error' ? 'integration-note-error' : ''}`}>
           <AppIcon name={statusTone === 'success' ? 'check' : 'info'} />
-          <p>{statusMessage}</p>
+          <p>{translateUiText(statusMessage, language)}</p>
         </div>
       ) : null}
 
@@ -903,7 +906,7 @@ export function GenerateTopicPage({ userId, onContinueToContent, onUpgrade }: Ge
                 type="submit"
                 disabled={!canSubmitManual}
               >
-                {isSubmitting ? 'Mencari ide...' : `Cari ${jumlahTopics} Ide`}
+                {isSubmitting ? (language === 'en' ? 'Finding ideas...' : 'Mencari ide...') : language === 'en' ? `Find ${jumlahTopics} Ideas` : `Cari ${jumlahTopics} Ide`}
               </button>
             </div>
 

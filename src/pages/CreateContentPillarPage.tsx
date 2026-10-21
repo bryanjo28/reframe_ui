@@ -12,6 +12,7 @@ import { listPersonaConfigs, type PersonaConfigRecord } from '../services/person
 import { useToast } from '../components/useToast'
 import { reportError } from '../utils/apiError'
 import { AppIcon } from '../components/AppIcon'
+import type { UiLanguage } from '../utils/uiLanguage'
 
 type PillarFieldKey = keyof ContentPillarPayload
 
@@ -178,7 +179,7 @@ function PillarFieldRenderer({
 }
 
 
-export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { isInitialSetup?: boolean; onSaved?: (pillar: ContentPillarRecord) => void }) {
+export function CreateContentPillarPage({ isInitialSetup = false, onSaved, language = 'id' }: { isInitialSetup?: boolean; onSaved?: (pillar: ContentPillarRecord) => void; language?: UiLanguage }) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [formValues, setFormValues] = useState<ContentPillarPayload>(emptyPillarForm)
   const [personaConfigs, setPersonaConfigs] = useState<PersonaConfigRecord[]>([])
@@ -391,9 +392,9 @@ export function CreateContentPillarPage({ isInitialSetup = false, onSaved }: { i
       return
     }
 
-    const shouldDelete = window.confirm(
-      `Hapus content pillar "${selectedPillar.name || 'selected pillar'}"?`,
-    )
+    const shouldDelete = window.confirm(language === 'en'
+      ? `Delete content pillar "${selectedPillar.name || 'selected pillar'}"?`
+      : `Hapus content pillar "${selectedPillar.name || 'pillar terpilih'}"?`)
 
     if (!shouldDelete) {
       return
