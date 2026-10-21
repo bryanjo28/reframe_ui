@@ -5,15 +5,44 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QrisCheckoutModal } from '../src/components/QrisCheckoutModal'
 
 describe('QrisCheckoutModal', () => {
+  it('hides expired payment instructions even while the server status is pending', () => {
+    render(<QrisCheckoutModal open title="Expired order" description="Credits" amount={29000}
+      qrImageUrl="https://payments.example/expired.png" checkoutUrl="https://payments.example/old"
+      expiresAt="2000-01-01T00:00:00Z" initialStatus="pending" onClose={vi.fn()} />)
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Buka halaman pembayaran' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Waktu pembayaran')).not.toBeInTheDocument()
+    expect(screen.queryByText('Buka aplikasi bank atau e-wallet.')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Detail transaksi' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tutup', exact: true })).toBeInTheDocument()
+  })
+
+  it('hides a QR as its expiry passes while still accepting a later paid response', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-20T10:00:00Z'))
+    const checkStatus = vi.fn().mockResolvedValue({ status: 'paid' })
+    const onPaid = vi.fn()
+    render(<QrisCheckoutModal open title="Order" description="Credits" amount={29000}
+      orderId="order-1" qrImageUrl="https://payments.example/qr.png"
+      checkoutUrl="https://payments.example/pay" expiresAt="2026-10-20T10:00:01Z"
+      checkStatus={checkStatus} onPaid={onPaid} onClose={vi.fn()} />)
+    expect(screen.getByRole('img')).toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000) })
+    expect(onPaid).toHaveBeenCalledWith('order-1')
+    expect(screen.getByText('Pembayaran berhasil')).toBeInTheDocument()
+  })
   it('keeps checking after countdown zero until server cancellation', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-20T10:00:00Z'))
     const checkStatus = vi.fn().mockResolvedValueOnce({ status: 'pending' }).mockResolvedValue({ status: 'cancelled' })
     render(<QrisCheckoutModal open title="Order" description="Credits" amount={29000} orderId="order-1" expiresAt="2026-10-20T10:00:01Z" checkStatus={checkStatus} onClose={() => undefined} />)
     await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
-    expect(screen.getByText('Menunggu konfirmasi server')).toBeInTheDocument()
+    expect(screen.getByText(/Waktu pembayaran habis/)).toBeInTheDocument()
     await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
-    expect(screen.getByText('Pembayaran dibatalkan/kedaluwarsa')).toBeInTheDocument()
+    expect(screen.getByText('Dibatalkan')).toBeInTheDocument()
     await act(async () => { await vi.advanceTimersByTimeAsync(10000) })
     expect(checkStatus).toHaveBeenCalledTimes(2)
   })

@@ -84,7 +84,7 @@ describe('SubscriptionPlansPage', () => {
     vi.mocked(createPaymentOrder).mockResolvedValue({
       id: 'plan-order', message: 'Order dibuat', status: 'pending', credits: 600,
       amount_idr: 59000, payment_method: 'bni_va', checkoutAvailable: true, checkoutUrl: null,
-      payment: { va_number: '880812345678', total_payment: 60500, expired_at: '2026-10-19T12:00:00.000Z', qr_string: null },
+      payment: { va_number: '880812345678', total_payment: 60500, expired_at: new Date(Date.now() + 600000).toISOString(), qr_string: null },
     })
     vi.mocked(getPaymentOrderStatus).mockResolvedValue({ status: 'pending' })
   })
@@ -117,6 +117,27 @@ describe('SubscriptionPlansPage', () => {
     expect(within(freeCard!).getByText('1 Content Pillar')).toBeInTheDocument()
     expect(within(freeCard!).getByText('Tanpa Connect Threads').closest('li')).toHaveClass('unavailable')
     expect(within(freeCard!).getByText('Tanpa Schedule Post').closest('li')).toHaveClass('unavailable')
+  })
+
+  it('never displays the default plan price as the 3- or 12-month total when duration pricing is missing', async () => {
+    vi.mocked(listSubscriptionPlans).mockResolvedValueOnce([
+      {
+        id: 'free-plan', key: 'free', name: 'Free', description: '', price: 0, currency: 'IDR', interval: 'monthly', status: 'active', active: true, featured: false, monthlyAiCredits: 6,
+        raw: { max_personas: 1, content_pillars: 1, monthly_ai_credits: 6, max_threads_accounts: 0, can_schedule: false },
+      },
+      {
+        id: 'starter-plan', key: 'starter', name: 'Starter', description: '', price: 29000, currency: 'IDR', interval: 'monthly', status: 'active', active: true, featured: false, monthlyAiCredits: 200,
+        raw: { max_personas: 2, content_pillars: 3, monthly_ai_credits: 200, max_threads_accounts: 1, can_schedule: true, defaultDurationMonths: 3, enabledDurations: [1, 3, 12] },
+      },
+    ])
+
+    render(<SubscriptionPlansPage userId="user-1" />)
+
+    const starterCard = (await screen.findByRole('heading', { name: 'Starter' })).closest('article')
+    expect(starterCard).not.toBeNull()
+    expect(within(starterCard!).getAllByText('Harga belum tersedia')).toHaveLength(2)
+    expect(within(starterCard!).getByRole('button', { name: 'Harga belum tersedia' })).toBeDisabled()
+    expect(within(starterCard!).queryByText('Rp 29.000')).not.toBeInTheDocument()
   })
 
   it('creates a plan order after the user selects a payment method', async () => {

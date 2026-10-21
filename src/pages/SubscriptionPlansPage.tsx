@@ -21,8 +21,12 @@ type SubscriptionPlansPageProps = {
   onOpenPayments?: () => void
 }
 
-function formatPrice(value: number | null) {
-  if (value === null || value === 0) {
+function formatPrice(value: number | null, language: UiLanguage = 'id') {
+  if (value === null) {
+    return language === 'en' ? 'Price unavailable' : 'Harga belum tersedia'
+  }
+
+  if (value === 0) {
     return 'Free'
   }
 
@@ -41,7 +45,25 @@ function durationLabel(months: number, language: UiLanguage) {
 function getDurationPrice(plan: NormalizedSubscriptionPlan, durationMonths: number) {
   const pricing = plan.raw.pricing as { prices?: Record<string, unknown> } | undefined
   const price = pricing?.prices?.[String(durationMonths)]
-  return typeof price === 'number' && Number.isFinite(price) ? price : plan.price
+  if (typeof price === 'number' && Number.isSafeInteger(price) && price >= 0) {
+    return price
+  }
+
+  // Never reuse the default plan price for another duration. The server may
+  // return a monthly price without the duration matrix during a partial deploy;
+  // showing that value as a 3- or 12-month total makes the checkout misleading.
+  if (durationMonths === 1) {
+    const monthlyPrice = plan.raw.monthlyPrice ?? plan.raw.monthly_price
+    if (typeof monthlyPrice === 'number' && Number.isSafeInteger(monthlyPrice) && monthlyPrice >= 0) {
+      return monthlyPrice
+    }
+
+    if (!pricing && plan.raw.defaultDurationMonths == null) {
+      return plan.price
+    }
+  }
+
+  return null
 }
 
 function getSavingPercent(plan: NormalizedSubscriptionPlan, durationMonths: number) {
@@ -167,6 +189,7 @@ function SubscriptionPlanCard({
   const hasDurationDiscount = regularTotal !== null && amount !== null && regularTotal > amount
   const saving = getSavingPercent(plan, duration)
   const mustRenewCurrentPlan = Boolean(currentSubscription?.active && !currentSubscription.planKey.toLowerCase().includes('free') && !isOwned)
+  const priceUnavailable = amount === null && !plan.key.toLowerCase().includes('free')
 
   return (
     <article className={`subscription-card tone-${tone}${isOwned ? ' owned' : ''}${plan.key.toLowerCase().includes('creator') ? ' recommended' : ''}`}>
@@ -177,10 +200,10 @@ function SubscriptionPlanCard({
           <h3>{translatePlanName(plan.name, plan.key, language)}</h3>
         </div>
         <div className="subscription-price">
-          {hasDurationDiscount ? <del className="subscription-price-original" aria-label={language === 'en' ? 'Regular price' : 'Harga normal'}>{formatPrice(regularTotal)}</del> : null}
-          <strong>{formatPrice(amount)}</strong>
+          {hasDurationDiscount ? <del className="subscription-price-original" aria-label={language === 'en' ? 'Regular price' : 'Harga normal'}>{formatPrice(regularTotal, language)}</del> : null}
+          <strong>{formatPrice(amount, language)}</strong>
           <span>{language === 'en' ? `one-time payment for ${durationLabel(duration, language)}` : `bayar sekali untuk ${durationLabel(duration, language)}`}</span>
-          {duration > 1 ? <small>{formatPrice(amount ? Math.round(amount / duration) : null)}{language === 'en' ? '/month effective' : '/bulan efektif'}</small> : null}
+          {duration > 1 && amount !== null ? <small>{formatPrice(amount ? Math.round(amount / duration) : null, language)}{language === 'en' ? '/month effective' : '/bulan efektif'}</small> : null}
           {saving > 0 ? <em className="subscription-saving-badge">{language === 'en' ? `Save ${saving}%` : `Hemat ${saving}%`}</em> : null}
         </div>
       </div>
@@ -195,8 +218,8 @@ function SubscriptionPlanCard({
       </ul>
 
       <div className="subscription-card-footer">
-        <button className="primary-button subscription-action" type="button" disabled={plan.key.toLowerCase().includes('free') || mustRenewCurrentPlan} onClick={() => onBuy(plan, duration)}>
-          {isOwned ? (language === 'en' ? 'Renew Subscription' : 'Perpanjang langganan') : mustRenewCurrentPlan ? (language === 'en' ? 'Available after expiry' : 'Tersedia setelah masa aktif') : language === 'en' ? `Buy ${translatePlanName(plan.name, plan.key, language)}` : `Beli ${plan.name}`}
+        <button className="primary-button subscription-action" type="button" disabled={plan.key.toLowerCase().includes('free') || mustRenewCurrentPlan || priceUnavailable} onClick={() => onBuy(plan, duration)}>
+          {priceUnavailable ? (language === 'en' ? 'Price unavailable' : 'Harga belum tersedia') : isOwned ? (language === 'en' ? 'Renew Subscription' : 'Perpanjang langganan') : mustRenewCurrentPlan ? (language === 'en' ? 'Available after expiry' : 'Tersedia setelah masa aktif') : language === 'en' ? `Buy ${translatePlanName(plan.name, plan.key, language)}` : `Beli ${plan.name}`}
         </button>
       </div>
     </article>
@@ -351,6 +374,10 @@ export function SubscriptionPlansPage({ onOpenPayments, language = 'id' }: Subsc
 
   async function createPlanOrder() {
     if (!checkoutPlan || !hasPaymentMethod(paymentMethods, selectedMethod) || isBuying) return
+    if (getDurationPrice(checkoutPlan, durationMonths) === null) {
+      setErrorMessage(language === 'en' ? 'The selected subscription price is unavailable. Please choose another duration or try again later.' : 'Harga untuk durasi ini belum tersedia. Pilih durasi lain atau coba lagi nanti.')
+      return
+    }
     setIsBuying(true)
     try {
       const order = await createPaymentOrder({ planId: checkoutPlan.id, method: selectedMethod, durationMonths: durationMonths as 1 | 3 | 12 })
@@ -377,7 +404,8 @@ export function SubscriptionPlansPage({ onOpenPayments, language = 'id' }: Subsc
     const availableDurationsRaw = checkoutPlan.raw.enabledDurations as number[] | undefined
     const availableDurations = [1, 3, 12].filter((months) => !availableDurationsRaw?.length || availableDurationsRaw.includes(months))
     const planPrice = getDurationPrice(checkoutPlan, durationMonths)
-    const regularPrice = durationMonths > 1 && planPrice !== null ? (getDurationPrice(checkoutPlan, 1) ?? 0) * durationMonths : null
+    const monthlyPrice = getDurationPrice(checkoutPlan, 1)
+    const regularPrice = durationMonths > 1 && planPrice !== null && monthlyPrice !== null ? monthlyPrice * durationMonths : null
     const hasDurationDiscount = regularPrice !== null && planPrice !== null && regularPrice > planPrice
     const numberLocale = language === 'en' ? 'en-US' : 'id-ID'
     const checkoutPlanName = translatePlanName(checkoutPlan.name, checkoutPlan.key, language)
@@ -417,14 +445,14 @@ export function SubscriptionPlansPage({ onOpenPayments, language = 'id' }: Subsc
                     const originalPrice = months > 1 && price !== null ? (getDurationPrice(checkoutPlan, 1) ?? 0) * months : null
                     const hasDiscount = originalPrice !== null && price !== null && originalPrice > price
                     return (
-                      <label className={`payment-package-option${selected ? ' selected' : ''}`} key={months}>
-                        <input type="radio" name="subscription-duration" value={months} checked={selected} onChange={() => setDurationMonths(months)} aria-label={durationLabel(months, language)} />
+                      <label className={`payment-package-option${selected ? ' selected' : ''}${price === null ? ' unavailable' : ''}`} key={months}>
+                        <input type="radio" name="subscription-duration" value={months} checked={selected} disabled={price === null} onChange={() => setDurationMonths(months)} aria-label={durationLabel(months, language)} />
                         <span className="payment-radio" aria-hidden="true" />
                         <span className="payment-package-copy"><strong>{durationLabel(months, language)}</strong><small>{saving > 0 ? `${language === 'en' ? 'Save' : 'Hemat'} ${saving}%` : (language === 'en' ? 'One-time payment' : 'Bayar satu kali')}</small></span>
                         <span className={`payment-package-prices${hasDiscount ? ' has-discount' : ''}`}>
-                          {hasDiscount ? <del>{formatPrice(originalPrice)}</del> : null}
-                          <strong className="payment-package-price">{formatPrice(price)}</strong>
-                          {hasDiscount ? <small className="payment-package-discount">{language === 'en' ? `${formatPrice(originalPrice - price)} off` : `Diskon ${formatPrice(originalPrice - price)}`}</small> : null}
+                          {hasDiscount ? <del>{formatPrice(originalPrice, language)}</del> : null}
+                          <strong className="payment-package-price">{formatPrice(price, language)}</strong>
+                          {hasDiscount ? <small className="payment-package-discount">{language === 'en' ? `${formatPrice(originalPrice - price, language)} off` : `Diskon ${formatPrice(originalPrice - price, language)}`}</small> : null}
                         </span>
                       </label>
                     )
@@ -439,12 +467,12 @@ export function SubscriptionPlansPage({ onOpenPayments, language = 'id' }: Subsc
                 rows={[
                   { label: language === 'en' ? 'Subscription duration' : 'Durasi langganan', value: durationLabel(durationMonths, language) },
                   { label: language === 'en' ? 'AI Credits per month' : 'AI Credits per bulan', value: (checkoutPlan.monthlyAiCredits || 0).toLocaleString(numberLocale) },
-                  { label: language === 'en' ? 'Plan price' : 'Harga paket', value: formatPrice(planPrice), originalValue: hasDurationDiscount ? formatPrice(regularPrice) : undefined },
-                  ...(hasDurationDiscount ? [{ label: language === 'en' ? 'Discount' : 'Diskon', value: `−${formatPrice(regularPrice - planPrice)}`, variant: 'discount' as const }] : []),
+                  { label: language === 'en' ? 'Plan price' : 'Harga paket', value: formatPrice(planPrice, language), originalValue: hasDurationDiscount ? formatPrice(regularPrice, language) : undefined },
+                  ...(hasDurationDiscount ? [{ label: language === 'en' ? 'Discount' : 'Diskon', value: `−${formatPrice(regularPrice - planPrice, language)}`, variant: 'discount' as const }] : []),
                 ]}
                 totalLabel={language === 'en' ? 'Total payment' : 'Total pembayaran'}
-                total={formatPrice(planPrice)}
-                totalOriginal={hasDurationDiscount ? formatPrice(regularPrice) : undefined}
+                total={formatPrice(planPrice, language)}
+                totalOriginal={hasDurationDiscount ? formatPrice(regularPrice, language) : undefined}
                 note={language === 'en' ? 'Paid once at the start. Monthly credits are granted during the active period.' : 'Dibayar sekali di awal. Credits bulanan diberikan selama masa aktif.'}
               />
 
@@ -454,8 +482,8 @@ export function SubscriptionPlansPage({ onOpenPayments, language = 'id' }: Subsc
               </section>
 
               <footer className="payment-checkout-footer">
-                <div className="payment-checkout-footer-total"><span>{language === 'en' ? 'Total payment' : 'Total pembayaran'}</span><strong>{formatPrice(planPrice)}</strong></div>
-                <button className="primary-button payment-checkout-button" type="button" disabled={isBuying || !hasPaymentMethod(paymentMethods, selectedMethod)} onClick={() => void createPlanOrder()}>
+                <div className="payment-checkout-footer-total"><span>{language === 'en' ? 'Total payment' : 'Total pembayaran'}</span><strong>{formatPrice(planPrice, language)}</strong></div>
+                <button className="primary-button payment-checkout-button" type="button" disabled={planPrice === null || isBuying || !hasPaymentMethod(paymentMethods, selectedMethod)} onClick={() => void createPlanOrder()}>
                   {isBuying ? (language === 'en' ? 'Creating order…' : 'Membuat order…') : language === 'en' ? 'Continue to payment' : 'Lanjutkan Pembayaran'}
                   {!isBuying ? <AppIcon name="chevron-right" /> : null}
                 </button>
