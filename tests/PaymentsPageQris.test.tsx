@@ -20,6 +20,21 @@ vi.mock('../src/components/useToast', () => ({
 }))
 
 describe('PaymentsPage QRIS checkout', () => {
+  it('shows checkout API failures inline and leaves the same order retryable', async () => {
+    const base = await vi.mocked(getPaymentPage)()
+    vi.mocked(getPaymentPage).mockResolvedValue({ ...base, orders: [{
+      id: 'retry-error', status: 'pending', amount_idr: 15000, token_amount: 100,
+      provider: 'pakasir', created_at: '2026-10-19T10:00:00Z', paid_at: null,
+      product_name: 'Retry Pack', providerExpiresAt: '2099-01-01T00:00:00Z',
+    }] })
+    vi.mocked(retryPaymentCheckout).mockRejectedValueOnce(new Error('Checkout belum tersedia. Silakan coba lagi.'))
+    render(<PaymentsPage onBackToCredits={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Lanjutkan pembayaran Retry Pack' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('alurin sedang mengalami kendala. Coba lagi beberapa saat.')
+    expect(screen.getByRole('button', { name: 'Lanjutkan pembayaran Retry Pack' })).toBeEnabled()
+    expect(retryPaymentCheckout).toHaveBeenCalledWith('retry-error')
+    expect(createPaymentOrder).not.toHaveBeenCalled()
+  })
   it('only offers a status check after expiry for the original order', async () => {
     const base = await vi.mocked(getPaymentPage)()
     vi.mocked(getPaymentPage).mockResolvedValue({ ...base, orders: [{
@@ -44,7 +59,7 @@ describe('PaymentsPage QRIS checkout', () => {
     vi.mocked(getPaymentPage).mockResolvedValue({ ...base, orders: [{
       id: 'open-order', status: 'pending', amount_idr: 15000, token_amount: 100,
       provider: 'pakasir', created_at: '2026-10-19T10:00:00Z', paid_at: null,
-      product_name: 'Open Pack', expired_at: '2099-01-01T00:00:00Z',
+      product_name: 'Open Pack', expired_at: '2099-01-01T00:00:00Z', checkoutAvailable: true,
     }] })
     vi.mocked(retryPaymentCheckout).mockResolvedValue({ id: 'open-order', status: 'pending', checkoutAvailable: true, checkoutUrl: null, amount_idr: 15000, credits: 100, payment_method: 'qris' })
     render(<PaymentsPage onBackToCredits={vi.fn()} onTopUp={vi.fn()} />)
@@ -123,12 +138,12 @@ describe('PaymentsPage QRIS checkout', () => {
       checkoutAvailable: true,
       checkoutUrl: 'https://payments.example/order-1',
       qrImageUrl: 'https://payments.example/order-1.png',
-      expiresAt: '2026-10-19T12:00:00.000Z',
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
       payment_method: 'qris',
       payment: {
         va_number: null,
         total_payment: 100500,
-        expired_at: '2026-10-19T12:00:00.000Z',
+        expired_at: new Date(Date.now() + 600000).toISOString(),
         qr_string: null,
       },
     })

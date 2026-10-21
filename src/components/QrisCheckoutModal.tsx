@@ -72,33 +72,34 @@ export function QrisCheckoutModal({ open, title, description, amount, totalPayme
   if (!open) return null
   const qrImage = generatedQrImage && generatedQrImage.source === qrString ? generatedQrImage.url : qrImageUrl
   const pending = paymentStatus === 'pending'
+  const canPay = pending && secondsLeft !== 0
   const statusCopy = ({paid: 'Pembayaran berhasil', cancelled: 'Dibatalkan', expired: 'Waktu pembayaran habis', failed: 'Pembayaran gagal', refunded: 'Pembayaran dikembalikan'} as Record<string, string>)[paymentStatus] || (secondsLeft === 0 ? 'Waktu pembayaran habis. Sudah membayar? Cek status terlebih dahulu.' : 'Menunggu pembayaran')
 
   return <div className="qris-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-    <section className="qris-modal" role="dialog" aria-modal="true" aria-label={`Pembayaran ${methodLabel}`}>
+    <section className={`qris-modal${canPay ? '' : ' qris-modal-detail'}`} role="dialog" aria-modal="true" aria-label={`Pembayaran ${methodLabel}`}>
       <header className="qris-modal-header">
-        <div><p className="eyebrow">Pembayaran {methodLabel}</p><h2>{!pending ? 'Detail transaksi' : isQris ? 'Scan untuk menyelesaikan pembayaran' : 'Selesaikan pembayaran melalui virtual account'}</h2></div>
+        <div><p className="eyebrow">Pembayaran {methodLabel}</p><h2>{!canPay ? 'Detail transaksi' : isQris ? 'Scan untuk menyelesaikan pembayaran' : 'Selesaikan pembayaran melalui virtual account'}</h2></div>
         <button type="button" aria-label="Tutup pembayaran" onClick={onClose}><AppIcon name="close" /></button>
       </header>
       <div className="qris-modal-body">
         <div className="qris-code-panel">
-          {pending && (isQris ? <div className={`qris-code${qrImage ? '' : ' is-placeholder'}`}>
+          {canPay && (isQris ? <div className={`qris-code${qrImage ? '' : ' is-placeholder'}`}>
             {qrImage ? <img src={qrImage} alt={`QRIS untuk ${title}`} /> : <><div className="qris-placeholder-mark" aria-hidden="true"><span /><span /><span /></div><strong>QRIS akan muncul di sini</strong><small>Menunggu data QR dari payment gateway</small></>}
           </div> : <div className="va-number-card"><span>Nomor {methodLabel}</span><strong>{vaNumber || '-'}</strong><button type="button" disabled={!vaNumber} onClick={() => { if (vaNumber) void navigator.clipboard?.writeText(vaNumber) }}>Salin nomor VA</button></div>)}
           <span className={`qris-status ${paymentStatus}`}><i /> {statusCopy}</span>
-          {pending && secondsLeft !== null ? <div className="qris-countdown"><small>Waktu pembayaran</small><strong>{String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:{String(secondsLeft % 60).padStart(2, '0')}</strong></div> : null}
+          {canPay && secondsLeft !== null ? <div className="qris-countdown"><small>Waktu pembayaran</small><strong>{String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:{String(secondsLeft % 60).padStart(2, '0')}</strong></div> : null}
         </div>
         <div className="qris-order-panel">
           <div><p className="eyebrow">Ringkasan order</p><h3>{title}</h3><p>{description}</p></div>
           <dl>{orderId ? <div><dt>ID transaksi</dt><dd>{orderId}</dd></div> : null}<div><dt>Metode</dt><dd>{methodLabel}</dd></div></dl>
-          {pending ? <ol className="qris-instructions">{isQris ? <><li>Buka aplikasi bank atau e-wallet.</li><li>Pilih menu scan QRIS dan arahkan ke kode.</li><li>Konfirmasi nominal, lalu selesaikan pembayaran.</li></> : <><li>Buka aplikasi atau ATM bank tujuan.</li><li>Pilih transfer ke virtual account.</li><li>Masukkan nomor VA dan bayar sesuai total.</li></>}</ol> : null}
-          {pending && checkoutUrl && isQris ? <a className="primary-button qris-checkout-link" href={checkoutUrl}>Buka halaman pembayaran</a> : null}
-          {pending ? <p>Pembayaran dapat dibuka kembali melalui Riwayat pembayaran.</p> : null}
+          {canPay ? <ol className="qris-instructions">{isQris ? <><li>Buka aplikasi bank atau e-wallet.</li><li>Pilih menu scan QRIS dan arahkan ke kode.</li><li>Konfirmasi nominal, lalu selesaikan pembayaran.</li></> : <><li>Buka aplikasi atau ATM bank tujuan.</li><li>Pilih transfer ke virtual account.</li><li>Masukkan nomor VA dan bayar sesuai total.</li></>}</ol> : null}
+          {canPay && checkoutUrl && isQris ? <a className="primary-button qris-checkout-link" href={checkoutUrl}>Buka halaman pembayaran</a> : null}
+          {canPay ? <p>Pembayaran dapat dibuka kembali melalui Riwayat pembayaran.</p> : null}
         </div>
       </div>
       <footer className="qris-modal-footer">
         <div className="payment-checkout-footer-total"><span>Total pembayaran</span><strong>{money(totalPayment ?? amount)}</strong></div>
-        <button className="ghost-button qris-close-action" type="button" onClick={onClose}>{pending ? 'Bayar nanti' : 'Tutup'}</button>
+        <button className="ghost-button qris-close-action" type="button" onClick={onClose}>{canPay ? 'Bayar nanti' : 'Tutup'}</button>
       </footer>
     </section>
   </div>

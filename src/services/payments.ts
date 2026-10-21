@@ -91,7 +91,7 @@ export async function createPaymentOrder(
 }
 
 export async function getPaymentOrderStatus(id:string){return await payload(await fetch(buildApiUrl(`/api/payments/orders/${encodeURIComponent(id)}`),{headers:headers()})) as PaymentOrderDetails}
-export async function retryPaymentCheckout(id:string){return await payload(await fetch(buildApiUrl(`/api/payments/orders/${encodeURIComponent(id)}/checkout`),{method:'POST',headers:headers()})) as CreatedPaymentOrder}
+export async function retryPaymentCheckout(id:string){return await payload(await fetch(buildApiUrl(`/api/payments/orders/${encodeURIComponent(id)}/checkout`),{method:'POST',headers:headers(),signal:AbortSignal.timeout(25000)})) as CreatedPaymentOrder}
 export async function markPaymentNotificationRead(id:string){await payload(await fetch(buildApiUrl(`/api/payments/notifications/${id}/read`),{method:'PATCH',headers:headers()}))}
 
 export async function getNotifications(): Promise<PaymentNotification[]> {

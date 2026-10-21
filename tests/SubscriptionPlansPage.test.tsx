@@ -84,7 +84,7 @@ describe('SubscriptionPlansPage', () => {
     vi.mocked(createPaymentOrder).mockResolvedValue({
       id: 'plan-order', message: 'Order dibuat', status: 'pending', credits: 600,
       amount_idr: 59000, payment_method: 'bni_va', checkoutAvailable: true, checkoutUrl: null,
-      payment: { va_number: '880812345678', total_payment: 60500, expired_at: '2026-10-19T12:00:00.000Z', qr_string: null },
+      payment: { va_number: '880812345678', total_payment: 60500, expired_at: new Date(Date.now() + 600000).toISOString(), qr_string: null },
     })
     vi.mocked(getPaymentOrderStatus).mockResolvedValue({ status: 'pending' })
   })

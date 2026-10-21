@@ -3,6 +3,7 @@ import { QrisCheckoutModal } from '../components/QrisCheckoutModal'
 import { AppIcon } from '../components/AppIcon'
 import { useToast } from '../components/useToast'
 import { notifyUsageChanged } from '../services/usage'
+import { getUserFacingError } from '../utils/apiError'
 import { retryPaymentCheckout, getPaymentOrderStatus, getPaymentPage, type PaymentPageData, type PaymentOrder, type PaymentOrderDetails } from '../services/payments'
 const money = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 const formatDate = (value: string) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -22,6 +23,7 @@ export function PaymentsPage({ onBackToCredits, onTopUp }: { onBackToCredits: ()
   const [error, setError] = useState('')
   const [orderFilter, setOrderFilter] = useState<OrderFilter>('all')
   const [checkingOrderId, setCheckingOrderId] = useState('')
+  const [checkoutError, setCheckoutError] = useState<{ orderId: string; message: string } | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<{ order: PaymentOrder; detail: PaymentOrderDetails } | null>(null)
   const toast = useToast()
   const filteredOrders = useMemo(() => data?.orders.filter((order) => orderFilter === 'all' || order.status.toLowerCase() === orderFilter) || [], [data?.orders, orderFilter])
@@ -32,8 +34,11 @@ export function PaymentsPage({ onBackToCredits, onTopUp }: { onBackToCredits: ()
   }, [])
   useEffect(() => { void load() }, [load])
   async function retryCheckout(order: PaymentOrder) {
-    if (checkingOrderId || order.status.toLowerCase() !== 'pending') return
+    if (checkingOrderId) return
+    // Both available and unavailable pending checkouts must be openable on this order.
+    if (order.status.toLowerCase() !== 'pending') return
     setCheckingOrderId(order.id)
+    setCheckoutError(null)
     try {
       const result = await retryPaymentCheckout(order.id)
       setData((current) => current ? { ...current, orders: current.orders.map((item) => item.id === order.id ? {
@@ -41,12 +46,14 @@ export function PaymentsPage({ onBackToCredits, onTopUp }: { onBackToCredits: ()
         expired_at: result.payment?.expired_at || result.providerExpiresAt || result.expiresAt || item.expired_at,
       } : item) } : current)
       if (result.checkoutAvailable === false) {
-        toast.error('Checkout belum tersedia', result.message || 'Order tetap tersimpan. Silakan coba lagi.')
+        setCheckoutError({ orderId: order.id, message: result.message || 'QRIS belum tersedia. Order tetap tersimpan. Silakan coba lagi.' })
         return
       }
       setSelectedOrder({ order, detail: result })
     } catch (cause) {
-      toast.error('Checkout belum tersedia', cause instanceof Error ? cause.message : 'Order tetap tersimpan. Silakan coba lagi.')
+      setCheckoutError({ orderId: order.id, message: cause instanceof Error && cause.name === 'TimeoutError'
+        ? 'Permintaan pembayaran terlalu lama. Silakan coba lagi pada order ini.'
+        : getUserFacingError(cause, 'Pembayaran belum dapat dibuka. Order tetap tersimpan. Silakan coba lagi.') })
       await load()
     } finally {
       setCheckingOrderId('')
@@ -80,7 +87,7 @@ export function PaymentsPage({ onBackToCredits, onTopUp }: { onBackToCredits: ()
             {filteredOrders.length ? filteredOrders.map((order) => {
               const status = order.status.toLowerCase()
               const isTopUp = (order.order_type || order.product_type) !== 'subscription'
-              const expiry = order.expired_at || order.providerExpiresAt || order.payment?.expired_at
+              const expiry = order.providerExpiresAt || order.expired_at || order.payment?.expired_at
               const expiryTime = expiry ? Date.parse(expiry) : NaN
               const timedOut = status === 'expired' || (status === 'pending' && Number.isFinite(expiryTime) && expiryTime <= now)
               const unavailable = status === 'pending' && (order.checkoutAvailable === false || !Number.isFinite(expiryTime))
@@ -89,8 +96,8 @@ export function PaymentsPage({ onBackToCredits, onTopUp }: { onBackToCredits: ()
               const action = canTopUpAgain && onTopUp ? 'Top up lagi' : status === 'pending' && !timedOut ? unavailable ? 'Coba lagi' : 'Lanjutkan pembayaran' : 'Lihat detail'
               const title = order.product_name || (order.order_type === 'subscription' ? `Subscription · ${order.duration_months || 1} bulan` : `${(order.token_amount || 0).toLocaleString('id-ID')} AI Credits`)
               return <div className="payment-order-row" key={order.id}>
-                <div><strong>{title}</strong><small>{order.order_type === 'subscription' ? `${(order.monthly_credits || 0).toLocaleString('id-ID')} AI Credits / bulan · bayar sekali` : 'Top up AI Credits'} · {formatDate(order.created_at)} · {order.id.slice(0, 8).toUpperCase()}</small></div>
-                <span>{money(order.amount_idr)}</span>
+                <div className="payment-order-copy"><strong>{title}</strong><small>{order.order_type === 'subscription' ? `${(order.monthly_credits || 0).toLocaleString('id-ID')} AI Credits / bulan · bayar sekali` : 'Top up AI Credits'} · {formatDate(order.created_at)} · {order.id.slice(0, 8).toUpperCase()}</small></div>
+                <span className="payment-order-amount">{money(order.amount_idr)}</span>
                 <div className="payment-order-actions">
                   <b className={`payment-order-status ${status}`}>{label}</b>
                   {!timedOut ? <button
@@ -107,6 +114,7 @@ export function PaymentsPage({ onBackToCredits, onTopUp }: { onBackToCredits: ()
                     <button type="button" disabled={Boolean(checkingOrderId)} aria-label={`Cek status ${title}`} onClick={() => void refreshPendingOrder(order.id)}>Cek status</button>
                   </> : null}
                 </div>
+                {checkoutError?.orderId === order.id ? <p className="payment-order-error" role="alert">{checkoutError.message}</p> : null}
               </div>
             }) : <p className="payment-empty">Tidak ada pembayaran dengan status ini.</p>}
           </section> : null}
@@ -121,7 +129,7 @@ export function PaymentsPage({ onBackToCredits, onTopUp }: { onBackToCredits: ()
       qrString={selectedOrder.detail.payment?.qr_string}
       vaNumber={selectedOrder.detail.payment?.va_number}
       checkoutUrl={selectedOrder.detail.checkoutUrl}
-      expiresAt={selectedOrder.detail.providerExpiresAt || selectedOrder.detail.payment?.expired_at}
+      expiresAt={selectedOrder.detail.providerExpiresAt || selectedOrder.detail.payment?.expired_at || selectedOrder.order.providerExpiresAt || selectedOrder.order.expired_at || selectedOrder.order.payment?.expired_at}
       orderId={selectedOrder.order.id}
       initialStatus={selectedOrder.detail.status}
       checkStatus={getPaymentOrderStatus}

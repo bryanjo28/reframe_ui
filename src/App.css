@@ -7670,6 +7670,30 @@ body{background-color:#080609;background-image:radial-gradient(circle at 90% 0%,
 .content-bank-thread-remove{display:grid;place-items:center;width:28px;height:28px;margin-left:auto;border:1px solid var(--border);border-radius:8px;color:var(--text-primary);background:var(--bg-surface);font-size:18px;cursor:pointer}
 .content-bank-thread-remove:hover:not(:disabled){border-color:var(--brand-primary);color:var(--brand-primary)}
 .content-bank-thread-remove:disabled{opacity:.35;cursor:not-allowed}
+.payment-order-history .payment-order-row{grid-template-columns:minmax(0,1fr) max-content 190px;gap:20px;padding-block:20px}
+.payment-order-copy{min-width:0;gap:6px}
+.payment-order-copy>strong{font-size:15px;line-height:1.4}
+.payment-order-copy>small{font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.payment-order-history .payment-order-amount{font-size:14px;font-weight:650;white-space:nowrap}
+.payment-order-actions>.payment-order-status{font-size:12px;line-height:1.4;padding:7px 10px}
+.payment-order-actions>button{min-height:40px;padding:8px 12px;font-size:13px;line-height:1.4;touch-action:manipulation}
+.payment-order-actions>small{font-size:12px;line-height:1.5}
+.payment-order-error{grid-column:1/-1;margin:0;padding:10px 12px;border:1px solid rgba(255,113,143,.25);border-radius:10px;color:#ff91a7;font-size:13px;line-height:1.5;background:rgba(255,113,143,.05)}
+.qris-modal-detail .qris-status{margin-top:0;line-height:1.6}
+@media(max-width:680px){
+  .payment-order-history .payment-order-row{grid-template-columns:minmax(0,1fr) max-content;gap:14px 12px;padding:18px 0}
+  .payment-order-row>.payment-order-copy{grid-column:1;grid-row:1}
+  .payment-order-row>.payment-order-amount{grid-column:2;grid-row:1;align-self:start;padding-top:2px}
+  .payment-order-row>.payment-order-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+  .payment-order-actions>.payment-order-status{grid-area:auto;max-width:100%;text-transform:none}
+  .payment-order-actions>button{min-height:44px;font-size:13px;margin-left:auto}
+  .payment-order-actions>small{flex-basis:100%;order:3}
+  .payment-order-history .payment-order-filters{flex-wrap:wrap;gap:8px;overflow:visible;margin-bottom:16px}
+  .payment-order-filters>button{min-height:36px;padding:8px 12px;font-size:12px}
+  .qris-modal-detail{height:auto}
+  .qris-modal .qris-order-panel dd{max-width:70%;overflow-wrap:anywhere}
+  .qris-modal-header h2{font-size:16px}
+}
 .ai-credits-plan-card-compact{display:grid;justify-items:start;gap:14px}
 .ai-credits-plan-card-summary{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:28px;padding:24px}
 .ai-credits-plan-card-summary .ai-credits-plan-copy{gap:12px}
