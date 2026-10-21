@@ -14,8 +14,8 @@ vi.mock('../src/services/authService', async (original) => {
   return { ...actual, getCurrentAuthState: vi.fn(), invalidateAuthStateCache: vi.fn() }
 })
 
-function renderPage(onStatusChange?: (status: 'connected' | 'needs_reconnect' | 'disconnected') => void) {
-  return render(<ToastProvider><ConnectingAppsPage onStatusChange={onStatusChange} /></ToastProvider>)
+function renderPage(onStatusChange?: (status: 'connected' | 'needs_reconnect' | 'disconnected') => void, language: 'id' | 'en' = 'id') {
+  return render(<ToastProvider><ConnectingAppsPage onStatusChange={onStatusChange} language={language} /></ToastProvider>)
 }
 
 describe('ConnectingAppsPage', () => {
@@ -48,5 +48,18 @@ describe('ConnectingAppsPage', () => {
     await waitFor(() => expect(getCurrentAuthState).toHaveBeenCalledTimes(2))
     expect(onStatusChange).toHaveBeenLastCalledWith('disconnected')
     expect(await screen.findByRole('button', { name: /^connect threads$/i })).toBeInTheDocument()
+  })
+
+  it('shows the connected username in English when English is selected', async () => {
+    vi.mocked(getCurrentAuthState).mockResolvedValue({
+      user: { id: 'user-1' }, onboarding: null,
+      socialAccounts: { threads: { connected: true, status: 'connected', username: 'bryanjon28' } },
+    })
+
+    renderPage(undefined, 'en')
+
+    expect(await screen.findByText('Connected to bryanjon28')).toBeInTheDocument()
+    expect(screen.getByText('Connected')).toBeInTheDocument()
+    expect(screen.queryByText(/Terhubung/)).not.toBeInTheDocument()
   })
 })

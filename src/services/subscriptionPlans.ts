@@ -138,6 +138,7 @@ export type NormalizedCurrentSubscription = {
   planId: string
   planKey: string
   planName: string
+  monthlyAiCredits?: number | null
   status: string
   active: boolean
   raw: CurrentSubscriptionRecord
@@ -261,14 +262,19 @@ export function normalizeCurrentSubscription(record: CurrentSubscriptionRecord):
         : null
 
   const planId =
-    readFirstString(record, ['planId', 'plan_id', 'subscriptionPlanId', 'subscription_plan_id']) ||
-    (planRecord ? extractPlanId(planRecord) : '')
+    (planRecord ? extractPlanId(planRecord) : '') ||
+    readFirstString(record, ['planId', 'plan_id', 'subscriptionPlanId', 'subscription_plan_id'])
   const planKey =
+    (planRecord ? extractPlanKey(planRecord) : '') ||
     readFirstString(record, ['planKey', 'plan_key']) ||
-    (planRecord ? extractPlanKey(planRecord) : planId)
+    planId
   const planName =
+    (planRecord ? extractPlanName(planRecord) : '') ||
     readFirstString(record, ['planName', 'plan_name']) ||
-    (planRecord ? extractPlanName(planRecord) : planKey || 'Subscription')
+    planKey || 'Subscription'
+  const monthlyAiCredits = planRecord
+    ? readFirstNumber(planRecord, ['monthly_ai_credits', 'monthlyAiCredits', 'aiCredits', 'ai_credits']) ?? null
+    : readFirstNumber(record, ['monthly_ai_credits', 'monthlyAiCredits', 'aiCredits', 'ai_credits']) ?? null
   const status = extractStatus(record)
   const active = Boolean(
     readFirstBoolean(record, ['active', 'isActive', 'is_active']) ??
@@ -279,6 +285,7 @@ export function normalizeCurrentSubscription(record: CurrentSubscriptionRecord):
     planId,
     planKey,
     planName,
+    monthlyAiCredits,
     status,
     active,
     raw: record,

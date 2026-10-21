@@ -13,6 +13,7 @@ import {
   deleteThreadsConnection,
   getThreadsAuthorizationUrl,
 } from '../services/threadsAuth'
+import { translateText, type UiLanguage } from '../utils/uiLanguage'
 
 type ThreadsConnectionView = {
   status?: string
@@ -60,8 +61,9 @@ function toThreadsConnectionView(
   }
 }
 
-export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (status: ThreadsConnectionStatus) => void }) {
+export function ConnectingAppsPage({ onStatusChange, language = 'id' }: { onStatusChange?: (status: ThreadsConnectionStatus) => void; language?: UiLanguage }) {
   const { success: toastSuccess, error: toastError } = useToast()
+  const t = (value: string) => translateText(value, language)
   const [isConnectingThreads, setIsConnectingThreads] = useState(false)
   const [isDeletingThreads, setIsDeletingThreads] = useState(false)
   const [isLoadingThreadsStatus, setIsLoadingThreadsStatus] = useState(true)
@@ -86,7 +88,7 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
     if (connected === 'true' && !error) {
       toastSuccess(
         'Threads connected',
-        'Akun Threads berhasil terhubung dan status koneksi sudah diperbarui.',
+        language === 'en' ? 'Your Threads account is connected and its status has been updated.' : 'Akun Threads berhasil terhubung dan status koneksi sudah diperbarui.',
       )
     }
 
@@ -173,7 +175,7 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
       setThreadsConnection(toThreadsConnectionView(authState?.socialAccounts?.threads ?? null))
       onStatusChangeRef.current?.(getThreadsConnectionStatus(authState?.socialAccounts?.threads))
       setIsDisconnectModalOpen(false)
-      toastSuccess('Threads unlinked', 'Koneksi akun Threads berhasil dihapus.')
+      toastSuccess('Threads unlinked', language === 'en' ? 'Your Threads account connection has been removed.' : 'Koneksi akun Threads berhasil dihapus.')
     } catch (error) {
       const message =
         error instanceof Error
@@ -190,10 +192,10 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
   return (
     <section className="connecting-page">
       <header className="page-header">
-        <p className="eyebrow">alurin Account</p>
-        <h1>Connected Accounts</h1>
+        <p className="eyebrow">{language === 'en' ? 'alurin Account' : 'Akun alurin'}</p>
+        <h1>{language === 'en' ? 'Connected Accounts' : 'Akun Terhubung'}</h1>
         <p className="page-description">
-          Hubungkan akun media sosial Anda untuk memulai automasi.
+          {language === 'en' ? 'Connect your social media account to start automating.' : 'Hubungkan akun media sosial Anda untuk memulai automasi.'}
         </p>
       </header>
 
@@ -213,17 +215,19 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
           const isConnected = canUseThreads
           const handle = isThreads
             ? isConnected
-              ? `Terhubung${threadsConnection?.username ? ` sebagai ${threadsConnection.username}` : ''}`
+              ? language === 'en'
+                ? `Connected${threadsConnection?.username ? ` to ${threadsConnection.username}` : ''}`
+                : `Terhubung${threadsConnection?.username ? ` sebagai ${threadsConnection.username}` : ''}`
               : needsReconnect
-                ? 'Perlu dihubungkan ulang'
+                ? t('Perlu dihubungkan ulang')
                 : isLoadingThreadsStatus
-                  ? 'Memeriksa status koneksi...'
-                  : 'Belum terhubung'
+                  ? t('Memeriksa status koneksi...')
+                  : t('Belum terhubung')
             : app.handle
           const statusText = isConnected
-            ? 'Terhubung'
+            ? t('Terhubung')
             : needsReconnect
-              ? 'Perlu dihubungkan ulang'
+              ? t('Perlu dihubungkan ulang')
               : null
 
           return (
@@ -263,7 +267,7 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
                     disabled={isConnectingThreads || isLoadingThreadsStatus}
                   >
                     <AppIcon name={isConnectingThreads ? 'link' : 'plus'} />
-                    {isConnectingThreads ? 'Menghubungkan...' : 'Hubungkan Ulang Threads'}
+                    {isConnectingThreads ? t('Menghubungkan...') : t('Hubungkan Ulang Threads')}
                   </button>
                 </div>
               ) : isThreads ? (
@@ -274,7 +278,7 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
                   disabled={isConnectingThreads || isLoadingThreadsStatus}
                 >
                   <AppIcon name={isConnectingThreads ? 'link' : 'plus'} />
-                  {isConnectingThreads ? 'Menghubungkan...' : 'Connect Threads'}
+                  {isConnectingThreads ? t('Menghubungkan...') : 'Connect Threads'}
                 </button>
               ) : (
                 <button className="connect-button" type="button">
@@ -304,10 +308,11 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
             onClick={(event) => event.stopPropagation()}
           >
             <div className="threads-disconnect-modal-head">
-              <h3 id="threads-disconnect-modal-title">Disconnect Threads?</h3>
+              <h3 id="threads-disconnect-modal-title">{language === 'en' ? 'Disconnect Threads?' : 'Putuskan koneksi Threads?'}</h3>
               <p>
-                Koneksi Threads akan diputus. Setelah itu status akun menjadi disconnected
-                dan action berikutnya adalah connect lagi.
+                {language === 'en'
+                  ? 'Your Threads account will be disconnected. You can connect it again whenever you need it.'
+                  : 'Koneksi akun Threads akan diputus. Kamu bisa menghubungkannya kembali kapan saja.'}
               </p>
             </div>
             <div className="threads-disconnect-modal-actions">
@@ -317,7 +322,7 @@ export function ConnectingAppsPage({ onStatusChange }: { onStatusChange?: (statu
                 onClick={(event) => dismissModal(() => setIsDisconnectModalOpen(false), event.currentTarget)}
                 disabled={isDeletingThreads}
               >
-                Batal
+                {language === 'en' ? 'Cancel' : 'Batal'}
               </button>
               <button
                 className="connect-button"

@@ -84,3 +84,25 @@ test('offers reconnect instead of treating an expired Threads account as disconn
   expect(onConnectThreads).toHaveBeenCalledOnce()
   expect(screen.getByText(/kedaluwarsa/i)).toBeInTheDocument()
 })
+
+test('renders the empty Schedule page fully in English', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: [] }), {
+    status: 200, headers: { 'Content-Type': 'application/json' },
+  })))
+
+  render(
+    <ToastProvider language="en">
+      <AutoPostPage userId="user-1" threadsStatus="needs_reconnect" onConnectThreads={vi.fn()} language="en" />
+    </ToastProvider>,
+  )
+
+  expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeInTheDocument()
+  expect(screen.getByText('Manage what gets published and when.')).toBeInTheDocument()
+  expect(screen.getByText('Your Threads connection has expired. Reconnect your account.')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Reconnect Threads' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Calendar' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Not scheduled' })).toBeInTheDocument()
+  expect(screen.getByText('No content is ready to schedule')).toBeInTheDocument()
+  expect(screen.queryByText(/Jadwal|Belum|Hubungkan|konten/i)).not.toBeInTheDocument()
+})

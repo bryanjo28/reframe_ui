@@ -948,7 +948,7 @@ function AppShell() {
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage onStatusChange={(status) => {
                 setThreadsStatus(status)
-              }} />
+              }} language={language} />
             ) : activePage === 'settings' ? (
               <SettingsPage user={currentUser} language={language} onLanguageChange={setLanguage} theme={theme} onThemeChange={setTheme} onReplayTutorial={() => setShowTutorial(true)} onLogout={handleLogout} onNavigate={handleNavigate} />
             ) : activePage === 'referral' ? (
