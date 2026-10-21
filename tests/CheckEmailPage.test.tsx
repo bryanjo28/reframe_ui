@@ -17,7 +17,7 @@ describe('CheckEmailPage', () => {
     expect(screen.getByText('user@example.com')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Kembali ke Login' })).toHaveAttribute('href', '/login')
 
-    await user.click(screen.getByRole('button', { name: 'Kirim ulang verifikasi' }))
+    await user.click(screen.getByRole('button', { name: 'Kirim ulang email verifikasi' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent('Email verifikasi telah dikirim ulang')
   })
@@ -27,7 +27,7 @@ describe('CheckEmailPage', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })))
     render(<CheckEmailPage email="user@example.com" />)
 
-    await user.click(screen.getByRole('button', { name: 'Kirim ulang verifikasi' }))
+    await user.click(screen.getByRole('button', { name: 'Kirim ulang email verifikasi' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Gagal mengirim ulang email verifikasi')
   })

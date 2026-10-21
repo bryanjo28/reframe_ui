@@ -6,6 +6,9 @@ import { NotificationBell } from '../src/components/NotificationBell'
 import { getPaymentPage, markPaymentNotificationRead } from '../src/services/payments'
 import { getNotifications } from '../src/services/payments'
 import { USAGE_UPDATED_EVENT } from '../src/services/usage'
+import { getCurrentSubscription } from '../src/services/subscriptionPlans'
+
+vi.mock('../src/services/subscriptionPlans', () => ({ getCurrentSubscription: vi.fn() }))
 
 vi.mock('../src/services/payments', () => ({
   getPaymentPage: vi.fn(),
@@ -26,6 +29,7 @@ describe('AiCreditsPage', () => {
     expect(await screen.findByText('Hasil generate topic')).toBeInTheDocument()
   })
   beforeEach(() => {
+    vi.mocked(getCurrentSubscription).mockResolvedValue(null)
     vi.mocked(markPaymentNotificationRead).mockResolvedValue(undefined)
     vi.mocked(getPaymentPage).mockResolvedValue({
       packages: [],
@@ -62,6 +66,45 @@ describe('AiCreditsPage', () => {
         created_at: '2026-10-14T09:00:00.000Z',
       }],
     })
+  })
+
+  it('shows a compact active plan, payment balance and queued plan', async () => {
+    vi.mocked(getCurrentSubscription).mockResolvedValue({
+      planId: 'pro', planKey: 'pro', planName: 'Old catalog name', status: 'active', active: true,
+      raw: {
+        plan: { name: 'Pro', monthlyAiCredits: 1200 },
+        subscription: { endsAt: '2026-10-21T00:00:00Z' },
+        contracts: [{ status: 'active', duration_months: 1, ends_at: '2026-11-21T00:00:00Z' }],
+        queued: [{ id: 'next', plan: { name: 'Pro' }, starts_at: '2026-11-21T00:00:00Z' }],
+      },
+    })
+    const onViewPlans = vi.fn()
+    render(<AiCreditsPage language="id" onTopUp={vi.fn()} onViewPlans={onViewPlans} onViewPaymentHistory={vi.fn()} />)
+    expect(await screen.findByText('Pro · 1 bulan')).toBeInTheDocument()
+    expect(screen.getByText('Aktif sampai 21 November 2026')).toBeInTheDocument()
+    expect(screen.getByText('98')).toBeInTheDocument()
+    expect(screen.getByText('AI Credits tersedia')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Top up' })).toBeInTheDocument()
+    expect(screen.getByText('98').closest('.ai-credits-plan-card-summary')).toBeInTheDocument()
+    expect(screen.getByText(/Paket berikutnya: Pro/)).toBeInTheDocument()
+    expect(screen.getByText('Tidak diperpanjang otomatis.')).toBeInTheDocument()
+    expect(screen.queryByText('Dibayar')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Beli paket berikutnya' }))
+    expect(onViewPlans).toHaveBeenCalledOnce()
+  })
+
+  it('uses the active monthly period end when no active contract is available', async () => {
+    vi.mocked(getCurrentSubscription).mockResolvedValue({
+      planId: 'pro', planKey: 'pro', planName: 'Pro', status: 'active', active: true,
+      raw: {
+        plan: { name: 'Pro' },
+        subscription: { endsAt: '2026-11-21T00:00:00Z' },
+        contracts: [{ status: 'queued', ends_at: '2027-01-21T00:00:00Z' }],
+      },
+    })
+    render(<AiCreditsPage language="id" onTopUp={vi.fn()} onViewPlans={vi.fn()} onViewPaymentHistory={vi.fn()} />)
+    expect(await screen.findByText('Aktif sampai 21 November 2026')).toBeInTheDocument()
+    expect(screen.queryByText(/21 Januari 2027/)).not.toBeInTheDocument()
   })
 
   it('opens notifications from a bell and marks an item as read', async () => {

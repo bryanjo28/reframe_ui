@@ -95,7 +95,7 @@ const sections: Array<[AdminSection, string, string]> = [
   ['overview', 'Overview', 'Ringkasan operasional'],
   ['users', 'Users', 'Akun, plan dan saldo kredit'],
   ['profitability', 'Profitability', 'Perbandingan pembayaran dan konsumsi AI'],
-  ['transactions', 'Transactions', 'Order top up dan Midtrans'],
+  ['transactions', 'Transactions', 'Riwayat transaksi pembayaran'],
   ['ai-usage', 'AI usage', 'Token, biaya dan kredit'],
   ['scheduled-posts', 'Scheduled posts', 'Antrean dan hasil publish'],
   ['audit-logs', 'Audit logs', 'Riwayat tindakan admin'],
@@ -166,6 +166,8 @@ function value(row: AdminRow, key: string) {
 }
 
 function AdminTable({ columns, rows, empty, onSelect, sortableKeys = [] }: { columns: Array<[string, string, (row: AdminRow) => ReactNode]>; rows: AdminRow[]; empty: string; onSelect?: (row: AdminRow) => void; sortableKeys?: string[] }) {
+  const [tablePage, setTablePage] = useState(1)
+  const currentPage = Math.min(tablePage, Math.max(1, Math.ceil(rows.length / 10)))
   const [sorting, setSorting] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null)
   const sortedRows = sorting ? [...rows].sort((a, b) => {
     const comparable = (row: AdminRow) => {
@@ -180,7 +182,7 @@ function AdminTable({ columns, rows, empty, onSelect, sortableKeys = [] }: { col
     return (left - right) * (sorting.direction === 'ascending' ? 1 : -1)
   }) : rows
   if (!rows.length) return <div className="panel admin-empty">{empty}</div>
-  return <div className="panel admin-table-wrap"><table className="admin-table"><thead><tr>{columns.map(([key, title]) => <th key={key} scope="col" aria-sort={sortableKeys.includes(key) ? sorting?.key === key ? sorting.direction : 'none' : undefined}>{sortableKeys.includes(key) ? <button className="admin-sort-button" type="button" title="Urutkan data di halaman ini" onClick={() => setSorting((current) => ({ key, direction: current?.key === key && current.direction === 'descending' ? 'ascending' : 'descending' }))}>{title}<span aria-hidden="true">{sorting?.key === key ? sorting.direction === 'ascending' ? '↑' : '↓' : '↕'}</span></button> : title}</th>)}</tr></thead><tbody>{sortedRows.map((row, index) => <tr key={String(row.id ?? row.requestId ?? index)} onClick={onSelect ? () => onSelect(row) : undefined} onKeyDown={onSelect ? (event) => { if (event.key === 'Enter') onSelect(row) } : undefined} tabIndex={onSelect ? 0 : undefined} className={onSelect ? 'admin-table-row-clickable' : undefined}>{columns.map(([key, , render]) => <td key={key}>{render(row)}</td>)}</tr>)}</tbody></table></div>
+  return <div className="panel admin-table-wrap"><table className="admin-table"><thead><tr>{columns.map(([key, title]) => <th key={key} scope="col" aria-sort={sortableKeys.includes(key) ? sorting?.key === key ? sorting.direction : 'none' : undefined}>{sortableKeys.includes(key) ? <button className="admin-sort-button" type="button" title="Urutkan data di halaman ini" onClick={() => setSorting((current) => ({ key, direction: current?.key === key && current.direction === 'descending' ? 'ascending' : 'descending' }))}>{title}<span aria-hidden="true">{sorting?.key === key ? sorting.direction === 'ascending' ? '↑' : '↓' : '↕'}</span></button> : title}</th>)}</tr></thead><tbody>{sortedRows.slice((currentPage - 1) * 10, currentPage * 10).map((row, index) => <tr key={String(row.id ?? row.requestId ?? index)} onClick={onSelect ? () => onSelect(row) : undefined} onKeyDown={onSelect ? (event) => { if (event.key === 'Enter') onSelect(row) } : undefined} tabIndex={onSelect ? 0 : undefined} className={onSelect ? 'admin-table-row-clickable' : undefined}>{columns.map(([key, , render]) => <td key={key}>{render(row)}</td>)}</tr>)}</tbody></table>{rows.length > 10 ? <div className="admin-pagination"><span>{rows.length} records</span><div><button className="ghost-button" type="button" disabled={currentPage <= 1} onClick={() => setTablePage(currentPage - 1)}>Sebelumnya</button><span>Halaman {currentPage}</span><button className="ghost-button" type="button" disabled={currentPage * 10 >= rows.length} onClick={() => setTablePage(currentPage + 1)}>Berikutnya</button></div></div> : null}</div>
 }
 
 function StatusBadge({ status }: { status: unknown }) {
@@ -255,7 +257,7 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
         setSubscriptionFinancials(data || null)
         setList({ items: data?.contracts || [], total: data?.contracts?.length || 0, page: 1, limit: 10000 })
       } else {
-        const params = new URLSearchParams({ page: String(page), limit: '25' })
+        const params = new URLSearchParams({ page: String(page), limit: '10' })
         if (query.trim()) params.set('query', query.trim())
         if (status) params.set('status', status)
         const range = isoRange(from, to)
@@ -270,7 +272,7 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
           setUserDetail(details || null)
         } else {
           const data = await adminRequest<AdminList>(`/api/admin/${section}?${params.toString()}`)
-          setList(data || { items: [], total: 0, page, limit: 25 })
+          setList(data || { items: [], total: 0, page, limit: 10 })
           if (section === 'referrals') setReferralData(data as ReferralAdminData || null)
           setUserDetail(null)
         }
@@ -387,6 +389,7 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
     ['product', 'Product', (row) => value(row, 'product')], ['amountIdr', 'Amount', (row) => formatCurrency(row.amountIdr)],
     ['credits', 'Credits', (row) => formatNumber(row.credits)], ['provider', 'Provider', (row) => value(row, 'provider')],
     ['status', 'Status', (row) => <StatusBadge status={row.status} />], ['createdAt', 'Created', (row) => formatDate(row.createdAt)],
+    ['paidAt', 'Paid at', (row) => formatDate(row.paidAt)],
   ] : section === 'ai-usage' ? [
     ['createdAt', 'Time', (row) => formatDate(row.createdAt)], ['user', 'User', (row) => <><strong>{value(row, 'user')}</strong><small>{value(row, 'accountName')}</small></>],
     ['feature', 'Feature', (row) => value(row, 'feature')], ['model', 'Model', (row) => value(row, 'model')],
@@ -516,7 +519,7 @@ export function AdminDashboardPage({ onBackToUser, onLogout }: { onBackToUser: (
           {!loading && !error && section !== 'overview' && section !== 'subscription-pricing' && list && !(section === 'users' && selectedUserId) ? <>
             <AdminTable key={section} columns={columns} rows={list.items} sortableKeys={section === 'users' ? ['created_at', 'lastLoginAt'] : section === 'ai-usage' ? ['estimatedCostIdr'] : section === 'scheduled-posts' || section === 'feedback' ? ['created_at'] : []} empty={section === 'error-logs' ? 'Belum ada error server yang tercatat.' : section === 'feedback' ? 'Belum ada feedback dari pengguna.' : 'Belum ada data untuk filter ini.'} onSelect={section === 'users' ? openUser : undefined} />
             {list.truncated ? <p className="admin-data-note">Daftar users dibatasi pada 100.000 profil untuk menjaga penggunaan database.</p> : null}
-            <div className="admin-pagination"><span>{formatNumber(list.total)} records</span><div><button className="ghost-button" type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>Sebelumnya</button><span>Halaman {page}</span><button className="ghost-button" type="button" onClick={() => setPage((current) => current + 1)} disabled={page * list.limit >= list.total}>Berikutnya</button></div></div>
+            {section !== 'subscription-financials' ? <div className="admin-pagination"><span>{formatNumber(list.total)} records</span><div><button className="ghost-button" type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>Sebelumnya</button><span>Halaman {page}</span><button className="ghost-button" type="button" onClick={() => setPage((current) => current + 1)} disabled={page * 10 >= list.total}>Berikutnya</button></div></div> : null}
           </> : null}
           {section === 'error-logs' && !loading && !error ? <p className="admin-data-note">Log mencakup error API/server berstatus 5xx. Body request, kredensial, dan stack trace tidak disimpan.</p> : null}
         </div>

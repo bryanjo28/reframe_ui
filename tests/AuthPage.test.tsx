@@ -75,7 +75,7 @@ describe('AuthPage', () => {
     const user = userEvent.setup()
     const onEmailNotVerified = vi.fn()
     vi.spyOn(authService, 'login').mockRejectedValue(
-      new authService.AuthRequestError('Email belum diverifikasi.', 'EMAIL_NOT_VERIFIED'),
+      new authService.AuthRequestError('Email belum diverifikasi.', 'EMAIL_NOT_CONFIRMED'),
     )
     render(
       <AuthPage

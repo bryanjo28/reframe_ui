@@ -5,6 +5,23 @@ import { expect, test, vi } from 'vitest'
 import { ToastProvider } from '../src/components/Toast'
 import { ContentBankPage } from '../src/pages/ContentBankPage'
 
+test.each(['short', 'long'])('uses the original %s format for part controls', async (threadType) => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ success: true, data: [{
+    id: 'format-output', title: 'Format test', platform: 'threads', threadType,
+    content: 'Bagian pertama', status: 'draft',
+  }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+  const user = userEvent.setup()
+  render(<ToastProvider><ContentBankPage userId="user-1" onNavigate={vi.fn()} language="id" /></ToastProvider>)
+  await user.click(await screen.findByRole('button', { name: 'Review' }))
+  if (threadType === 'short') {
+    expect(screen.queryByRole('button', { name: '+ Tambah bagian' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Hapus Thread 1' })).not.toBeInTheDocument()
+  } else {
+    expect(screen.getByRole('button', { name: '+ Tambah bagian' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Hapus Thread 1' })).toBeDisabled()
+  }
+})
+
 test('edits split Threads in separate Content Bank fields and preserves the delimiter on save', async () => {
   let updateBody: Record<string, unknown> | null = null
 
@@ -63,6 +80,16 @@ test('edits split Threads in separate Content Bank fields and preserves the deli
 
   expect(firstThread).toHaveValue('Pembuka thread')
   expect(secondThread).toHaveValue('Isi thread kedua')
+
+  const addPart = screen.getByRole('button', { name: '+ Tambah bagian' })
+  for (let index = 0; index < 6; index += 1) await user.click(addPart)
+  expect(screen.getAllByRole('textbox', { name: /^Thread / })).toHaveLength(8)
+  expect(addPart).toBeDisabled()
+  for (let index = 8; index >= 3; index -= 1) {
+    await user.click(screen.getByRole('button', { name: `Hapus Thread ${index}` }))
+  }
+  expect(screen.getAllByRole('textbox', { name: /^Thread / })).toHaveLength(2)
+  expect(addPart).toBeEnabled()
 
   await user.clear(secondThread)
   await user.type(secondThread, 'Isi kedua dari Content Bank')

@@ -202,7 +202,9 @@ export function AuthPage({
       }
 
       switch (apiError.code) {
+        case 'EMAIL_NOT_CONFIRMED':
         case 'EMAIL_NOT_VERIFIED':
+          setErrorMessage('Verifikasi email kamu terlebih dahulu')
           onEmailNotVerified?.(normalizedEmail)
           return
         case 'EMAIL_ALREADY_EXISTS':

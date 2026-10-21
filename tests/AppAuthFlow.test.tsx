@@ -141,7 +141,7 @@ it('routes a registration requiring confirmation to check email without opening 
   expect(screen.getByLabelText('Konfirmasi Password')).toHaveAttribute('type', 'text')
   await user.click(screen.getByRole('button', { name: 'Register' }))
 
-  expect(await screen.findByRole('heading', { name: 'Cek email kamu dulu' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Verifikasi email kamu terlebih dahulu' })).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Lengkapi Persona Pertama' })).not.toBeInTheDocument()
   expect(window.location.pathname).toBe('/check-email')
   expect(localStorage.getItem('alurin.authToken')).toBeNull()

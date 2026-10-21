@@ -4,6 +4,20 @@ import { AdminDashboardPage } from '../src/pages/Admin/AdminDashboardPage'
 
 afterEach(() => vi.unstubAllGlobals())
 
+it('requests ten records per page and loads the next page', async () => {
+  window.history.replaceState({}, '', '/admin/transactions')
+  const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ data: {
+    items: [{ id: 'order-1', product: 'Top up' }], total: 11, page: 1, limit: 10,
+  } }), { status: 200 }))
+  vi.stubGlobal('fetch', fetchSpy)
+  render(<AdminDashboardPage onBackToUser={vi.fn()} onLogout={vi.fn()} />)
+  await screen.findByText('order-1')
+  const requested = () => fetchSpy.mock.calls.map((args) => new URL(String((args as unknown[])[0])))
+  expect(requested()[0].searchParams.get('limit')).toBe('10')
+  fireEvent.click(screen.getByRole('button', { name: 'Berikutnya' }))
+  await waitFor(() => expect(requested().some((url) => url.searchParams.get('page') === '2' && url.searchParams.get('limit') === '10')).toBe(true))
+})
+
 it.each([
   ['users', 'Registered', 'created_at', '2026-01-01', '2026-02-01'],
   ['users', 'Last Login', 'lastLoginAt', '2026-01-01', '2026-02-01'],

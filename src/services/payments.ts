@@ -2,7 +2,7 @@ import { buildApiHeaders, buildApiUrl } from '../config/api'
 import { getCurrentAuthToken } from './authService'
 import { createApiResponseError, SESSION_EXPIRED_EVENT } from '../utils/apiError'
 export type TokenPackage={id:string;code:string;name:string;token_amount:number;price_idr:number}
-export type PaymentOrder={id:string;amount_idr:number;token_amount:number;status:string;provider:string|null;payment_method?:string|null;created_at:string;paid_at:string|null;product_name?:string;product_type?:string;order_type?:string;duration_months?:number|null;monthly_credits?:number|null;pricing_config_version?:number|null;plan_id?:string|null}
+export type PaymentOrder={id:string;amount_idr:number;token_amount:number;status:string;provider:string|null;payment_method?:string|null;created_at:string;paid_at:string|null;product_name?:string;product_type?:string;order_type?:string;duration_months?:number|null;monthly_credits?:number|null;pricing_config_version?:number|null;plan_id?:string|null;expired_at?:string|null;providerExpiresAt?:string|null;checkoutAvailable?:boolean;payment?:PaymentDetails|null}
 export type PaymentNotification={id:string;type:string;title:string;message:string;read_at:string|null;created_at:string}
 export type TokenLedgerItem={id:string;amount?:number;credits_delta?:number;balance_after:number;kind?:string;transaction_type?:string;source_type?:string|null;description?:string;created_at:string}
 export type UsageHistoryItem={request_id:string;feature:string;total_tokens:number;credits_charged:number;status:string;created_at:string}

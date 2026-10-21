@@ -7404,6 +7404,10 @@ body{background-color:#080609;background-image:radial-gradient(circle at 90% 0%,
 .admin-nav {
   position: sticky;
   top: 18px;
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
   display: grid;
   gap: 5px;
   padding: 8px;
@@ -7528,7 +7532,7 @@ body{background-color:#080609;background-image:radial-gradient(circle at 90% 0%,
 
 @media (max-width: 1050px) {
   .admin-layout { grid-template-columns: 1fr; }
-  .admin-nav { position: static; display: flex; overflow-x: auto; }
+  .admin-nav { position: static; display: flex; max-height: none; overflow-x: auto; }
   .admin-nav-item { min-width: 150px; }
 }
 
@@ -7652,5 +7656,34 @@ body{background-color:#080609;background-image:radial-gradient(circle at 90% 0%,
 .ai-credits-plan-note{margin:0;color:var(--text-muted);font-size:.73rem;line-height:1.5}
 .ai-credits-plan-card-detailed>.ai-credits-history-link{width:100%;min-height:40px;padding:8px 12px;border:1px solid var(--border);border-radius:999px;color:var(--text-primary);background:transparent;box-shadow:none;font-size:.78rem;font-weight:650;cursor:pointer}
 .ai-credits-plan-card-detailed>.ai-credits-history-link:hover{background:var(--bg-surface-soft);box-shadow:none;filter:none;transform:none}
+.ai-credits-history-grid .payment-panel{scrollbar-width:thin;scrollbar-color:rgba(196,152,188,.48) var(--bg-surface);scrollbar-gutter:stable;overscroll-behavior-y:contain}
+.ai-credits-history-grid .payment-panel::-webkit-scrollbar{width:8px;height:8px}
+.ai-credits-history-grid .payment-panel::-webkit-scrollbar-track{background:var(--bg-surface);border-radius:999px;margin-block:12px}
+.ai-credits-history-grid .payment-panel::-webkit-scrollbar-thumb{background:rgba(196,152,188,.48);border:2px solid var(--bg-surface);border-radius:999px;min-height:36px}
+.ai-credits-history-grid .payment-panel::-webkit-scrollbar-thumb:hover{background:var(--brand-primary)}
+.ai-credits-history-grid .payment-panel::-webkit-scrollbar-button{display:none;width:0;height:0}
+.ai-credits-history-grid .payment-panel::-webkit-scrollbar-corner{background:transparent}
+.content-bank-thread-controls{display:flex;align-items:center;gap:12px}
+.content-bank-thread-controls>button{min-height:32px;padding:6px 12px;font-size:12px}
+.content-bank-thread-remove{display:grid;place-items:center;width:28px;height:28px;margin-left:auto;border:1px solid var(--border);border-radius:8px;color:var(--text-primary);background:var(--bg-surface);font-size:18px;cursor:pointer}
+.content-bank-thread-remove:hover:not(:disabled){border-color:var(--brand-primary);color:var(--brand-primary)}
+.content-bank-thread-remove:disabled{opacity:.35;cursor:not-allowed}
+.ai-credits-plan-card-compact{display:grid;justify-items:start;gap:14px}
+.ai-credits-plan-card-summary{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:28px;padding:24px}
+.ai-credits-plan-card-summary .ai-credits-plan-copy{gap:12px}
+.ai-credits-plan-card-summary .ai-credits-plan-copy>strong{font-size:20px;line-height:1.3}
+.ai-credits-plan-card-summary .ai-credits-plan-copy>span{font-size:15px;line-height:1.6}
+.ai-credits-plan-card-summary .ai-credits-history-link{justify-self:start;padding:0;border:0;color:var(--text-secondary);background:transparent;font-size:14px;cursor:pointer;text-align:left}
+.ai-credits-plan-card-summary .ai-credits-history-link:hover{text-decoration:underline}
+.ai-credits-summary-balance{display:grid;gap:8px;min-width:0;padding-left:28px;border-left:1px solid var(--border)}
+.ai-credits-summary-balance>strong{font-size:30px;line-height:1.2;font-variant-numeric:tabular-nums}
+.ai-credits-summary-balance>span{font-size:15px}
+.ai-credits-summary-balance>small{color:var(--text-muted);font-size:14px;line-height:1.5}
+.ai-credits-summary-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.ai-credits-summary-actions>button{font-size:14px;min-height:42px}
+@media(max-width:640px){.ai-credits-plan-card-summary{grid-template-columns:minmax(0,1fr);gap:20px;padding:20px}.ai-credits-summary-balance{border-left:0;border-top:1px solid var(--border);padding:20px 0 0}.ai-credits-summary-actions{width:100%}.ai-credits-summary-actions>button{flex:1}}
+.ai-credits-plan-card-compact .ai-credits-plan-copy{gap:8px}
+.ai-credits-plan-card-compact>.ai-credits-history-link{padding:0;border-radius:0;color:var(--text-muted);background:transparent;box-shadow:none;font-weight:400}
+.ai-credits-plan-card-compact>.ai-credits-history-link:hover{background:transparent;box-shadow:none;transform:none;filter:none;text-decoration:underline}
 .ai-credits-plan-card-detailed>.ai-credits-history-link:focus-visible,.ai-credits-plan-top>button:focus-visible{outline:2px solid var(--brand-primary);outline-offset:3px}
 @media(max-width:430px){.ai-credits-plan-top{align-items:flex-start}.ai-credits-plan-top .ai-credits-plan-copy{padding-top:2px}.ai-credits-plan-top>button{padding:8px 10px;font-size:.7rem}.ai-credits-subscription-details{grid-template-columns:1fr}}

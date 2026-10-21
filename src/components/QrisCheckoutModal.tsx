@@ -72,7 +72,7 @@ export function QrisCheckoutModal({ open, title, description, amount, totalPayme
   if (!open) return null
   const qrImage = generatedQrImage && generatedQrImage.source === qrString ? generatedQrImage.url : qrImageUrl
   const pending = paymentStatus === 'pending'
-  const statusCopy = ({paid: 'Pembayaran berhasil', cancelled: 'Pembayaran dibatalkan/kedaluwarsa', expired: 'Pembayaran kedaluwarsa', failed: 'Pembayaran gagal', refunded: 'Pembayaran dikembalikan'} as Record<string, string>)[paymentStatus] || (secondsLeft === 0 ? 'Menunggu konfirmasi server' : 'Menunggu pembayaran')
+  const statusCopy = ({paid: 'Pembayaran berhasil', cancelled: 'Dibatalkan', expired: 'Waktu pembayaran habis', failed: 'Pembayaran gagal', refunded: 'Pembayaran dikembalikan'} as Record<string, string>)[paymentStatus] || (secondsLeft === 0 ? 'Waktu pembayaran habis. Sudah membayar? Cek status terlebih dahulu.' : 'Menunggu pembayaran')
 
   return <div className="qris-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
     <section className="qris-modal" role="dialog" aria-modal="true" aria-label={`Pembayaran ${methodLabel}`}>

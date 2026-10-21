@@ -892,7 +892,7 @@ function AppShell() {
 	        /> : null}
 
         <main className="content-area">
-          <TokenBalance onOpenCredits={() => handleNavigate('ai-credits')} language={language} />
+          <TokenBalance onOpenCredits={() => handleNavigate('top-up-credits')} language={language} />
           <div key={activePage} className="page-transition">
             {activePage === 'create' ? (
               <CreateHubPage onNavigate={handleNavigate} />
@@ -942,7 +942,7 @@ function AppShell() {
             ) : activePage === 'ai-credits' ? (
               <AiCreditsPage onTopUp={() => handleNavigate('top-up-credits')} onViewPlans={() => handleNavigate('subscription-plans')} onViewPaymentHistory={() => handleNavigate('payments')} language={language} />
             ) : activePage === 'payments' ? (
-              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} />
+              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} onTopUp={() => handleNavigate('top-up-credits')} />
             ) : activePage === 'top-up-credits' ? (
               <TopUpCreditsPage onBackToCredits={() => handleNavigate('ai-credits')} onPaymentComplete={() => handleNavigate('ai-credits')} onOpenPayments={() => handleNavigate('payments')} language={language} />
             ) : activePage === 'connecting-apps' ? (

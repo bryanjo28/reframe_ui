@@ -490,10 +490,9 @@ export function SubscriptionPlansPage({ onOpenPayments, language = 'id' }: Subsc
         <div>
           <p className="eyebrow">Account</p>
           <h1>Subscription</h1>
-          {/* <p className="page-description">
-            Lihat paket aktif yang tersedia, lalu cek paket yang sedang dimiliki akun ini
-            lewat `GET /api/subscriptions/me`.
-          </p> */}
+          <p className="page-description">{language === 'en'
+            ? 'If your paid plan is still active, your newly purchased subscription will start after your current plan expires.'
+            : 'Jika paket berbayar kamu masih aktif, langganan yang baru dibeli akan dimulai setelah masa aktif paket saat ini berakhir.'}</p>
         </div>
 
       </header>
