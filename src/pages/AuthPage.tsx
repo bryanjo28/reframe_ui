@@ -3,14 +3,17 @@ import { login, register, type AuthSession } from '../services/authService'
 import { getApiError, getUserFacingError, reportError } from '../utils/apiError'
 import { AppIcon } from '../components/AppIcon'
 import { BrandLogo } from '../components/BrandLogo'
+import { clearReferralAttribution, getStoredReferralAttribution, saveReferralAttribution, validateReferralCode } from '../services/referrals'
 
 type AuthMode = 'login' | 'register'
-type AuthField = 'email' | 'fullName' | 'accountName' | 'password' | 'confirmPassword'
+type AuthField = 'email' | 'fullName' | 'accountName' | 'password' | 'confirmPassword' | 'legalConsent'
 type AuthFieldErrors = Partial<Record<AuthField, string>>
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const ACCOUNT_NAME_PATTERN = /^[a-z0-9._-]+$/
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/
+const TERMS_VERSION = '2026-10-20'
+const PRIVACY_NOTICE_VERSION = '2026-10-20'
 
 type AuthPageProps = {
   onAuthenticated: (session: AuthSession, mode: AuthMode) => void
@@ -37,11 +40,16 @@ export function AuthPage({
   const [accountName, setAccountName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [legalConsentAccepted, setLegalConsentAccepted] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({})
+  const [referralCode, setReferralCode] = useState(() => getStoredReferralAttribution()?.code || '')
+  const [referralMessage, setReferralMessage] = useState('')
+  const [referralValid, setReferralValid] = useState(() => Boolean(getStoredReferralAttribution()))
+  const [referralBonus, setReferralBonus] = useState<number | null>(() => getStoredReferralAttribution()?.referredBonusCredits ?? null)
 
   const clearAuthForm = useCallback(() => {
     setEmail('')
@@ -49,6 +57,7 @@ export function AuthPage({
     setAccountName('')
     setPassword('')
     setConfirmPassword('')
+    setLegalConsentAccepted(false)
     setShowPassword(false)
     setShowConfirmPassword(false)
     setErrorMessage('')
@@ -85,6 +94,10 @@ export function AuthPage({
     }
 
     if (mode === 'register') {
+      if (!legalConsentAccepted) {
+        nextFieldErrors.legalConsent = 'Setujui Syarat & Ketentuan dan Pemberitahuan Privasi untuk membuat akun.'
+      }
+
       if (normalizedFullName.length < 2 || normalizedFullName.length > 100) {
         nextFieldErrors.fullName = 'Full name harus terdiri dari 2-100 karakter.'
       }
@@ -125,12 +138,34 @@ export function AuthPage({
         return
       }
 
+      let referralToken = getStoredReferralAttribution()?.token
+      if (referralCode.trim() && !referralToken) {
+        try {
+          const validation = await validateReferralCode(referralCode)
+          if (validation.valid) {
+            const saved = saveReferralAttribution(validation)
+            referralToken = saved?.token
+            setReferralValid(Boolean(saved))
+            setReferralMessage(validation.valid ? 'Kode referral tervalidasi.' : '')
+          } else {
+            setReferralMessage('Kode referral tidak valid. Pendaftaran dilanjutkan tanpa referral.')
+          }
+        } catch {
+          setReferralMessage('Kode referral belum bisa diverifikasi. Pendaftaran dilanjutkan tanpa referral.')
+        }
+      }
+
       const result = await register({
         email: normalizedEmail,
         fullName: normalizedFullName,
         accountName: normalizedAccountName,
         password,
+        acceptedTermsVersion: TERMS_VERSION,
+        acceptedPrivacyNoticeVersion: PRIVACY_NOTICE_VERSION,
+        referralToken,
       })
+
+      clearReferralAttribution()
 
       if (result.emailConfirmationRequired) {
         onRegisterRequiresEmail?.(normalizedEmail)
@@ -167,7 +202,9 @@ export function AuthPage({
       }
 
       switch (apiError.code) {
+        case 'EMAIL_NOT_CONFIRMED':
         case 'EMAIL_NOT_VERIFIED':
+          setErrorMessage('Verifikasi email kamu terlebih dahulu')
           onEmailNotVerified?.(normalizedEmail)
           return
         case 'EMAIL_ALREADY_EXISTS':
@@ -330,6 +367,37 @@ export function AuthPage({
             </>
           )}
 
+          {!isLogin && allowRegister ? (
+            <div className="auth-referral-field full-width">
+              <label className="auth-field" htmlFor="register-referral-code">
+                <span>Punya kode referral?</span>
+                <input
+                  id="register-referral-code"
+                  value={referralCode}
+                  onChange={(event) => { setReferralCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16)); setReferralValid(false); setReferralMessage('') }}
+                  placeholder="Masukkan kode referral (opsional)"
+                  autoComplete="off"
+                  readOnly={referralValid}
+                  maxLength={16}
+                />
+              </label>
+              {!referralValid && referralCode.trim() ? <button type="button" className="ghost-button" onClick={async () => {
+                setReferralMessage('Memeriksa kode...')
+                try {
+                  const validation = await validateReferralCode(referralCode)
+                  if (!validation.valid) { setReferralMessage('Kode referral tidak valid atau program sedang tidak aktif.'); return }
+                  const saved = saveReferralAttribution(validation)
+                  setReferralCode(saved?.code || validation.code || referralCode)
+                  setReferralValid(Boolean(saved))
+                  setReferralBonus(validation.referredBonusCredits ?? null)
+                  setReferralMessage(saved?.code === validation.code ? 'Kode referral valid. Referral pertama yang valid akan dipakai.' : 'Kode referral valid, tetapi referral pertama yang sudah tersimpan tetap digunakan.')
+                } catch (error) { setReferralMessage(error instanceof Error ? error.message : 'Kode referral belum bisa diverifikasi.') }
+              }}>Validasi kode</button> : null}
+              {referralValid ? <p className="auth-referral-invitation"><strong>Kamu diundang untuk mencoba Alurin!</strong><span>Daftar sekarang dan dapatkan bonus {referralBonus ?? 10} AI Credits setelah pembelian paket pertamamu berhasil. Bonus masuk setelah periode validasi pembayaran.</span></p> : null}
+              {referralMessage ? <small className="auth-referral-message" role="status">{referralMessage}</small> : null}
+            </div>
+          ) : null}
+
           <div className={`auth-password-group${isLogin ? '' : ' auth-password-pair'}`}>
             <label className="auth-field">
               <span>Password</span>
@@ -393,6 +461,36 @@ export function AuthPage({
               </label>
             ) : null}
           </div>
+
+          {!isLogin && allowRegister ? (
+            <div className="auth-legal-consent">
+              <label className="auth-legal-consent-label">
+                <input
+                  type="checkbox"
+                  checked={legalConsentAccepted}
+                  onChange={(event) => {
+                    setLegalConsentAccepted(event.target.checked)
+                    setFieldErrors((current) => ({ ...current, legalConsent: undefined }))
+                  }}
+                  aria-invalid={Boolean(fieldErrors.legalConsent)}
+                  aria-describedby={fieldErrors.legalConsent ? 'register-legal-consent-error' : undefined}
+                  required
+                />
+                <span>
+                  Saya setuju dengan{' '}
+                  <a href="/terms-of-service" target="_blank" rel="noreferrer">Syarat &amp; Ketentuan</a>
+                  {' '}dan{' '}
+                  <a href="/privacy-policy" target="_blank" rel="noreferrer">Pemberitahuan Privasi</a>
+                  {' '}yang berlaku.
+                </span>
+              </label>
+              {fieldErrors.legalConsent ? (
+                <small id="register-legal-consent-error" className="auth-field-error" role="alert">
+                  {fieldErrors.legalConsent}
+                </small>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="auth-actions">
             <button className="primary-button" type="submit" disabled={isSubmitting}>

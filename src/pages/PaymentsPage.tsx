@@ -10,7 +10,12 @@ type OrderFilter = typeof orderFilters[number][0]
 const statusLabels: Record<string, string> = { pending: 'Pending', paid: 'Berhasil', failed: 'Gagal', expired: 'Kedaluwarsa', cancelled: 'Dibatalkan', refunded: 'Refund' }
 
 
-export function PaymentsPage({ onBackToCredits, onNewPayment }: { onBackToCredits: () => void; onNewPayment?: (productType?: string) => void }) {
+export function PaymentsPage({ onBackToCredits, onTopUp }: { onBackToCredits: () => void; onTopUp?: () => void }) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
   const [data, setData] = useState<PaymentPageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -36,7 +41,10 @@ export function PaymentsPage({ onBackToCredits, onNewPayment }: { onBackToCredit
     setCheckingOrderId(order.id)
     try {
       const result = await retryPaymentCheckout(order.id)
-      setData((current) => current ? { ...current, orders: current.orders.map((item) => item.id === order.id ? { ...item, status: result.status, checkoutAvailable: result.checkoutAvailable } : item) } : current)
+      setData((current) => current ? { ...current, orders: current.orders.map((item) => item.id === order.id ? {
+        ...item, status: result.status, checkoutAvailable: result.checkoutAvailable,
+        expired_at: result.payment?.expired_at || result.providerExpiresAt || result.expiresAt || item.expired_at,
+      } : item) } : current)
       if (result.checkoutAvailable === false) {
         setFeedback({ title: 'Checkout belum tersedia', message: result.message || 'Order tetap tersimpan. Silakan coba lagi.' })
         return
@@ -86,16 +94,33 @@ export function PaymentsPage({ onBackToCredits, onNewPayment }: { onBackToCredit
             <div className="payment-order-filters" aria-label="Filter status pembayaran">{orderFilters.map(([value, label]) => <button className={orderFilter === value ? 'active' : ''} type="button" aria-pressed={orderFilter === value} onClick={() => setOrderFilter(value)} key={value}>{label}</button>)}</div>
             {filteredOrders.length ? filteredOrders.map((order) => {
               const status = order.status.toLowerCase()
-              const title = order.product_name || `${(order.token_amount || 0).toLocaleString('id-ID')} AI Credits`
-              const needsRetry = status === 'pending' && order.checkoutAvailable === false
+              const isTopUp = (order.order_type || order.product_type) !== 'subscription'
+              const expiry = order.expired_at || order.providerExpiresAt || order.payment?.expired_at
+              const expiryTime = expiry ? Date.parse(expiry) : NaN
+              const timedOut = status === 'expired' || (status === 'pending' && Number.isFinite(expiryTime) && expiryTime <= now)
+              const unavailable = status === 'pending' && (order.checkoutAvailable === false || !Number.isFinite(expiryTime))
+              const canTopUpAgain = isTopUp && status === 'cancelled'
+              const label = status === 'pending' ? timedOut ? 'Waktu pembayaran habis' : unavailable ? 'QRIS belum tersedia' : 'Menunggu pembayaran' : status === 'paid' ? 'Pembayaran berhasil' : statusLabels[status] || order.status
+              const action = canTopUpAgain && onTopUp ? 'Top up lagi' : status === 'pending' && !timedOut ? unavailable ? 'Coba lagi' : 'Lanjutkan pembayaran' : 'Lihat detail'
+              const title = order.product_name || (order.order_type === 'subscription' ? `Subscription · ${order.duration_months || 1} bulan` : `${(order.token_amount || 0).toLocaleString('id-ID')} AI Credits`)
               return <div className="payment-order-row" key={order.id}>
-                <div><strong>{title}</strong><small>{formatDate(order.created_at)} Â· {order.id.slice(0, 8).toUpperCase()}</small></div>
+                <div><strong>{title}</strong><small>{order.order_type === 'subscription' ? `${(order.monthly_credits || 0).toLocaleString('id-ID')} AI Credits / bulan · bayar sekali` : 'Top up AI Credits'} · {formatDate(order.created_at)} · {order.id.slice(0, 8).toUpperCase()}</small></div>
                 <span>{money(order.amount_idr)}</span>
                 <div className="payment-order-actions">
-                  <b className={`payment-order-status ${status}`}>{statusLabels[status] || order.status}</b>
-                  {!needsRetry ? <button className={status === 'paid' ? 'payment-detail-paid' : ''} type="button" disabled={Boolean(checkingOrderId)} aria-label={`${status === 'pending' ? 'Cek status' : 'Detail'} ${title}`} onClick={() => void refreshPendingOrder(order.id)}>{checkingOrderId === order.id ? 'Memproses...' : status === 'pending' ? 'Cek status' : 'Detail'}</button> : null}
-                  {status === 'pending' ? <button type="button" disabled={Boolean(checkingOrderId)} aria-label={`${needsRetry ? 'Coba lagi' : 'Lanjutkan pembayaran'} ${title}`} onClick={() => void (needsRetry ? retryCheckout(order) : refreshPendingOrder(order.id))}>{checkingOrderId === order.id ? 'Memproses...' : needsRetry ? 'Coba lagi' : 'Lanjutkan pembayaran'}</button> : null}
-                  {status === 'expired' || status === 'cancelled' ? <button type="button" disabled={Boolean(checkingOrderId)} aria-label={`Buat pembayaran baru ${title}`} onClick={() => onNewPayment ? onNewPayment(order.product_type) : onBackToCredits()}>Buat pembayaran baru</button> : null}
+                  <b className={`payment-order-status ${status}`}>{label}</b>
+                  {!timedOut ? <button
+                    className={status === 'paid' ? 'payment-detail-paid' : ''}
+                    type="button"
+                    disabled={Boolean(checkingOrderId)}
+                    aria-label={`${action} ${title}`}
+                    onClick={() => canTopUpAgain && onTopUp ? onTopUp() : void (status === 'pending' && !timedOut ? retryCheckout(order) : refreshPendingOrder(order.id))}
+                  >
+                    {checkingOrderId === order.id ? 'Memproses...' : action}
+                  </button> : null}
+                  {timedOut ? <>
+                    <small>Sudah membayar? Cek status terlebih dahulu.</small>
+                    <button type="button" disabled={Boolean(checkingOrderId)} aria-label={`Cek status ${title}`} onClick={() => void refreshPendingOrder(order.id)}>Cek status</button>
+                  </> : null}
                 </div>
               </div>
             }) : <p className="payment-empty">Tidak ada pembayaran dengan status ini.</p>}
@@ -111,7 +136,7 @@ export function PaymentsPage({ onBackToCredits, onNewPayment }: { onBackToCredit
       qrString={selectedOrder.detail.payment?.qr_string}
       vaNumber={selectedOrder.detail.payment?.va_number}
       checkoutUrl={selectedOrder.detail.checkoutUrl}
-      expiresAt={selectedOrder.detail.providerExpiresAt}
+      expiresAt={selectedOrder.detail.providerExpiresAt || selectedOrder.detail.payment?.expired_at}
       orderId={selectedOrder.order.id}
       initialStatus={selectedOrder.detail.status}
       checkStatus={getPaymentOrderStatus}

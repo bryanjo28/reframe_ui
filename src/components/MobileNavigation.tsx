@@ -3,6 +3,7 @@ import type { NavKey } from '../types/navigation'
 import type { AuthUser } from '../services/authService'
 import { dismissModal } from '../utils/modalAnimation'
 import { withCurrentBrand } from '../utils/brand'
+import type { UiLanguage } from '../utils/uiLanguage'
 
 type Props = {
   activePage: NavKey
@@ -11,6 +12,7 @@ type Props = {
   onToggleMore: () => void
   onCloseMore: () => void
   currentUser: AuthUser | null
+  language: UiLanguage
 }
 
 const primary: Array<{ key: NavKey; label: string; icon: string }> = [
@@ -22,14 +24,17 @@ const primary: Array<{ key: NavKey; label: string; icon: string }> = [
 
 const secondary: Array<{ key: NavKey; label: string; icon: string }> = [
   { key: 'personalize', label: 'Persona & Pillar', icon: 'user' },
+  { key: 'referral', label: 'Referral & Rewards', icon: 'sparkles' },
 ]
 
-const settingsPages: NavKey[] = ['settings', 'connecting-apps', 'subscription-plans', 'ai-credits', 'payments', 'top-up-credits']
+const settingsPages: NavKey[] = ['settings', 'connecting-apps', 'subscription-plans', 'ai-credits', 'payments', 'top-up-credits', 'referral']
 
 const createFlowPages: NavKey[] = ['create', 'generate-topic', 'content-engine', 'manual-post']
 
 export function MobileNavigation(props: Props) {
   const name = withCurrentBrand(props.currentUser?.fullName || props.currentUser?.accountName || props.currentUser?.name || props.currentUser?.username || 'Pengguna alurin')
+  const isBillingPage = ['subscription-plans', 'ai-credits', 'top-up-credits', 'payments'].includes(props.activePage)
+  const english = props.language === 'en'
   return (
     <>
       {props.isMoreOpen ? (
@@ -46,6 +51,17 @@ export function MobileNavigation(props: Props) {
                   <AppIcon name={item.icon} /><span>{item.label}</span><AppIcon name="chevron-right" />
                 </button>
               ))}
+              <button
+                type="button"
+                className={`mobile-billing-shortcut${isBillingPage ? ' active' : ''}`}
+                onClick={() => props.onNavigate('ai-credits')}
+                aria-label={english ? 'Subscription & AI Credits' : 'Langganan & AI Credits'}
+                aria-current={isBillingPage ? 'page' : undefined}
+              >
+                <AppIcon name="sparkles" />
+                <span>{english ? 'Subscription & AI Credits' : 'Langganan & AI Credits'}</span>
+                <AppIcon name="chevron-right" />
+              </button>
             </nav>
             <nav className="mobile-more-list mobile-settings-link"><button type="button" onClick={() => props.onNavigate('settings')}><AppIcon name="menu" /><span>Semua Pengaturan</span><AppIcon name="chevron-right" /></button></nav>
           </section>

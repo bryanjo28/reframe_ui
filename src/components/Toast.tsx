@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ToastContext, type ToastContextValue, type ToastInput, type ToastTone } from './toastContext'
+import type { UiLanguage } from '../utils/uiLanguage'
+import { translateUiText } from '../utils/uiLanguage'
 
 type ToastItem = ToastInput & {
   id: string
@@ -25,7 +27,7 @@ function ToastIcon({ tone }: { tone: ToastTone }) {
   return <span aria-hidden="true">i</span>
 }
 
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({ children, language = 'id' }: { children: ReactNode; language?: UiLanguage }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const removeToast = useCallback((id: string) => {
@@ -71,8 +73,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <ToastIcon tone={toast.tone} />
             </div>
             <div className="toast-copy">
-              <strong>{toast.title}</strong>
-              <p>{toast.message}</p>
+              <strong>{translateUiText(toast.title, language)}</strong>
+              <p>{translateUiText(toast.message, language)}</p>
             </div>
             <button className="toast-close" type="button" onClick={() => removeToast(toast.id)}>
               ×

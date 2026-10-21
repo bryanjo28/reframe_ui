@@ -6,6 +6,7 @@ import type { AuthUser } from '../services/authService'
 import { getCurrentSubscription, listSubscriptionPlans } from '../services/subscriptionPlans'
 import { getMyUsage, USAGE_UPDATED_EVENT } from '../services/usage'
 import type { UiLanguage } from '../utils/uiLanguage'
+import { translatePlanName } from '../utils/uiLanguage'
 import { withCurrentBrand } from '../utils/brand'
 
 type SidebarProps = {
@@ -32,6 +33,7 @@ const overviewMenu: SidebarMenuItem[] = [
   { key: 'create', label: 'Create', icon: 'plus' },
   { key: 'content-bank', label: 'Content Bank', icon: 'layers' },
   { key: 'auto-post', label: 'Schedule', icon: 'calendar' },
+  { key: 'referral', label: 'Referral & Rewards', icon: 'sparkles' },
 ]
 
 const contentBrainMenu: SidebarMenuItem[] = [
@@ -120,6 +122,7 @@ export function Sidebar({
   const [usedCredits, setUsedCredits] = useState<number | null>(null)
   const [creditLimit, setCreditLimit] = useState<number | null>(null)
   const [planName, setPlanName] = useState('Current plan')
+  const [planKey, setPlanKey] = useState('')
 
   const displayName = withCurrentBrand(
     currentUser?.accountName ||
@@ -166,6 +169,7 @@ export function Sidebar({
         setUsedCredits(summary?.credits.usedThisMonth ?? null)
         setCreditLimit(activePlan?.monthlyAiCredits ?? null)
         setPlanName(currentSubscription?.planName || activePlan?.name || 'Current plan')
+        setPlanKey(activePlan?.key || currentSubscription?.planKey || '')
       } catch {
         if (!isMounted) {
           return
@@ -195,7 +199,7 @@ export function Sidebar({
       window.removeEventListener(USAGE_UPDATED_EVENT, handleUsageUpdated)
       refreshTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId))
     }
-  }, [])
+  }, [language])
 
   const usagePercent = useMemo(() => {
     if (usedCredits === null || !creditLimit || creditLimit <= 0) {
@@ -272,7 +276,7 @@ export function Sidebar({
             <strong>
               {usedCredits === null ? '-' : usedCredits.toLocaleString('id-ID')} / {creditLimitLabel}
             </strong>
-            <span>{planName} dipakai sebagai batas usage saat ini.</span>
+            <span>{language === 'en' ? `${translatePlanName(planName, planKey, language)} sets your current usage limit.` : `${planName} dipakai sebagai batas penggunaan saat ini.`}</span>
             <div className="token-track" aria-hidden="true">
               <span className="token-track-fill" style={{ width: `${usagePercent}%` }} />
             </div>

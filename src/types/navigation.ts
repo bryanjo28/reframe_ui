@@ -16,6 +16,7 @@ export type NavKey =
   | 'top-up-credits'
   | 'connecting-apps'
   | 'settings'
+  | 'referral'
   | 'admin'
 
 export type AppTheme = 'dark' | 'light'

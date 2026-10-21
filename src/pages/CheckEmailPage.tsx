@@ -41,11 +41,15 @@ export function CheckEmailPage({ email, onBackToLogin }: CheckEmailPageProps) {
       <section className="panel bootstrap-card">
         <BrandLogo className="auth-brand-logo" />
         <p className="eyebrow">Check Email</p>
-        <h1>Cek email kamu dulu</h1>
+        <h1>Verifikasi email kamu terlebih dahulu</h1>
         <p className="page-description">
           Kami sudah mengirim link verifikasi ke{' '}
           <strong>{email || 'email yang kamu daftarkan'}</strong>. Buka email tersebut dan klik
           link verifikasi sebelum login.
+        </p>
+        <p className="page-description">
+          Belum menemukan emailnya di kotak masuk? Cek folder Spam atau Junk. Jika tetap
+          belum ada, klik tombol kirim ulang email verifikasi di bawah.
         </p>
 
         {successMessage ? (
@@ -66,7 +70,7 @@ export function CheckEmailPage({ email, onBackToLogin }: CheckEmailPageProps) {
             onClick={() => void handleResend()}
             disabled={!email || isSending}
           >
-            {isSending ? 'Mengirim...' : 'Kirim ulang verifikasi'}
+            {isSending ? 'Mengirim...' : 'Kirim ulang email verifikasi'}
           </button>
           <a className="auth-secondary-link" href="/login" onClick={onBackToLogin}>
             Kembali ke Login

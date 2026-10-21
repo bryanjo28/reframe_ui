@@ -1251,7 +1251,7 @@ export function ContentEnginePage({
               <p className="eyebrow">Choose a flow</p>
               <h2>Pilih dulu yang mau kamu edit</h2>
             </div>
-            <span className="pill subtle">2 option</span>
+            <span className="pill subtle">2 options</span>
           </div>
 
           <p className="page-description generate-chooser-copy">

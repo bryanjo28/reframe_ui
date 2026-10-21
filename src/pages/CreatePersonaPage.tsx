@@ -11,6 +11,7 @@ import { reportError } from '../utils/apiError'
 import { AppIcon } from '../components/AppIcon'
 import { getCurrentSubscription, listSubscriptionPlans } from '../services/subscriptionPlans'
 import { UPGRADE_PLAN_REQUIRED_EVENT } from '../utils/apiError'
+import type { UiLanguage } from '../utils/uiLanguage'
 
 type PersonaFieldKey = keyof PersonaConfigPayload
 
@@ -40,6 +41,7 @@ type CreatePersonaPageProps = {
   personaConfig: PersonaConfigRecord | null
   isInitialSetup?: boolean
   onSaved?: (personaConfig: PersonaConfigRecord) => void
+  language: UiLanguage
 }
 
 const personaFields: PersonaField[] = [
@@ -208,6 +210,7 @@ export function CreatePersonaPage({
   personaConfig,
   isInitialSetup = false,
   onSaved,
+  language,
 }: CreatePersonaPageProps) {
   const { success: toastSuccess, error: toastError } = useToast()
   const [formValues, setFormValues] = useState<PersonaConfigPayload>(() =>
@@ -307,7 +310,10 @@ export function CreatePersonaPage({
   function handleCreateNew() {
     const ids = new Set([...savedPersonas.map((item) => item.id), personaConfig?.id].filter(Boolean))
     if (personaLimit !== null && ids.size >= personaLimit) {
-      window.dispatchEvent(new CustomEvent(UPGRADE_PLAN_REQUIRED_EVENT, { detail: { message: `Paket kamu mendukung maksimal ${personaLimit} persona. Upgrade paket untuk menambah persona.` } }))
+      const message = language === 'en'
+        ? `Your plan allows up to ${personaLimit} personas. Upgrade to add more personas.`
+        : `Paket kamu mendukung maksimal ${personaLimit} persona. Upgrade paket untuk menambah persona.`
+      window.dispatchEvent(new CustomEvent(UPGRADE_PLAN_REQUIRED_EVENT, { detail: { message } }))
       return
     }
     setSavedRecord(null)

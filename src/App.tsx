@@ -34,6 +34,8 @@ import { OnboardingTutorial } from './components/OnboardingTutorial'
 import { LegalPage } from './pages/LegalPage'
 import { LandingPage } from './pages/LandingPage'
 import { AdminDashboardPage } from './pages/Admin/AdminDashboardPage'
+import { ReferralPage } from './pages/ReferralPage'
+import { saveReferralAttribution, validateReferralCode } from './services/referrals'
 import { watchLanguage, type UiLanguage } from './utils/uiLanguage'
 import { reportError, SESSION_EXPIRED_EVENT, UPGRADE_PLAN_REQUIRED_EVENT } from './utils/apiError'
 import {
@@ -93,7 +95,9 @@ type AppHistoryState = {
 }
 
 function getPagePath(page: NavKey) {
-  return page === 'admin' ? '/admin' : '/dashboard'
+  if (page === 'admin') return '/admin'
+  if (page === 'referral') return '/dashboard/referrals'
+  return '/dashboard'
 }
 
 function isNavKey(value: unknown): value is NavKey {
@@ -101,7 +105,7 @@ function isNavKey(value: unknown): value is NavKey {
     'dashboard', 'create', 'content-bank', 'personalize', 'create-persona-chat',
     'create-persona', 'content-pillar', 'generate-topic', 'content-engine',
     'manual-post', 'auto-post', 'subscription-plans', 'ai-credits', 'payments', 'top-up-credits',
-    'connecting-apps', 'settings', 'admin',
+    'connecting-apps', 'settings', 'referral', 'admin',
   ].includes(value)
 }
 
@@ -185,6 +189,7 @@ function setStoredPendingVerificationEmail(email?: string) {
 }
 
 function getStoredActivePage(): NavKey {
+  if (typeof window !== 'undefined' && window.location.pathname === '/dashboard/referrals') return 'referral'
   if (typeof localStorage === 'undefined') {
     return 'dashboard'
   }
@@ -247,6 +252,7 @@ function AppShell() {
   const isAuthCallbackRoute =
     typeof window !== 'undefined' && window.location.pathname === '/auth/callback'
   const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
+  const [isReferralRedirect, setIsReferralRedirect] = useState(() => /^\/ref\/[A-Za-z0-9]{8,16}\/?$/.test(window.location.pathname))
   const [authError, setAuthError] = useState('')
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [threadsStatus, setThreadsStatus] = useState<ThreadsConnectionStatus>('disconnected')
@@ -633,6 +639,26 @@ function AppShell() {
   }, [])
 
   useEffect(() => {
+    const match = window.location.pathname.match(/^\/ref\/([A-Za-z0-9]{8,16})\/?$/)
+    if (!match) return
+    let active = true
+    const finish = (path: string) => {
+      if (!active) return
+      window.history.replaceState({}, document.title, path)
+      setIsReferralRedirect(false)
+    }
+    if (getCurrentAuthToken()) {
+      finish('/dashboard')
+      return () => { active = false }
+    }
+    void validateReferralCode(match[1], true).then(validation => {
+      if (validation.valid) saveReferralAttribution(validation)
+      finish('/register')
+    }).catch(() => finish('/register'))
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
     if (!isAuthCallbackRoute) {
       return
     }
@@ -748,7 +774,7 @@ function AppShell() {
 
   let content: ReactNode
 
-  if (authStatus === 'loading') {
+  if (authStatus === 'loading' || isReferralRedirect) {
     content = (
       <div className="bootstrap-shell">
         <section className="bootstrap-loading" aria-live="polite">
@@ -839,6 +865,7 @@ function AppShell() {
           <PersonalizePage
             key={personaConfig ? 'setup-content-pillar' : 'setup-persona'}
             personaConfig={personaConfig}
+            language={language}
             onPersonaSaved={handlePersonalizePersonaSaved}
             initialTab={personaConfig ? 'content-pillar' : 'persona'}
             onPillarSaved={completeFirstSetup}
@@ -865,13 +892,14 @@ function AppShell() {
 	        /> : null}
 
         <main className="content-area">
-          <TokenBalance onOpenCredits={() => handleNavigate('ai-credits')} onTopUp={() => handleNavigate('top-up-credits')} />
+          <TokenBalance onOpenCredits={() => handleNavigate('top-up-credits')} language={language} />
           <div key={activePage} className="page-transition">
             {activePage === 'create' ? (
               <CreateHubPage onNavigate={handleNavigate} />
             ) : activePage === 'personalize' || activePage === 'create-persona' || activePage === 'content-pillar' ? (
               <PersonalizePage
                 personaConfig={personaConfig}
+                language={language}
                 onPersonaSaved={handlePersonalizePersonaSaved}
                 initialTab={activePage === 'content-pillar' ? 'content-pillar' : activePage === 'personalize' ? undefined : 'persona'}
                 onNavigate={handleNavigate}
@@ -879,6 +907,7 @@ function AppShell() {
             ) : activePage === 'generate-topic' ? (
               <GenerateTopicPage
                 userId={currentUser?.id || ''}
+                language={language}
                 onContinueToContent={() => handleNavigate('content-engine')}
                 onUpgrade={() => handleNavigate('subscription-plans')}
               />
@@ -894,7 +923,7 @@ function AppShell() {
                 onViewContentBank={() => handleNavigate('content-bank')}
               />
             ) : activePage === 'content-bank' ? (
-              <ContentBankPage userId={currentUser?.id || ''} onNavigate={handleNavigate} />
+              <ContentBankPage userId={currentUser?.id || ''} onNavigate={handleNavigate} language={language} />
             ) : activePage === 'manual-post' ? (
               <ManualPostPage
                 userId={currentUser?.id || ''}
@@ -906,21 +935,24 @@ function AppShell() {
                 threadsStatus={threadsStatus}
                 onConnectThreads={() => handleNavigate('connecting-apps')}
                 onReviewContent={() => handleNavigate('content-bank')}
+                language={language}
               />
             ) : activePage === 'subscription-plans' ? (
-              <SubscriptionPlansPage userId={currentUser?.id || ''} onOpenPayments={() => handleNavigate('payments')} />
+              <SubscriptionPlansPage userId={currentUser?.id || ''} onOpenPayments={() => handleNavigate('payments')} language={language} />
             ) : activePage === 'ai-credits' ? (
-              <AiCreditsPage onTopUp={() => handleNavigate('top-up-credits')} onViewPlans={() => handleNavigate('subscription-plans')} />
+              <AiCreditsPage onTopUp={() => handleNavigate('top-up-credits')} onViewPlans={() => handleNavigate('subscription-plans')} onViewPaymentHistory={() => handleNavigate('payments')} language={language} />
             ) : activePage === 'payments' ? (
-              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} onNewPayment={(productType) => handleNavigate(productType === 'subscription' ? 'subscription-plans' : 'top-up-credits')} />
+              <PaymentsPage onBackToCredits={() => handleNavigate('ai-credits')} onTopUp={() => handleNavigate('top-up-credits')} />
             ) : activePage === 'top-up-credits' ? (
-              <TopUpCreditsPage onBackToCredits={() => handleNavigate('ai-credits')} onPaymentComplete={() => handleNavigate('ai-credits')} onOpenPayments={() => handleNavigate('payments')} />
+              <TopUpCreditsPage onBackToCredits={() => handleNavigate('ai-credits')} onPaymentComplete={() => handleNavigate('ai-credits')} onOpenPayments={() => handleNavigate('payments')} language={language} />
             ) : activePage === 'connecting-apps' ? (
               <ConnectingAppsPage onStatusChange={(status) => {
                 setThreadsStatus(status)
               }} />
             ) : activePage === 'settings' ? (
               <SettingsPage user={currentUser} language={language} onLanguageChange={setLanguage} theme={theme} onThemeChange={setTheme} onReplayTutorial={() => setShowTutorial(true)} onLogout={handleLogout} onNavigate={handleNavigate} />
+            ) : activePage === 'referral' ? (
+              <ReferralPage language={language} />
               ) : (
                 <DashboardPage activePage={activePage} userId={currentUser?.id || ''} onNavigate={handleNavigate} threadsStatus={threadsStatus} />
               )}
@@ -937,6 +969,7 @@ function AppShell() {
             onToggleMore={() => setIsMoreOpen((current) => !current)}
             onCloseMore={() => setIsMoreOpen(false)}
             currentUser={currentUser}
+            language={language}
           />
         ) : null}
       </div>
@@ -944,7 +977,7 @@ function AppShell() {
   }
 
   return (
-    <ToastProvider>
+    <ToastProvider language={language}>
       {content}
       {showTutorial && authStatus === 'authenticated' && !showAdminEntryChoice && personaStatus === 'ready' ? <OnboardingTutorial onComplete={completeTutorial} /> : null}
       {upgradePrompt ? (
